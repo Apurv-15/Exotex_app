@@ -1,7 +1,7 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { API_URL } from '../constants/config';
 import { AuthResponse, User } from '../types';
+import { Storage } from '../utils/storage';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
@@ -35,21 +35,21 @@ export const AuthService = {
     },
 
     logout: async () => {
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
-        await SecureStore.deleteItemAsync(USER_KEY);
+        await Storage.deleteItem(TOKEN_KEY);
+        await Storage.deleteItem(USER_KEY);
     },
 
     getToken: async () => {
-        return await SecureStore.getItemAsync(TOKEN_KEY);
+        return await Storage.getItem(TOKEN_KEY);
     },
 
     getUser: async (): Promise<User | null> => {
-        const userJson = await SecureStore.getItemAsync(USER_KEY);
+        const userJson = await Storage.getItem(USER_KEY);
         return userJson ? JSON.parse(userJson) : null;
     },
 
     saveAuth: async (response: AuthResponse) => {
-        await SecureStore.setItemAsync(TOKEN_KEY, response.token);
-        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(response.user));
+        await Storage.setItem(TOKEN_KEY, response.token);
+        await Storage.setItem(USER_KEY, JSON.stringify(response.user));
     },
 };
