@@ -1,63 +1,95 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { THEME } from '../../constants/config';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Platform } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BarChart } from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get('window').width;
 
-const chartConfig = {
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
-    strokeWidth: 2, // optional, default 3
-    barPercentage: 0.5,
-    useShadowColorFromDataset: false // optional
-};
-
 export default function AnalyticsScreen() {
-    // Mock data for Branch-wise performance
+    const chartWidth = Platform.OS === 'web' ? Math.min(screenWidth - 80, 400) : screenWidth - 80;
+
     const data = {
-        labels: ["Sub 1", "Sub 2", "Sub 3", "Sub 4"],
-        datasets: [
-            {
-                data: [20, 45, 28, 80]
-            }
-        ]
+        labels: ["Branch 1", "Branch 2", "Branch 3", "Branch 4"],
+        datasets: [{ data: [20, 45, 28, 80] }]
     };
+
+    const chartConfig = {
+        backgroundGradientFrom: "#fff",
+        backgroundGradientTo: "#fff",
+        color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
+        barPercentage: 0.6,
+    };
+
+    const topProducts = [
+        { name: 'Inverter Model X', units: 120, color: '#7C3AED' },
+        { name: 'Solar Panel A1', units: 95, color: '#10B981' },
+        { name: 'Battery Pack Pro', units: 80, color: '#F59E0B' },
+    ];
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <Text style={styles.title}>Detailed Analytics</Text>
+            <View style={styles.header}>
+                <View style={styles.headerIcon}>
+                    <MaterialCommunityIcons name="chart-bar" size={24} color="#7C3AED" />
+                </View>
+                <Text style={styles.title}>Detailed Analytics</Text>
+                <Text style={styles.subtitle}>Branch performance overview</Text>
+            </View>
 
             <View style={styles.card}>
-                <Text style={styles.cardTitle}>Branch Performance</Text>
-                <Text style={styles.cardSubtitle}>Sales count per branch</Text>
+                <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="office-building" size={18} color="#7C3AED" />
+                    <Text style={styles.cardTitle}>Branch Performance</Text>
+                </View>
                 <BarChart
                     data={data}
-                    width={screenWidth - 64}
-                    height={220}
+                    width={chartWidth}
+                    height={200}
                     yAxisLabel=""
                     yAxisSuffix=""
                     chartConfig={chartConfig}
-                    verticalLabelRotation={0}
                     style={styles.chart}
                     showValuesOnTopOfBars
                 />
             </View>
 
             <View style={styles.card}>
-                <Text style={styles.cardTitle}>Top Products</Text>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>1. Inverter Model X</Text>
-                    <Text style={styles.rowValue}>120 units</Text>
+                <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="trophy" size={18} color="#F59E0B" />
+                    <Text style={styles.cardTitle}>Top Products</Text>
                 </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>2. Solar Panel A1</Text>
-                    <Text style={styles.rowValue}>95 units</Text>
+                {topProducts.map((product, index) => (
+                    <View key={index} style={styles.productRow}>
+                        <View style={styles.productRank}>
+                            <Text style={styles.rankText}>{index + 1}</Text>
+                        </View>
+                        <View style={styles.productInfo}>
+                            <Text style={styles.productName}>{product.name}</Text>
+                            <View style={styles.progressBar}>
+                                <View style={[styles.progressFill, { width: `${(product.units / 120) * 100}%`, backgroundColor: product.color }]} />
+                            </View>
+                        </View>
+                        <Text style={[styles.productUnits, { color: product.color }]}>{product.units}</Text>
+                    </View>
+                ))}
+            </View>
+
+            <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="information" size={18} color="#3B82F6" />
+                    <Text style={styles.cardTitle}>Summary</Text>
                 </View>
-                <View style={styles.row}>
-                    <Text style={styles.rowLabel}>3. Battery Pack Pro</Text>
-                    <Text style={styles.rowValue}>80 units</Text>
+                <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Total Revenue</Text>
+                    <Text style={styles.summaryValue}>₹12,50,000</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Active Warranties</Text>
+                    <Text style={styles.summaryValue}>245</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Avg. Daily Sales</Text>
+                    <Text style={styles.summaryValue}>12</Text>
                 </View>
             </View>
         </ScrollView>
@@ -65,58 +97,25 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: THEME.colors.surface,
-    },
-    content: {
-        padding: THEME.spacing.l,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: THEME.colors.text,
-        marginBottom: THEME.spacing.l,
-    },
-    card: {
-        backgroundColor: 'white',
-        borderRadius: THEME.borderRadius.l,
-        padding: THEME.spacing.m,
-        marginBottom: THEME.spacing.m,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    cardTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: THEME.colors.text,
-        marginBottom: 4,
-    },
-    cardSubtitle: {
-        fontSize: 14,
-        color: THEME.colors.textSecondary,
-        marginBottom: THEME.spacing.m,
-    },
-    chart: {
-        borderRadius: 16,
-    },
-    row: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: THEME.colors.border,
-    },
-    rowLabel: {
-        fontSize: 16,
-        color: THEME.colors.text,
-    },
-    rowValue: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: THEME.colors.primary,
-    }
+    container: { flex: 1, backgroundColor: '#FAFAFA' },
+    content: { padding: 20 },
+    header: { alignItems: 'center', marginBottom: 24 },
+    headerIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#EDE9FE', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+    title: { fontSize: 24, fontWeight: '700', color: '#1A1A1A' },
+    subtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+    card: { backgroundColor: 'white', borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+    cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
+    cardTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+    chart: { borderRadius: 12 },
+    productRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    productRank: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#EDE9FE', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    rankText: { fontSize: 12, fontWeight: '700', color: '#7C3AED' },
+    productInfo: { flex: 1 },
+    productName: { fontSize: 14, fontWeight: '600', color: '#1A1A1A', marginBottom: 6 },
+    progressBar: { height: 6, backgroundColor: '#F3F4F6', borderRadius: 3, overflow: 'hidden' },
+    progressFill: { height: '100%', borderRadius: 3 },
+    productUnits: { fontSize: 16, fontWeight: '700', marginLeft: 12 },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    summaryLabel: { fontSize: 14, color: '#6B7280' },
+    summaryValue: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
 });
