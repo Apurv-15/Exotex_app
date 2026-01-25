@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/config';
 import { SalesService, Sale } from '../../services/SalesService';
-import DashboardCard from '../../components/DashboardCard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SubBranchDashboard() {
     const { logout, user } = useAuth();
@@ -41,74 +41,123 @@ export default function SubBranchDashboard() {
     const todaySales = sales.filter(s => s.saleDate === new Date().toISOString().split('T')[0]).length;
     const warrantiesGenerated = sales.filter(s => s.warrantyId).length;
 
-    const renderSaleItem = ({ item }: { item: Sale }) => (
-        <View style={styles.saleItem}>
+    const renderSaleItem = (item: Sale) => (
+        <Pressable
+            key={item.id}
+            style={({ pressed }) => [styles.saleItem, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+        >
+            <View style={[styles.saleIcon, { backgroundColor: item.status === 'approved' ? '#E8F5E9' : '#FFF3E0' }]}>
+                <MaterialCommunityIcons
+                    name={item.status === 'approved' ? 'check-circle' : 'clock-outline'}
+                    size={20}
+                    color={item.status === 'approved' ? '#4CAF50' : '#FF9800'}
+                />
+            </View>
             <View style={styles.saleInfo}>
                 <Text style={styles.productName}>{item.productModel}</Text>
                 <Text style={styles.customerName}>{item.customerName}</Text>
             </View>
             <View style={styles.saleMeta}>
                 <Text style={styles.date}>{item.saleDate}</Text>
-                <Text style={[styles.status, { color: item.status === 'approved' ? THEME.colors.success : THEME.colors.primary }]}>
+                <Text style={[styles.status, { color: item.status === 'approved' ? '#4CAF50' : '#FF9800' }]}>
                     {item.status.toUpperCase()}
                 </Text>
             </View>
-        </View>
+        </Pressable>
     );
 
     return (
         <View style={styles.container}>
             <ScrollView
                 contentContainerStyle={styles.content}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    Platform.OS !== 'web' ? (
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    ) : undefined
+                }
             >
-                <View style={styles.welcomeSection}>
-                    <Text style={styles.greeting}>Hello, {user?.name}</Text>
-                    <Text style={styles.branch}>Sub Branch Limitied</Text>
+                {/* Header */}
+                <View style={styles.header}>
+                    <View>
+                        <Text style={styles.greeting}>Hello, {user?.name}</Text>
+                        <Text style={styles.subtitle}>Make your sales tracking easy</Text>
+                    </View>
+                    <Pressable
+                        onPress={logout}
+                        style={({ pressed }) => [styles.avatarContainer, pressed && { opacity: 0.7 }]}
+                    >
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
+                        </View>
+                    </Pressable>
                 </View>
 
-                <View style={styles.statsGrid}>
-                    <DashboardCard
-                        title="Total Sales"
-                        value={totalSales}
-                        icon="chart-line"
-                        color={THEME.colors.primary}
-                        style={{ flex: 1, marginRight: THEME.spacing.s }}
-                    />
-                    <DashboardCard
-                        title="Today's Sales"
-                        value={todaySales}
-                        icon="calendar-today"
-                        color={THEME.colors.success}
-                        style={{ flex: 1, marginLeft: THEME.spacing.s }}
-                    />
-                </View>
-                <DashboardCard
-                    title="Warranties Generated"
-                    value={warrantiesGenerated}
-                    icon="shield-check"
-                    color="#FF9500"
-                />
+                {/* Bento Grid Stats */}
+                <View style={styles.bentoGrid}>
+                    {/* Large Card - Total Sales */}
+                    <Pressable style={({ pressed }) => [styles.bentoCardLarge, pressed && { transform: [{ scale: 0.98 }] }]}>
+                        <View style={styles.bentoIconPurple}>
+                            <MaterialCommunityIcons name="chart-line" size={24} color="#7C3AED" />
+                        </View>
+                        <Text style={styles.bentoValue}>{totalSales}</Text>
+                        <Text style={styles.bentoLabel}>Total Sales</Text>
+                        <Text style={styles.bentoSubtext}>All time records</Text>
+                    </Pressable>
 
-                <TouchableOpacity
-                    style={styles.createButton}
+                    <View style={styles.bentoRight}>
+                        {/* Small Card - Today */}
+                        <Pressable style={({ pressed }) => [styles.bentoCardSmall, styles.bentoYellow, pressed && { transform: [{ scale: 0.98 }] }]}>
+                            <View style={styles.newBadge}>
+                                <Text style={styles.newBadgeText}>Today</Text>
+                            </View>
+                            <Text style={styles.bentoValueDark}>{todaySales}</Text>
+                            <Text style={styles.bentoLabelDark}>Sales Today</Text>
+                        </Pressable>
+
+                        {/* Small Card - Warranties */}
+                        <Pressable style={({ pressed }) => [styles.bentoCardSmall, styles.bentoDark, pressed && { transform: [{ scale: 0.98 }] }]}>
+                            <View style={styles.bentoIconDark}>
+                                <MaterialCommunityIcons name="shield-check" size={20} color="#FFF" />
+                            </View>
+                            <Text style={styles.bentoValueLight}>{warrantiesGenerated}</Text>
+                            <Text style={styles.bentoLabelLight}>Warranties</Text>
+                        </Pressable>
+                    </View>
+                </View>
+
+                {/* Create New Sale Button */}
+                <Pressable
+                    style={({ pressed }) => [styles.createButton, pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }]}
                     onPress={() => navigation.navigate('CreateSaleStep1')}
                 >
-                    <MaterialCommunityIcons name="plus" size={24} color="white" />
-                    <Text style={styles.createButtonText}>Create New Sale</Text>
-                </TouchableOpacity>
+                    <LinearGradient
+                        colors={['#7C3AED', '#5B21B6']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.gradientButton}
+                    >
+                        <MaterialCommunityIcons name="plus" size={22} color="white" />
+                        <Text style={styles.createButtonText}>Create New Sale</Text>
+                    </LinearGradient>
+                </Pressable>
 
-                <View style={styles.recentTitleHeader}>
+                {/* Recent Sales Section */}
+                <View style={styles.recentHeader}>
                     <Text style={styles.sectionTitle}>Recent Sales</Text>
-                    <TouchableOpacity onPress={logout}>
-                        <Text style={styles.logoutText}>Logout</Text>
-                    </TouchableOpacity>
+                    <Pressable onPress={logout} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+                        <Text style={styles.seeAllText}>Logout</Text>
+                    </Pressable>
                 </View>
 
                 {sales.length === 0 ? (
-                    <Text style={styles.emptyText}>No sales recorded yet.</Text>
+                    <View style={styles.emptyState}>
+                        <MaterialCommunityIcons name="inbox-outline" size={48} color="#C7C7CC" />
+                        <Text style={styles.emptyText}>No sales recorded yet</Text>
+                        <Text style={styles.emptySubtext}>Create your first sale to get started</Text>
+                    </View>
                 ) : (
-                    sales.map(item => <View key={item.id}>{renderSaleItem({ item })}</View>)
+                    sales.map(item => renderSaleItem(item))
                 )}
             </ScrollView>
         </View>
@@ -118,83 +167,216 @@ export default function SubBranchDashboard() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: THEME.colors.surface,
+        backgroundColor: '#FAFAFA',
     },
     content: {
-        padding: THEME.spacing.m,
+        padding: 20,
+        paddingBottom: 40,
     },
-    welcomeSection: {
-        marginBottom: THEME.spacing.l,
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
     },
     greeting: {
         fontSize: 28,
         fontWeight: '700',
-        color: THEME.colors.text,
+        color: '#1A1A1A',
+        letterSpacing: -0.5,
     },
-    branch: {
+    subtitle: {
         fontSize: 15,
-        color: THEME.colors.textSecondary,
+        color: '#888',
+        marginTop: 2,
     },
-    statsGrid: {
+    avatarContainer: {
+        cursor: 'pointer',
+    } as any,
+    avatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#7C3AED',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    bentoGrid: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: THEME.spacing.s,
+        gap: 12,
+        marginBottom: 20,
+    },
+    bentoCardLarge: {
+        flex: 1,
+        backgroundColor: '#EDE9FE',
+        borderRadius: 24,
+        padding: 20,
+        minHeight: 180,
+        justifyContent: 'flex-end',
+        cursor: 'pointer',
+    } as any,
+    bentoIconPurple: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(124, 58, 237, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 'auto',
+    },
+    bentoValue: {
+        fontSize: 42,
+        fontWeight: '700',
+        color: '#5B21B6',
+        marginTop: 12,
+    },
+    bentoLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#7C3AED',
+    },
+    bentoSubtext: {
+        fontSize: 12,
+        color: '#8B5CF6',
+        marginTop: 2,
+    },
+    bentoRight: {
+        flex: 1,
+        gap: 12,
+    },
+    bentoCardSmall: {
+        flex: 1,
+        borderRadius: 20,
+        padding: 16,
+        justifyContent: 'center',
+        cursor: 'pointer',
+    } as any,
+    bentoYellow: {
+        backgroundColor: '#FEF3C7',
+    },
+    bentoDark: {
+        backgroundColor: '#1F2937',
+    },
+    newBadge: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        backgroundColor: '#F59E0B',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    newBadgeText: {
+        color: 'white',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    bentoIconDark: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    bentoValueDark: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#92400E',
+    },
+    bentoLabelDark: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#B45309',
+    },
+    bentoValueLight: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#FFF',
+    },
+    bentoLabelLight: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(255,255,255,0.7)',
     },
     createButton: {
-        backgroundColor: THEME.colors.primary,
+        marginBottom: 24,
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: '#7C3AED',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    gradientButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: THEME.spacing.m,
-        borderRadius: THEME.borderRadius.m,
-        marginVertical: THEME.spacing.l,
-        shadowColor: THEME.colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        paddingVertical: 16,
+        gap: 8,
     },
     createButtonText: {
         color: 'white',
-        fontSize: 17,
-        fontWeight: '600',
-        marginLeft: THEME.spacing.s,
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    recentHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
     },
     sectionTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: THEME.colors.text,
+        color: '#1A1A1A',
     },
-    recentTitleHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: THEME.spacing.m
-    },
-    logoutText: {
-        color: THEME.colors.error,
-        fontSize: 15
-    },
+    seeAllText: {
+        fontSize: 14,
+        color: '#EF4444',
+        fontWeight: '600',
+        cursor: 'pointer',
+    } as any,
     saleItem: {
         backgroundColor: 'white',
-        padding: THEME.spacing.m,
-        borderRadius: THEME.borderRadius.m,
-        marginBottom: THEME.spacing.s,
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 10,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+        cursor: 'pointer',
+    } as any,
+    saleIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
     saleInfo: {
         flex: 1,
     },
     productName: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
-        color: THEME.colors.text,
+        color: '#1A1A1A',
     },
     customerName: {
-        fontSize: 14,
-        color: THEME.colors.textSecondary,
+        fontSize: 13,
+        color: '#888',
         marginTop: 2,
     },
     saleMeta: {
@@ -202,16 +384,26 @@ const styles = StyleSheet.create({
     },
     date: {
         fontSize: 12,
-        color: THEME.colors.textSecondary,
+        color: '#999',
     },
     status: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         marginTop: 4,
     },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
     emptyText: {
-        textAlign: 'center',
-        color: THEME.colors.textSecondary,
-        marginTop: 20,
-    }
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#888',
+        marginTop: 12,
+    },
+    emptySubtext: {
+        fontSize: 13,
+        color: '#AAA',
+        marginTop: 4,
+    },
 });
