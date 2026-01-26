@@ -13,11 +13,16 @@ export default function CreateSaleStep1() {
         city: '',
         productModel: '',
         serialNumber: '',
+        paymentConfirmed: false
     });
-    const [paymentReceived, setPaymentReceived] = useState(false);
 
-    const handleChange = (field: string, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+    const isStep1Valid = () => {
+        return (
+            formData.customerName.trim() !== '' &&
+            formData.phone.trim() !== '' &&
+            formData.productModel.trim() !== '' &&
+            formData.serialNumber.trim() !== ''
+        );
     };
 
     const showAlert = (title: string, message: string) => {
@@ -29,209 +34,167 @@ export default function CreateSaleStep1() {
     };
 
     const handleNext = () => {
-        const { customerName, phone, productModel, serialNumber } = formData;
-        if (!customerName || !phone || !productModel || !serialNumber) {
+        if (!isStep1Valid()) {
             showAlert('Missing Fields', 'Please fill in all required fields.');
             return;
         }
 
-        if (!paymentReceived) {
-            showAlert('Payment Required', 'Without amount received, warranty card cannot be generated. Please confirm payment first.');
+        if (!formData.paymentConfirmed) {
+            showAlert('Payment Required', 'Warranty card can only be generated after payment confirmation.');
             return;
         }
 
-        navigation.navigate('CreateSaleStep2', { formData, paymentReceived });
+        navigation.navigate('CreateSaleStep2', { formData });
     };
 
     return (
         <View style={styles.container}>
+            <LinearGradient
+                colors={['#F0F9FF', '#FFFFFF']}
+                style={StyleSheet.absoluteFill}
+            />
             <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.content}
+                contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Customer Details Section */}
+                <View style={styles.header}>
+                    <Text style={styles.title}>New Sale Entry</Text>
+                    <Text style={styles.subtitle}>Enter customer and product details</Text>
+                </View>
+
+                {/* Customer Information */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <View style={styles.sectionIcon}>
-                            <MaterialCommunityIcons name="account-outline" size={20} color="#7C3AED" />
-                        </View>
-                        <Text style={styles.sectionTitle}>Customer Details</Text>
+                        <MaterialCommunityIcons name="account-outline" size={20} color="#7C3AED" />
+                        <Text style={styles.sectionTitle}>Customer Information</Text>
                     </View>
-
-                    <View style={styles.inputWrapper}>
-                        <Text style={styles.label}>Full Name</Text>
+                    <View style={styles.card}>
                         <View style={styles.inputContainer}>
-                            <MaterialCommunityIcons name="account" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                            <Text style={styles.label}>Full Name</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Enter customer name"
-                                placeholderTextColor="#9CA3AF"
                                 value={formData.customerName}
-                                onChangeText={(text) => handleChange('customerName', text)}
+                                onChangeText={(text) => setFormData({ ...formData, customerName: text })}
                             />
                         </View>
-                    </View>
 
-                    <View style={styles.row}>
-                        <View style={[styles.inputWrapper, { flex: 1, marginRight: 8 }]}>
-                            <Text style={styles.label}>Phone</Text>
-                            <View style={styles.inputContainer}>
-                                <MaterialCommunityIcons name="phone" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                        <View style={styles.row}>
+                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                <Text style={styles.label}>Phone Number</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="9876543210"
-                                    placeholderTextColor="#9CA3AF"
                                     keyboardType="phone-pad"
                                     value={formData.phone}
-                                    onChangeText={(text) => handleChange('phone', text)}
+                                    onChangeText={(text) => setFormData({ ...formData, phone: text })}
                                 />
                             </View>
-                        </View>
-                        <View style={[styles.inputWrapper, { flex: 1, marginLeft: 8 }]}>
-                            <Text style={styles.label}>City</Text>
-                            <View style={styles.inputContainer}>
-                                <MaterialCommunityIcons name="map-marker" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                            <View style={[styles.inputContainer, { flex: 1 }]}>
+                                <Text style={styles.label}>City</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Mumbai"
-                                    placeholderTextColor="#9CA3AF"
                                     value={formData.city}
-                                    onChangeText={(text) => handleChange('city', text)}
+                                    onChangeText={(text) => setFormData({ ...formData, city: text })}
                                 />
                             </View>
                         </View>
-                    </View>
 
-                    <View style={styles.inputWrapper}>
-                        <Text style={styles.label}>Email <Text style={styles.optional}>(Optional)</Text></Text>
-                        <View style={styles.inputContainer}>
-                            <MaterialCommunityIcons name="email-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                        <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
+                            <Text style={styles.label}>Email Address (Optional)</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="john@example.com"
-                                placeholderTextColor="#9CA3AF"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 value={formData.email}
-                                onChangeText={(text) => handleChange('email', text)}
+                                onChangeText={(text) => setFormData({ ...formData, email: text })}
                             />
                         </View>
                     </View>
                 </View>
 
-                {/* Product Details Section */}
+                {/* Product Information */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <View style={[styles.sectionIcon, { backgroundColor: '#FEF3C7' }]}>
-                            <MaterialCommunityIcons name="cube-outline" size={20} color="#F59E0B" />
-                        </View>
+                        <MaterialCommunityIcons name="cube-outline" size={20} color="#7C3AED" />
                         <Text style={styles.sectionTitle}>Product Details</Text>
                     </View>
-
-                    <View style={styles.inputWrapper}>
-                        <Text style={styles.label}>Product Model</Text>
+                    <View style={styles.card}>
                         <View style={styles.inputContainer}>
-                            <MaterialCommunityIcons name="tag-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                            <Text style={styles.label}>Product Model</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g. Inverter Model X"
-                                placeholderTextColor="#9CA3AF"
                                 value={formData.productModel}
-                                onChangeText={(text) => handleChange('productModel', text)}
+                                onChangeText={(text) => setFormData({ ...formData, productModel: text })}
                             />
                         </View>
-                    </View>
 
-                    <View style={styles.inputWrapper}>
-                        <Text style={styles.label}>Serial Number</Text>
-                        <View style={styles.inputContainer}>
-                            <MaterialCommunityIcons name="barcode" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                        <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
+                            <Text style={styles.label}>Serial Number</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="SN12345678"
-                                placeholderTextColor="#9CA3AF"
+                                autoCapitalize="characters"
                                 value={formData.serialNumber}
-                                onChangeText={(text) => handleChange('serialNumber', text)}
+                                onChangeText={(text) => setFormData({ ...formData, serialNumber: text })}
                             />
                         </View>
                     </View>
                 </View>
 
-                {/* Payment Section */}
+                {/* Payment Confirmation */}
                 <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <View style={[styles.sectionIcon, { backgroundColor: '#D1FAE5' }]}>
-                            <MaterialCommunityIcons name="cash" size={20} color="#10B981" />
-                        </View>
-                        <Text style={styles.sectionTitle}>Payment Confirmation</Text>
-                    </View>
-
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.paymentCard,
-                            paymentReceived && styles.paymentCardActive,
-                            pressed && { transform: [{ scale: 0.98 }] }
-                        ]}
-                        onPress={() => setPaymentReceived(!paymentReceived)}
-                    >
-                        <View style={[styles.checkbox, paymentReceived && styles.checkboxActive]}>
-                            {paymentReceived && (
-                                <MaterialCommunityIcons name="check" size={16} color="white" />
-                            )}
-                        </View>
+                    <View style={[styles.card, styles.paymentCard, formData.paymentConfirmed && styles.paymentCardActive]}>
                         <View style={styles.paymentInfo}>
-                            <Text style={[styles.paymentText, paymentReceived && styles.paymentTextActive]}>
-                                Payment Received
-                            </Text>
-                            <Text style={styles.paymentSubtext}>
-                                {paymentReceived ? 'Ready to proceed' : 'Tap to confirm payment'}
-                            </Text>
-                        </View>
-                        {paymentReceived && (
-                            <View style={styles.verifiedBadge}>
-                                <MaterialCommunityIcons name="check-circle" size={24} color="#10B981" />
+                            <MaterialCommunityIcons
+                                name={formData.paymentConfirmed ? "cash-check" : "cash-remove"}
+                                size={24}
+                                color={formData.paymentConfirmed ? "#10B981" : "#EF4444"}
+                            />
+                            <View style={styles.paymentTextContainer}>
+                                <Text style={styles.paymentTitle}>Payment Received?</Text>
+                                <Text style={styles.paymentSubtitle}>Confirm before proceeding</Text>
                             </View>
-                        )}
-                    </Pressable>
-
-                    {!paymentReceived && (
-                        <View style={styles.warningBox}>
-                            <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#F59E0B" />
-                            <Text style={styles.warningText}>
-                                Warranty card can only be generated after payment confirmation
-                            </Text>
                         </View>
-                    )}
+                        <Pressable
+                            onPress={() => setFormData({ ...formData, paymentConfirmed: !formData.paymentConfirmed })}
+                            style={[styles.toggleContainer, formData.paymentConfirmed && styles.toggleActive]}
+                        >
+                            <View style={[styles.toggleCircle, formData.paymentConfirmed && styles.toggleCircleActive]} />
+                        </Pressable>
+                    </View>
                 </View>
+
+                <View style={{ height: 120 }} />
             </ScrollView>
 
-            {/* Fixed Bottom Button */}
+            {/* Footer Button */}
             <View style={styles.footer}>
                 <Pressable
                     style={({ pressed }) => [
-                        styles.nextButton,
-                        pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-                        !paymentReceived && styles.nextButtonDisabled
+                        styles.button,
+                        (!formData.paymentConfirmed || !isStep1Valid()) && styles.buttonDisabled,
+                        pressed && !(!formData.paymentConfirmed || !isStep1Valid()) && { opacity: 0.9, transform: [{ scale: 0.98 }] }
                     ]}
                     onPress={handleNext}
+                    disabled={!formData.paymentConfirmed || !isStep1Valid()}
                 >
-                    {paymentReceived ? (
-                        <LinearGradient
-                            colors={['#7C3AED', '#5B21B6']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.gradientButton}
-                        >
-                            <Text style={styles.nextButtonText}>Continue to Upload</Text>
-                            <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
-                        </LinearGradient>
-                    ) : (
-                        <View style={styles.disabledButton}>
-                            <Text style={styles.nextButtonTextDisabled}>Confirm Payment First</Text>
-                        </View>
-                    )}
+                    <LinearGradient
+                        colors={formData.paymentConfirmed && isStep1Valid() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.gradientButton}
+                    >
+                        <Text style={styles.buttonText}>Continue to Photos</Text>
+                        <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+                    </LinearGradient>
                 </Pressable>
+                {!formData.paymentConfirmed && isStep1Valid() && (
+                    <Text style={styles.warningText}>Please confirm payment to continue</Text>
+                )}
             </View>
         </View>
     );
@@ -240,14 +203,24 @@ export default function CreateSaleStep1() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
+        backgroundColor: '#FFFFFF',
     },
-    scrollView: {
-        flex: 1,
-    },
-    content: {
+    scrollContent: {
         padding: 20,
-        paddingBottom: 100,
+    },
+    header: {
+        marginBottom: 24,
+        marginTop: 10,
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    subtitle: {
+        fontSize: 15,
+        color: '#6B7280',
+        marginTop: 4,
     },
     section: {
         marginBottom: 24,
@@ -255,169 +228,130 @@ const styles = StyleSheet.create({
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
-    },
-    sectionIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#EDE9FE',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
+        marginBottom: 12,
+        gap: 8,
+        paddingLeft: 4,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '700',
-        color: '#1A1A1A',
+        color: '#4B5563',
     },
-    inputWrapper: {
-        marginBottom: 16,
+    card: {
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 20,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
     },
     row: {
         flexDirection: 'row',
     },
-    label: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#6B7280',
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    optional: {
-        color: '#9CA3AF',
-        fontWeight: '400',
-    },
     inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'white',
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: '#E5E7EB',
-        paddingHorizontal: 14,
-        height: 52,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 1,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
     },
-    inputIcon: {
-        marginRight: 10,
+    label: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#9CA3AF',
+        marginBottom: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     input: {
-        flex: 1,
-        fontSize: 15,
+        fontSize: 16,
         color: '#1A1A1A',
-        outlineStyle: 'none',
-    } as any,
+        paddingVertical: 4,
+    },
     paymentCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'white',
-        padding: 18,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#E5E7EB',
-        cursor: 'pointer',
-    } as any,
+        justifyContent: 'space-between',
+        paddingVertical: 20,
+    },
     paymentCardActive: {
-        borderColor: '#10B981',
-        backgroundColor: '#ECFDF5',
-    },
-    checkbox: {
-        width: 26,
-        height: 26,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#D1D5DB',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 14,
-    },
-    checkboxActive: {
-        backgroundColor: '#10B981',
+        backgroundColor: '#F0FDF4',
         borderColor: '#10B981',
     },
     paymentInfo: {
-        flex: 1,
-    },
-    paymentText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#6B7280',
-    },
-    paymentTextActive: {
-        color: '#059669',
-    },
-    paymentSubtext: {
-        fontSize: 12,
-        color: '#9CA3AF',
-        marginTop: 2,
-    },
-    verifiedBadge: {
-        marginLeft: 8,
-    },
-    warningBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFBEB',
-        padding: 14,
-        borderRadius: 12,
-        marginTop: 12,
-        gap: 10,
+        gap: 12,
     },
-    warningText: {
-        flex: 1,
-        color: '#B45309',
-        fontSize: 13,
-        lineHeight: 18,
+    paymentTextContainer: {
+        gap: 2,
+    },
+    paymentTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    paymentSubtitle: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    toggleContainer: {
+        width: 52,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#E5E7EB',
+        padding: 4,
+    },
+    toggleActive: {
+        backgroundColor: '#10B981',
+    },
+    toggleCircle: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: 'white',
+        transform: [{ translateX: 0 }],
+    },
+    toggleCircleActive: {
+        transform: [{ translateX: 24 }],
     },
     footer: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
         padding: 20,
-        backgroundColor: '#FAFAFA',
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
     },
-    nextButton: {
+    button: {
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 8,
     },
-    nextButtonDisabled: {
-        shadowOpacity: 0,
-        elevation: 0,
+    buttonDisabled: {
+        opacity: 0.6,
     },
     gradientButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 18,
-        gap: 8,
+        gap: 10,
     },
-    disabledButton: {
-        backgroundColor: '#E5E7EB',
-        paddingVertical: 18,
-        alignItems: 'center',
-        borderRadius: 16,
-    },
-    nextButtonText: {
+    buttonText: {
         color: 'white',
         fontSize: 16,
         fontWeight: '700',
     },
-    nextButtonTextDisabled: {
-        color: '#9CA3AF',
-        fontSize: 16,
+    warningText: {
+        textAlign: 'center',
+        color: '#EF4444',
+        fontSize: 12,
         fontWeight: '600',
+        marginTop: 10,
     },
 });

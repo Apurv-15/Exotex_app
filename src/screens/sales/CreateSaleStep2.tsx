@@ -8,10 +8,10 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const IMAGE_CONFIG = [
-    { label: 'Product Front', icon: 'image', color: '#7C3AED', bg: '#EDE9FE' },
-    { label: 'Serial Number', icon: 'barcode', color: '#F59E0B', bg: '#FEF3C7' },
-    { label: 'Invoice/Bill', icon: 'receipt', color: '#10B981', bg: '#D1FAE5' },
-    { label: 'Installation', icon: 'tools', color: '#3B82F6', bg: '#DBEAFE' },
+    { label: 'Product Front', icon: 'image', color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.1)' },
+    { label: 'Serial Number', icon: 'barcode', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)' },
+    { label: 'Invoice/Bill', icon: 'receipt', color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' },
+    { label: 'Installation', icon: 'tools', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)' },
 ];
 
 export default function CreateSaleStep2() {
@@ -53,10 +53,10 @@ export default function CreateSaleStep2() {
     };
 
     const handleSubmit = async () => {
-        const validImages = images.filter(img => img && img.length > 0);
+        const validImagesCount = images.filter(img => img && img.length > 0).length;
 
-        if (validImages.length < 4) {
-            showAlert('Images Required', `Please upload all 4 product images. You have uploaded ${validImages.length}/4 images.`);
+        if (validImagesCount < 4) {
+            showAlert('Images Required', `Please upload all 4 product images. You have uploaded ${validImagesCount}/4 images.`);
             return;
         }
 
@@ -81,6 +81,10 @@ export default function CreateSaleStep2() {
 
     return (
         <View style={styles.container}>
+            <LinearGradient
+                colors={['#F0F9FF', '#FFFFFF']}
+                style={StyleSheet.absoluteFill}
+            />
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={styles.header}>
@@ -93,8 +97,14 @@ export default function CreateSaleStep2() {
                     </Text>
                 </View>
 
-                {/* Progress */}
-                <View style={styles.progressSection}>
+                {/* Progress Card */}
+                <View style={styles.card}>
+                    <View style={styles.progressHeader}>
+                        <Text style={styles.progressLabel}>Upload Progress</Text>
+                        <Text style={[styles.progressValue, allImagesUploaded && { color: '#10B981' }]}>
+                            {validImagesCount}/4 Files {allImagesUploaded && '✓'}
+                        </Text>
+                    </View>
                     <View style={styles.progressBar}>
                         <LinearGradient
                             colors={allImagesUploaded ? ['#10B981', '#059669'] : ['#7C3AED', '#5B21B6']}
@@ -103,9 +113,6 @@ export default function CreateSaleStep2() {
                             style={[styles.progressFill, { width: `${(validImagesCount / 4) * 100}%` }]}
                         />
                     </View>
-                    <Text style={[styles.progressText, allImagesUploaded && { color: '#10B981' }]}>
-                        {validImagesCount}/4 uploaded {allImagesUploaded && '✓'}
-                    </Text>
                 </View>
 
                 {/* Image Grid */}
@@ -146,14 +153,7 @@ export default function CreateSaleStep2() {
                     ))}
                 </View>
 
-                {!allImagesUploaded && (
-                    <View style={styles.warningBox}>
-                        <MaterialCommunityIcons name="information-outline" size={18} color="#7C3AED" />
-                        <Text style={styles.warningText}>
-                            Upload all images to proceed with warranty generation
-                        </Text>
-                    </View>
-                )}
+                <View style={{ height: 120 }} />
             </ScrollView>
 
             {/* Fixed Bottom */}
@@ -161,33 +161,27 @@ export default function CreateSaleStep2() {
                 <Pressable
                     style={({ pressed }) => [
                         styles.submitButton,
-                        pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-                        !allImagesUploaded && styles.submitButtonDisabled
+                        pressed && !(!allImagesUploaded || submitting) && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+                        (!allImagesUploaded || submitting) && styles.submitButtonDisabled
                     ]}
                     onPress={handleSubmit}
                     disabled={submitting || !allImagesUploaded}
                 >
-                    {allImagesUploaded ? (
-                        <LinearGradient
-                            colors={['#10B981', '#059669']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.gradientButton}
-                        >
-                            {submitting ? (
-                                <ActivityIndicator color="white" />
-                            ) : (
-                                <>
-                                    <MaterialCommunityIcons name="shield-check" size={20} color="white" />
-                                    <Text style={styles.submitButtonText}>Generate Warranty</Text>
-                                </>
-                            )}
-                        </LinearGradient>
-                    ) : (
-                        <View style={styles.disabledButton}>
-                            <Text style={styles.disabledButtonText}>Upload All Images First</Text>
-                        </View>
-                    )}
+                    <LinearGradient
+                        colors={allImagesUploaded ? ['#10B981', '#059669'] : ['#E5E7EB', '#D1D5DB']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.gradientButton}
+                    >
+                        {submitting ? (
+                            <ActivityIndicator color="white" />
+                        ) : (
+                            <>
+                                <MaterialCommunityIcons name="shield-check" size={20} color="white" />
+                                <Text style={styles.submitButtonText}>Generate Warranty</Text>
+                            </>
+                        )}
+                    </LinearGradient>
                 </Pressable>
             </View>
         </View>
@@ -197,15 +191,15 @@ export default function CreateSaleStep2() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
+        backgroundColor: '#FFFFFF',
     },
     content: {
         padding: 20,
-        paddingBottom: 100,
     },
     header: {
         alignItems: 'center',
         marginBottom: 24,
+        marginTop: 10,
     },
     headerIcon: {
         width: 56,
@@ -217,7 +211,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     title: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '700',
         color: '#1A1A1A',
         textAlign: 'center',
@@ -228,25 +222,44 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 8,
     },
-    progressSection: {
+    card: {
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 20,
+        padding: 20,
         marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
+    },
+    progressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    progressLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#4B5563',
+    },
+    progressValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#7C3AED',
     },
     progressBar: {
         height: 8,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: '#F3F4F6',
         borderRadius: 4,
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
         borderRadius: 4,
-    },
-    progressText: {
-        textAlign: 'center',
-        marginTop: 8,
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#7C3AED',
     },
     imageGrid: {
         flexDirection: 'row',
@@ -256,14 +269,13 @@ const styles = StyleSheet.create({
     imageSlot: {
         width: '48%',
         aspectRatio: 1,
-        borderRadius: 16,
+        borderRadius: 20,
         overflow: 'hidden',
-        cursor: 'pointer',
-    } as any,
+    },
     imageContainer: {
         width: '100%',
         height: '100%',
-        borderRadius: 16,
+        borderRadius: 20,
         overflow: 'hidden',
     },
     image: {
@@ -272,35 +284,34 @@ const styles = StyleSheet.create({
     },
     removeButton: {
         position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        top: 10,
+        right: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 12,
         padding: 6,
-        cursor: 'pointer',
-    } as any,
+    },
     imageOverlay: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: 'rgba(255,255,255,0.95)',
+        backgroundColor: 'rgba(255,255,255,0.9)',
         flexDirection: 'row',
         alignItems: 'center',
         padding: 10,
         gap: 6,
     },
     imageLabelDone: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         color: '#1A1A1A',
     },
     emptySlot: {
         width: '100%',
         height: '100%',
-        backgroundColor: 'white',
-        borderRadius: 16,
-        borderWidth: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        borderRadius: 20,
+        borderWidth: 1.5,
         borderColor: '#E5E7EB',
         borderStyle: 'dashed',
         justifyContent: 'center',
@@ -308,37 +319,23 @@ const styles = StyleSheet.create({
         padding: 12,
     },
     slotIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
     },
     slotLabel: {
-        fontSize: 13,
-        fontWeight: '600',
+        fontSize: 12,
+        fontWeight: '700',
         color: '#1A1A1A',
         textAlign: 'center',
     },
     slotAction: {
-        fontSize: 11,
+        fontSize: 10,
         color: '#9CA3AF',
         marginTop: 4,
-    },
-    warningBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#EDE9FE',
-        padding: 14,
-        borderRadius: 12,
-        marginTop: 20,
-        gap: 10,
-    },
-    warningText: {
-        flex: 1,
-        color: '#5B21B6',
-        fontSize: 13,
     },
     footer: {
         position: 'absolute',
@@ -346,22 +343,17 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         padding: 20,
-        backgroundColor: '#FAFAFA',
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
     },
     submitButton: {
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#10B981',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 8,
     },
     submitButtonDisabled: {
-        shadowOpacity: 0,
-        elevation: 0,
+        opacity: 0.6,
     },
     gradientButton: {
         flexDirection: 'row',
@@ -374,16 +366,5 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         fontWeight: '700',
-    },
-    disabledButton: {
-        backgroundColor: '#E5E7EB',
-        paddingVertical: 18,
-        alignItems: 'center',
-        borderRadius: 16,
-    },
-    disabledButtonText: {
-        color: '#9CA3AF',
-        fontSize: 16,
-        fontWeight: '600',
     },
 });
