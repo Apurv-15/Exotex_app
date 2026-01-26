@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Sale } from '../../services/SalesService';
@@ -11,6 +11,34 @@ export default function WarrantyCard() {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const sale: Sale = route.params?.sale;
+
+    // Animation values
+    const scaleAnim = useRef(new Animated.Value(0)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+
+    useEffect(() => {
+        Animated.sequence([
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                tension: 50,
+                friction: 7,
+                useNativeDriver: true,
+            }),
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 600,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 600,
+                    useNativeDriver: true,
+                }),
+            ]),
+        ]).start();
+    }, []);
 
     if (!sale) return null;
 
@@ -79,20 +107,30 @@ export default function WarrantyCard() {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Success Animation */}
                 <View style={styles.successSection}>
-                    <View style={styles.successIcon}>
+                    <Animated.View style={[styles.successIcon, { transform: [{ scale: scaleAnim }] }]}>
                         <LinearGradient
                             colors={['#10B981', '#059669']}
                             style={styles.successGradient}
                         >
                             <MaterialCommunityIcons name="check" size={40} color="white" />
                         </LinearGradient>
-                    </View>
-                    <Text style={styles.successTitle}>Warranty Activated!</Text>
-                    <Text style={styles.successSubtitle}>Your warranty has been successfully generated</Text>
+                    </Animated.View>
+                    <Animated.Text style={[styles.successTitle, { opacity: fadeAnim }]}>
+                        Warranty Activated!
+                    </Animated.Text>
+                    <Animated.Text style={[styles.successSubtitle, { opacity: fadeAnim }]}>
+                        Your warranty has been successfully generated
+                    </Animated.Text>
                 </View>
 
                 {/* Warranty Card */}
-                <View style={styles.card}>
+                <Animated.View style={[
+                    styles.card,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }]
+                    }
+                ]}>
                     <View style={styles.cardHeader}>
                         <View style={styles.cardLogo}>
                             <MaterialCommunityIcons name="shield-check" size={24} color="#7C3AED" />
@@ -153,10 +191,16 @@ export default function WarrantyCard() {
                         <MaterialCommunityIcons name="clock-check-outline" size={16} color="#5B21B6" />
                         <Text style={styles.validityText}>Valid for 1 year from purchase</Text>
                     </View>
-                </View>
+                </Animated.View>
 
                 {/* Actions */}
-                <View style={styles.actions}>
+                <Animated.View style={[
+                    styles.actions,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }]
+                    }
+                ]}>
                     <Pressable
                         style={({ pressed }) => [styles.downloadButton, pressed && { transform: [{ scale: 0.98 }] }]}
                         onPress={handleDownloadPDF}
@@ -179,7 +223,7 @@ export default function WarrantyCard() {
                         <MaterialCommunityIcons name="home-outline" size={20} color="#6B7280" />
                         <Text style={styles.homeButtonText}>Back to Dashboard</Text>
                     </Pressable>
-                </View>
+                </Animated.View>
             </ScrollView>
         </View>
     );
