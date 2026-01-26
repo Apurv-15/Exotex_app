@@ -14,7 +14,7 @@ export default function SubBranchDashboard() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    const fetchSales = async () => {
+    const fetchSales = useCallback(async () => {
         try {
             const data = await SalesService.getSalesByBranch(user?.branchId || '');
             setSales(data);
@@ -24,18 +24,18 @@ export default function SubBranchDashboard() {
             setLoading(false);
             setRefreshing(false);
         }
-    };
+    }, [user?.branchId]);
 
     useFocusEffect(
         useCallback(() => {
             fetchSales();
-        }, [])
+        }, [fetchSales])
     );
 
     const onRefresh = React.useCallback(() => {
         setRefreshing(true);
         fetchSales();
-    }, []);
+    }, [fetchSales]);
 
     const totalSales = sales.length;
     const todaySales = sales.filter(s => s.saleDate === new Date().toISOString().split('T')[0]).length;
@@ -100,13 +100,16 @@ export default function SubBranchDashboard() {
                 {/* Bento Grid Stats */}
                 <View style={styles.bentoGrid}>
                     {/* Large Card - Total Sales */}
-                    <Pressable style={({ pressed }) => [styles.bentoCardLarge, pressed && { transform: [{ scale: 0.98 }] }]}>
+                    <Pressable
+                        style={({ pressed }) => [styles.bentoCardLarge, pressed && { transform: [{ scale: 0.98 }] }]}
+                        onPress={() => navigation.navigate('AnalyticsScreen')}
+                    >
                         <View style={styles.bentoIconPurple}>
                             <MaterialCommunityIcons name="chart-line" size={24} color="#7C3AED" />
                         </View>
                         <Text style={styles.bentoValue}>{totalSales}</Text>
                         <Text style={styles.bentoLabel}>Total Sales</Text>
-                        <Text style={styles.bentoSubtext}>All time records</Text>
+                        <Text style={styles.bentoSubtext}>Tap to view analytics</Text>
                     </Pressable>
 
                     <View style={styles.bentoRight}>

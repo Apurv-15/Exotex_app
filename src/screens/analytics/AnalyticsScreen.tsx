@@ -4,16 +4,25 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BarChart } from 'react-native-chart-kit';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SalesService, Sale } from '../../services/SalesService';
+import { useAuth } from '../../context/AuthContext';
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function AnalyticsScreen() {
+    const { user } = useAuth();
     const chartWidth = Platform.OS === 'web' ? Math.min(screenWidth - 40, 600) : screenWidth - 40;
     const [sales, setSales] = React.useState<Sale[]>([]);
 
     React.useEffect(() => {
-        SalesService.getAllSales().then(setSales);
-    }, []);
+        SalesService.getAllSales().then(allSales => {
+            // Filter by branch if user is not Admin
+            if (user?.role !== 'Admin') {
+                setSales(allSales.filter(s => s.branchId === user?.branchId));
+            } else {
+                setSales(allSales);
+            }
+        });
+    }, [user]);
 
     // Calculate dynamic data
     const branchStats = sales.reduce((acc: any, sale) => {
