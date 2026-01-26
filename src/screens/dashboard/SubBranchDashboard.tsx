@@ -68,6 +68,10 @@ export default function SubBranchDashboard() {
 
     return (
         <View style={styles.container}>
+            <LinearGradient
+                colors={['#F0F7FF', '#FFFFFF']}
+                style={StyleSheet.absoluteFill}
+            />
             <ScrollView
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
@@ -167,7 +171,7 @@ export default function SubBranchDashboard() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
+        backgroundColor: '#FFFFFF',
     },
     content: {
         padding: 20,
@@ -187,7 +191,7 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 15,
-        color: '#888',
+        color: '#6B7280',
         marginTop: 2,
     },
     avatarContainer: {
@@ -200,6 +204,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#7C3AED',
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#7C3AED',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     avatarText: {
         color: 'white',
@@ -213,12 +222,14 @@ const styles = StyleSheet.create({
     },
     bentoCardLarge: {
         flex: 1,
-        backgroundColor: '#EDE9FE',
+        backgroundColor: 'rgba(237, 233, 254, 0.7)',
         borderRadius: 24,
         padding: 20,
         minHeight: 180,
         justifyContent: 'flex-end',
         cursor: 'pointer',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
     } as any,
     bentoIconPurple: {
         width: 44,
@@ -251,13 +262,15 @@ const styles = StyleSheet.create({
     },
     bentoCardSmall: {
         flex: 1,
-        borderRadius: 20,
+        borderRadius: 22,
         padding: 16,
         justifyContent: 'center',
         cursor: 'pointer',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
     } as any,
     bentoYellow: {
-        backgroundColor: '#FEF3C7',
+        backgroundColor: 'rgba(254, 243, 199, 0.7)',
     },
     bentoDark: {
         backgroundColor: '#1F2937',
@@ -307,11 +320,11 @@ const styles = StyleSheet.create({
     },
     createButton: {
         marginBottom: 24,
-        borderRadius: 16,
+        borderRadius: 18,
         overflow: 'hidden',
         shadowColor: '#7C3AED',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.3,
         shadowRadius: 16,
         elevation: 8,
     },
@@ -319,12 +332,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 16,
+        paddingVertical: 18,
         gap: 8,
     },
     createButtonText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '700',
     },
     recentHeader: {
@@ -345,38 +358,40 @@ const styles = StyleSheet.create({
         cursor: 'pointer',
     } as any,
     saleItem: {
-        backgroundColor: 'white',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
         padding: 16,
-        borderRadius: 16,
-        marginBottom: 10,
+        borderRadius: 20,
+        marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.03,
+        shadowRadius: 12,
         elevation: 2,
         cursor: 'pointer',
     } as any,
     saleIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+        width: 44,
+        height: 44,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 14,
     },
     saleInfo: {
         flex: 1,
     },
     productName: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '600',
         color: '#1A1A1A',
     },
     customerName: {
         fontSize: 13,
-        color: '#888',
+        color: '#6B7280',
         marginTop: 2,
     },
     saleMeta: {
@@ -384,7 +399,7 @@ const styles = StyleSheet.create({
     },
     date: {
         fontSize: 12,
-        color: '#999',
+        color: '#9CA3AF',
     },
     status: {
         fontSize: 11,
