@@ -45,6 +45,7 @@ export default function SubBranchDashboard() {
         <Pressable
             key={item.id}
             style={({ pressed }) => [styles.saleItem, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+            onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
         >
             <View style={[styles.saleIcon, { backgroundColor: item.status === 'approved' ? '#E8F5E9' : '#FFF3E0' }]}>
                 <MaterialCommunityIcons
@@ -63,6 +64,7 @@ export default function SubBranchDashboard() {
                     {item.status.toUpperCase()}
                 </Text>
             </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" style={{ marginLeft: 8 }} />
         </Pressable>
     );
 
