@@ -10,9 +10,17 @@ export default function CreateSaleStep1() {
         customerName: '',
         phone: '',
         email: '',
+        address: '',
         city: '',
+        date: new Date().toISOString().split('T')[0],
+        waterTestingBefore: '',
+        waterTestingAfter: '',
+        executiveName: '',
+        designation: '',
+        plumberName: '',
         productModel: '',
         serialNumber: '',
+        productDetailsConfirmed: false,
         paymentConfirmed: false
     });
 
@@ -20,8 +28,12 @@ export default function CreateSaleStep1() {
         return (
             formData.customerName.trim() !== '' &&
             formData.phone.trim() !== '' &&
+            formData.address.trim() !== '' &&
+            formData.city.trim() !== '' &&
             formData.productModel.trim() !== '' &&
-            formData.serialNumber.trim() !== ''
+            formData.serialNumber.trim() !== '' &&
+            formData.productDetailsConfirmed &&
+            formData.paymentConfirmed
         );
     };
 
@@ -35,12 +47,7 @@ export default function CreateSaleStep1() {
 
     const handleNext = () => {
         if (!isStep1Valid()) {
-            showAlert('Missing Fields', 'Please fill in all required fields.');
-            return;
-        }
-
-        if (!formData.paymentConfirmed) {
-            showAlert('Payment Required', 'Warranty card can only be generated after payment confirmation.');
+            showAlert('Missing Fields', 'Please fill in all required fields and confirm the checkboxes.');
             return;
         }
 
@@ -59,7 +66,7 @@ export default function CreateSaleStep1() {
             >
                 <View style={styles.header}>
                     <Text style={styles.title}>New Sale Entry</Text>
-                    <Text style={styles.subtitle}>Enter customer and product details</Text>
+                    <Text style={styles.subtitle}>Enter complete customer and product details</Text>
                 </View>
 
                 {/* Customer Information */}
@@ -70,7 +77,7 @@ export default function CreateSaleStep1() {
                     </View>
                     <View style={styles.card}>
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Full Name</Text>
+                            <Text style={styles.label}>Customer Name *</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Enter customer name"
@@ -81,7 +88,7 @@ export default function CreateSaleStep1() {
 
                         <View style={styles.row}>
                             <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>Phone Number</Text>
+                                <Text style={styles.label}>Mobile No. *</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="9876543210"
@@ -91,7 +98,29 @@ export default function CreateSaleStep1() {
                                 />
                             </View>
                             <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <Text style={styles.label}>City</Text>
+                                <Text style={styles.label}>Date</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="YYYY-MM-DD"
+                                    value={formData.date}
+                                    onChangeText={(text) => setFormData({ ...formData, date: text })}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>Address *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter full address"
+                                value={formData.address}
+                                onChangeText={(text) => setFormData({ ...formData, address: text })}
+                            />
+                        </View>
+
+                        <View style={styles.row}>
+                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                <Text style={styles.label}>City *</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Mumbai"
@@ -99,23 +128,94 @@ export default function CreateSaleStep1() {
                                     onChangeText={(text) => setFormData({ ...formData, city: text })}
                                 />
                             </View>
-                        </View>
-
-                        <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
-                            <Text style={styles.label}>Email Address (Optional)</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="john@example.com"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                value={formData.email}
-                                onChangeText={(text) => setFormData({ ...formData, email: text })}
-                            />
+                            <View style={[styles.inputContainer, { flex: 1 }]}>
+                                <Text style={styles.label}>Email (Optional)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="email@example.com"
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    value={formData.email}
+                                    onChangeText={(text) => setFormData({ ...formData, email: text })}
+                                />
+                            </View>
                         </View>
                     </View>
                 </View>
 
-                {/* Product Information */}
+                {/* Water Testing */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <MaterialCommunityIcons name="water" size={20} color="#3B82F6" />
+                        <Text style={styles.sectionTitle}>Water Testing (PPM)</Text>
+                    </View>
+                    <View style={styles.card}>
+                        <View style={styles.row}>
+                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                <Text style={styles.label}>Before PPM</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="150"
+                                    keyboardType="numeric"
+                                    value={formData.waterTestingBefore}
+                                    onChangeText={(text) => setFormData({ ...formData, waterTestingBefore: text })}
+                                />
+                            </View>
+                            <View style={[styles.inputContainer, { flex: 1 }]}>
+                                <Text style={styles.label}>After PPM</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="50"
+                                    keyboardType="numeric"
+                                    value={formData.waterTestingAfter}
+                                    onChangeText={(text) => setFormData({ ...formData, waterTestingAfter: text })}
+                                />
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Executive Details */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <MaterialCommunityIcons name="account-tie" size={20} color="#10B981" />
+                        <Text style={styles.sectionTitle}>Executive Details</Text>
+                    </View>
+                    <View style={styles.card}>
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>Executive Name</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter executive name"
+                                value={formData.executiveName}
+                                onChangeText={(text) => setFormData({ ...formData, executiveName: text })}
+                            />
+                        </View>
+
+                        <View style={styles.row}>
+                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                <Text style={styles.label}>Designation</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Sales Executive"
+                                    value={formData.designation}
+                                    onChangeText={(text) => setFormData({ ...formData, designation: text })}
+                                />
+                            </View>
+                            <View style={[styles.inputContainer, { flex: 1 }]}>
+                                <Text style={styles.label}>Plumber Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Enter plumber name"
+                                    value={formData.plumberName}
+                                    onChangeText={(text) => setFormData({ ...formData, plumberName: text })}
+                                />
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Product Details */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <MaterialCommunityIcons name="cube-outline" size={20} color="#7C3AED" />
@@ -123,7 +223,7 @@ export default function CreateSaleStep1() {
                     </View>
                     <View style={styles.card}>
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Product Model</Text>
+                            <Text style={styles.label}>Product Model *</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g. Inverter Model X"
@@ -133,7 +233,7 @@ export default function CreateSaleStep1() {
                         </View>
 
                         <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
-                            <Text style={styles.label}>Serial Number</Text>
+                            <Text style={styles.label}>Serial Number *</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="SN12345678"
@@ -143,6 +243,23 @@ export default function CreateSaleStep1() {
                             />
                         </View>
                     </View>
+                </View>
+
+                {/* Product Details Confirmation */}
+                <View style={styles.section}>
+                    <Pressable
+                        style={styles.checkboxCard}
+                        onPress={() => setFormData({ ...formData, productDetailsConfirmed: !formData.productDetailsConfirmed })}
+                    >
+                        <View style={[styles.checkbox, formData.productDetailsConfirmed && styles.checkboxActive]}>
+                            {formData.productDetailsConfirmed && (
+                                <MaterialCommunityIcons name="check" size={16} color="white" />
+                            )}
+                        </View>
+                        <Text style={styles.checkboxText}>
+                            I hereby confirm that I have explained all the product details to the customer, and the customer has fully understood and acknowledged the same.
+                        </Text>
+                    </Pressable>
                 </View>
 
                 {/* Payment Confirmation */}
@@ -176,14 +293,14 @@ export default function CreateSaleStep1() {
                 <Pressable
                     style={({ pressed }) => [
                         styles.button,
-                        (!formData.paymentConfirmed || !isStep1Valid()) && styles.buttonDisabled,
-                        pressed && !(!formData.paymentConfirmed || !isStep1Valid()) && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+                        !isStep1Valid() && styles.buttonDisabled,
+                        pressed && isStep1Valid() && { opacity: 0.9, transform: [{ scale: 0.98 }] }
                     ]}
                     onPress={handleNext}
-                    disabled={!formData.paymentConfirmed || !isStep1Valid()}
+                    disabled={!isStep1Valid()}
                 >
                     <LinearGradient
-                        colors={formData.paymentConfirmed && isStep1Valid() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
+                        colors={isStep1Valid() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={styles.gradientButton}
@@ -192,9 +309,6 @@ export default function CreateSaleStep1() {
                         <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
                     </LinearGradient>
                 </Pressable>
-                {!formData.paymentConfirmed && isStep1Valid() && (
-                    <Text style={styles.warningText}>Please confirm payment to continue</Text>
-                )}
             </View>
         </View>
     );
@@ -269,6 +383,40 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#1A1A1A',
         paddingVertical: 4,
+    },
+    checkboxCard: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 16,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
+        gap: 12,
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 2,
+    },
+    checkboxActive: {
+        backgroundColor: '#7C3AED',
+        borderColor: '#7C3AED',
+    },
+    checkboxText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#4B5563',
+        lineHeight: 20,
     },
     paymentCard: {
         flexDirection: 'row',
@@ -346,12 +494,5 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         fontWeight: '700',
-    },
-    warningText: {
-        textAlign: 'center',
-        color: '#EF4444',
-        fontSize: 12,
-        fontWeight: '600',
-        marginTop: 10,
     },
 });
