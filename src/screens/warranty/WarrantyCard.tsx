@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Sale } from '../../services/SalesService';
@@ -11,6 +11,7 @@ export default function WarrantyCard() {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const sale: Sale = route.params?.sale;
+    const [loading, setLoading] = useState(false);
 
     // Animation values
     const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -42,63 +43,232 @@ export default function WarrantyCard() {
 
     if (!sale) return null;
 
-    const handleDownloadPDF = async () => {
-        const html = `
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Helvetica', sans-serif; padding: 40px; background: #f5f5f5; }
-            .card { background: white; border-radius: 16px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
-            .header { text-align: center; margin-bottom: 24px; }
-            .logo { font-size: 24px; font-weight: bold; color: #7C3AED; }
-            .warranty-id { font-size: 32px; font-weight: bold; color: #1a1a1a; margin: 16px 0 8px; }
-            .subtitle { color: #6B7280; font-size: 14px; }
-            .divider { height: 1px; background: #E5E7EB; margin: 24px 0; }
-            .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #F3F4F6; }
-            .label { color: #6B7280; font-size: 14px; }
-            .value { color: #1a1a1a; font-weight: 600; font-size: 14px; }
-            .footer { text-align: center; margin-top: 24px; padding: 16px; background: #EDE9FE; border-radius: 12px; }
-            .footer-text { color: #5B21B6; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="header">
-              <div class="logo">WarrantyPro</div>
-              <div class="warranty-id">${sale.warrantyId}</div>
-              <div class="subtitle">Warranty Certificate</div>
+    // Format date
+    const formattedDate = new Date(sale.saleDate).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+
+    // Generate HTML for EKOTEX Warranty Card
+    const generateWarrantyHTML = () => `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 40px;
+            background: white;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            border: 3px solid #0066cc;
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo-text {
+            font-size: 36px;
+            font-weight: bold;
+            color: #0066cc;
+            letter-spacing: 4px;
+        }
+        .tagline {
+            font-size: 10px;
+            color: #333;
+            font-style: italic;
+        }
+        .iso {
+            font-size: 11px;
+            color: #0066cc;
+            margin-top: 5px;
+        }
+        .warranty-title {
+            background: linear-gradient(90deg, #0066cc, #00cc66);
+            color: white;
+            padding: 12px 40px;
+            font-size: 22px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .divider {
+            text-align: center;
+            color: #0066cc;
+            font-size: 20px;
+            margin: 10px 0;
+        }
+        .form-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .form-row.no-border {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: bold;
+            color: #333;
+        }
+        .value {
+            color: #000;
+            font-weight: 500;
+        }
+        .address-section {
+            margin: 15px 0;
+        }
+        .address-label {
+            font-weight: bold;
+            color: #333;
+        }
+        .address-value {
+            margin-top: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            min-height: 60px;
+        }
+        .phone-stamp-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 20px 0;
+        }
+        .phone-section {
+            flex: 1;
+        }
+        .stamp-box {
+            width: 180px;
+            height: 100px;
+            border: 1px solid #333;
+            padding: 10px;
+            font-size: 10px;
+        }
+        .stamp-title {
+            font-size: 10px;
+            margin-bottom: 50px;
+        }
+        .signature {
+            text-align: right;
+            font-size: 10px;
+            font-style: italic;
+        }
+        .contact {
+            margin-top: 20px;
+        }
+        .contact-email {
+            color: #0066cc;
+            font-weight: bold;
+        }
+        .notice {
+            margin-top: 15px;
+            font-size: 11px;
+        }
+        .notice-bold {
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 10px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-text">EKOTEX</div>
+            <div class="tagline">Energizing Future, eMpowering Excellence.....</div>
+            <div class="iso">AN ISO 9001 - 2015 CERTIFIED COMPANY</div>
+            <div class="warranty-title">WARRANTY CARD</div>
+            <div class="divider">✦</div>
+        </div>
+
+        <div class="form-row">
+            <div><span class="label">Bill No :</span> <span class="value">${sale.warrantyId}</span></div>
+            <div><span class="label">Date :</span> <span class="value">${formattedDate}</span></div>
+        </div>
+
+        <div class="form-row">
+            <div><span class="label">Name of the Purchaser:</span> <span class="value">${sale.customerName}</span></div>
+        </div>
+
+        <div class="address-section">
+            <div class="address-label">Address:</div>
+            <div class="address-value">
+                ${sale.address}<br>
+                ${sale.city}
             </div>
-            <div class="divider"></div>
-            <div class="row"><span class="label">Product</span><span class="value">${sale.productModel}</span></div>
-            <div class="row"><span class="label">Serial Number</span><span class="value">${sale.serialNumber}</span></div>
-            <div class="row"><span class="label">Customer</span><span class="value">${sale.customerName}</span></div>
-            <div class="row"><span class="label">Purchase Date</span><span class="value">${sale.saleDate}</span></div>
-            <div class="footer">
-              <div class="footer-text">Valid for 1 year from purchase date</div>
+        </div>
+
+        <div class="phone-stamp-row">
+            <div class="phone-section">
+                <span class="label">Phone No :</span> <span class="value">${sale.phone}</span>
             </div>
-          </div>
-        </body>
-      </html>
+            <div class="stamp-box">
+                <div class="stamp-title">Name and Address of the dealer with Stamp</div>
+                <div class="signature">Signature</div>
+            </div>
+        </div>
+
+        <div class="contact">
+            <div>Write us at :</div>
+            <div class="contact-email">ekotexelectricient@gmail.com</div>
+        </div>
+
+        <div class="notice">
+            For warranty period please refer to the warranty page in the user manual *<br>
+            <span class="notice-bold">This Warranty is not valid if the above information is not duly filled in.</span>
+        </div>
+
+        <div class="footer">
+            Generated on ${new Date().toLocaleString('en-IN')} | Warranty ID: ${sale.warrantyId}
+        </div>
+    </div>
+</body>
+</html>
     `;
 
+    const handleDownloadPDF = async () => {
+        setLoading(true);
         try {
+            const html = generateWarrantyHTML();
+
             if (Platform.OS === 'web') {
+                // For web, open print dialog
                 const printWindow = window.open('', '_blank');
                 if (printWindow) {
                     printWindow.document.write(html);
                     printWindow.document.close();
-                    printWindow.print();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
                 }
             } else {
+                // For native, generate PDF and share
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
             }
         } catch (error) {
+            console.error('Download error:', error);
             if (Platform.OS === 'web') {
-                window.alert('Could not generate PDF');
+                window.alert('Could not generate PDF. Please try again.');
             } else {
-                Alert.alert('Error', 'Could not generate PDF');
+                Alert.alert('Error', 'Could not generate PDF. Please try again.');
             }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -202,17 +372,27 @@ export default function WarrantyCard() {
                     }
                 ]}>
                     <Pressable
-                        style={({ pressed }) => [styles.downloadButton, pressed && { transform: [{ scale: 0.98 }] }]}
+                        style={({ pressed }) => [styles.downloadButton, pressed && !loading && { transform: [{ scale: 0.98 }] }]}
                         onPress={handleDownloadPDF}
+                        disabled={loading}
                     >
                         <LinearGradient
-                            colors={['#7C3AED', '#5B21B6']}
+                            colors={loading ? ['#9CA3AF', '#6B7280'] : ['#7C3AED', '#5B21B6']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.gradientButton}
                         >
-                            <MaterialCommunityIcons name="download" size={20} color="white" />
-                            <Text style={styles.downloadButtonText}>Download PDF</Text>
+                            {loading ? (
+                                <>
+                                    <ActivityIndicator color="white" size="small" />
+                                    <Text style={styles.downloadButtonText}>Generating PDF...</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <MaterialCommunityIcons name="download" size={20} color="white" />
+                                    <Text style={styles.downloadButtonText}>Download PDF</Text>
+                                </>
+                            )}
                         </LinearGradient>
                     </Pressable>
 
