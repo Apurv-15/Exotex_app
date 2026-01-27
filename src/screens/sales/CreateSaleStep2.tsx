@@ -33,15 +33,21 @@ export default function CreateSaleStep2() {
 
     const pickImage = async (index: number) => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [4, 3],
             quality: 0.8,
+            allowsMultipleSelection: false,
         });
 
         if (!result.canceled) {
+            const uri = result.assets[0].uri;
+
+            // File validation removed as per request to allow all image types returned by picker
+
+
             const newImages = [...images];
-            newImages[index] = result.assets[0].uri;
+            newImages[index] = uri;
             setImages(newImages);
         }
     };
@@ -62,14 +68,21 @@ export default function CreateSaleStep2() {
 
         setSubmitting(true);
         try {
-            const newSale = await SalesService.createSale({
-                ...formData,
-                saleDate: new Date().toISOString().split('T')[0],
-                branchId: user?.branchId || 'unknown',
-            });
+            // Filter out empty images
+            const validImages = images.filter(img => img && img.length > 0);
+
+            const newSale = await SalesService.createSale(
+                {
+                    ...formData,
+                    saleDate: new Date().toISOString().split('T')[0],
+                    branchId: user?.branchId || 'unknown',
+                },
+                validImages // Pass images to be uploaded
+            );
 
             navigation.replace('WarrantyCard', { sale: newSale });
         } catch (error) {
+            console.error('Submit error:', error);
             showAlert('Error', 'Failed to submit sale. Please try again.');
         } finally {
             setSubmitting(false);
