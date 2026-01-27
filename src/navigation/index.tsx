@@ -62,6 +62,11 @@ function UserStack() {
                 component={WarrantyCard}
                 options={{ title: 'Warranty Generated', gestureEnabled: false, headerLeft: () => null }}
             />
+            <Stack.Screen
+                name="AnalyticsScreen"
+                component={AnalyticsScreen}
+                options={{ title: 'My Analytics' }}
+            />
         </Stack.Navigator>
     );
 }
