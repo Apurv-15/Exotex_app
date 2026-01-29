@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Alert } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/config';
 import { SalesService, Sale } from '../../services/SalesService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import FloatingTabBar from '../../components/FloatingTabBar';
 
 export default function SubBranchDashboard() {
     const { logout, user } = useAuth();
@@ -40,6 +41,16 @@ export default function SubBranchDashboard() {
     const totalSales = sales.length;
     const todaySales = sales.filter(s => s.saleDate === new Date().toISOString().split('T')[0]).length;
     const warrantiesGenerated = sales.filter(s => s.warrantyId).length;
+
+    const handleTabPress = (tab: 'home' | 'create' | 'forms') => {
+        if (tab === 'create') {
+            navigation.navigate('CreateSaleStep1');
+        } else if (tab === 'forms') {
+            // Placeholder for future forms tab
+            Alert.alert('Coming Soon', 'Forms feature will be available in the next update!');
+        }
+        // 'home' tab - already on home, do nothing
+    };
 
     const renderSaleItem = (item: Sale) => (
         <Pressable
@@ -135,22 +146,6 @@ export default function SubBranchDashboard() {
                     </View>
                 </View>
 
-                {/* Create New Sale Button */}
-                <Pressable
-                    style={({ pressed }) => [styles.createButton, pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }]}
-                    onPress={() => navigation.navigate('CreateSaleStep1')}
-                >
-                    <LinearGradient
-                        colors={['#7C3AED', '#5B21B6']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.gradientButton}
-                    >
-                        <MaterialCommunityIcons name="plus" size={22} color="white" />
-                        <Text style={styles.createButtonText}>Create New Sale</Text>
-                    </LinearGradient>
-                </Pressable>
-
                 {/* Recent Sales Section */}
                 <View style={styles.recentHeader}>
                     <Text style={styles.sectionTitle}>Recent Sales</Text>
@@ -168,7 +163,13 @@ export default function SubBranchDashboard() {
                 ) : (
                     sales.map(item => renderSaleItem(item))
                 )}
+
+                {/* Bottom spacing for floating tab bar */}
+                <View style={{ height: 100 }} />
             </ScrollView>
+
+            {/* Floating Tab Bar */}
+            <FloatingTabBar activeTab="home" onTabPress={handleTabPress} />
         </View>
     );
 }
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 20,
-        paddingBottom: 40,
+        paddingBottom: 120,
     },
     header: {
         flexDirection: 'row',

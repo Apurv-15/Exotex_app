@@ -1,39 +1,85 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { SalesService, Sale } from '../../services/SalesService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { LineChart } from 'react-native-chart-kit';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const screenWidth = Dimensions.get('window').width;
+
+// Region colors for visual distinction
+const REGION_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
+    'Mumbai': { bg: '#EDE9FE', text: '#7C3AED', icon: 'city' },
+    'Delhi': { bg: '#FEF3C7', text: '#B45309', icon: 'city-variant' },
+    'Bangalore': { bg: '#D1FAE5', text: '#059669', icon: 'office-building' },
+    'Chennai': { bg: '#DBEAFE', text: '#2563EB', icon: 'home-city' },
+    'Kolkata': { bg: '#FCE7F3', text: '#DB2777', icon: 'city-variant-outline' },
+    'Hyderabad': { bg: '#FEE2E2', text: '#DC2626', icon: 'domain' },
+    'Pune': { bg: '#E0E7FF', text: '#4F46E5', icon: 'town-hall' },
+    'default': { bg: '#F3F4F6', text: '#6B7280', icon: 'map-marker' },
+};
+
+const getRegionColor = (city: string) => REGION_COLORS[city] || REGION_COLORS['default'];
 
 export default function MainBranchDashboard() {
     const { logout, user } = useAuth();
     const navigation = useNavigation<any>();
     const [sales, setSales] = useState<Sale[]>([]);
+    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'All' | 'Today' | 'Month'>('All');
+    const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
 
     useFocusEffect(useCallback(() => {
-        SalesService.getAllSales().then(setSales).catch(console.error);
+        setLoading(true);
+        SalesService.getAllSales()
+            .then(setSales)
+            .catch(console.error)
+            .finally(() => setLoading(false));
     }, []));
 
-    const filteredSales = sales.filter(s => {
-        if (filter === 'All') return true;
-        const date = new Date(s.saleDate);
-        const now = new Date();
-        if (filter === 'Today') return date.toDateString() === now.toDateString();
-        return date.getMonth() === now.getMonth();
-    });
+    // Filter by time
+    const filteredSales = useMemo(() => {
+        return sales.filter(s => {
+            if (filter === 'All') return true;
+            const date = new Date(s.saleDate);
+            const now = new Date();
+            if (filter === 'Today') return date.toDateString() === now.toDateString();
+            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        });
+    }, [sales, filter]);
+
+    // Group sales by city/region
+    const salesByRegion = useMemo(() => {
+        const grouped: Record<string, Sale[]> = {};
+        filteredSales.forEach(sale => {
+            const region = sale.city || 'Unknown';
+            if (!grouped[region]) grouped[region] = [];
+            grouped[region].push(sale);
+        });
+        return grouped;
+    }, [filteredSales]);
+
+    // Get region stats
+    const regionStats = useMemo(() => {
+        return Object.entries(salesByRegion)
+            .map(([region, regionSales]) => ({
+                region,
+                total: regionSales.length,
+                approved: regionSales.filter(s => s.status === 'approved').length,
+                pending: regionSales.filter(s => s.status === 'pending').length,
+            }))
+            .sort((a, b) => b.total - a.total);
+    }, [salesByRegion]);
+
+    // Display sales (filtered by region if selected)
+    const displaySales = selectedRegion
+        ? salesByRegion[selectedRegion] || []
+        : filteredSales;
 
     const totalSales = filteredSales.length;
     const pending = filteredSales.filter(s => s.status === 'pending').length;
     const approved = filteredSales.filter(s => s.status === 'approved').length;
-    const chartWidth = Platform.OS === 'web' ? Math.min(screenWidth - 40, 600) : screenWidth - 40;
-
-    const totalRevenue = approved * 15000; // Mock calculation: ₹15k per approved sale
-    const revenueFormatted = (totalRevenue / 100000).toFixed(1) + 'L';
 
     return (
         <View style={styles.container}>
@@ -76,12 +122,12 @@ export default function MainBranchDashboard() {
                             style={styles.mainStatCard}
                         >
                             <View style={styles.statHeader}>
-                                <Text style={styles.mainStatLabel}>Est. Revenue</Text>
-                                <MaterialCommunityIcons name="trending-up" size={20} color="rgba(255,255,255,0.6)" />
+                                <Text style={styles.mainStatLabel}>Total Units Sold</Text>
+                                <MaterialCommunityIcons name="package-variant" size={20} color="rgba(255,255,255,0.6)" />
                             </View>
-                            <Text style={styles.mainStatValue}>₹{revenueFormatted}</Text>
+                            <Text style={styles.mainStatValue}>{totalSales}</Text>
                             <View style={styles.statBadge}>
-                                <Text style={styles.badgeText}>+{(totalSales * 2).toFixed(1)}%</Text>
+                                <Text style={styles.badgeText}>{regionStats.length} Regions</Text>
                             </View>
                         </LinearGradient>
 
@@ -98,36 +144,72 @@ export default function MainBranchDashboard() {
                     </View>
                 </View>
 
-                {/* Chart Section */}
+                {/* Region-wise Sales Section */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Performance Trend</Text>
-                    <Pressable onPress={() => navigation.navigate('AnalyticsScreen')}>
-                        <Text style={styles.seeAllText}>Analyze</Text>
-                    </Pressable>
+                    <Text style={styles.sectionTitle}>Sales by Region</Text>
+                    {selectedRegion && (
+                        <Pressable onPress={() => setSelectedRegion(null)}>
+                            <Text style={styles.seeAllText}>Show All</Text>
+                        </Pressable>
+                    )}
                 </View>
 
-                <View style={styles.chartCard}>
-                    <LineChart
-                        data={{
-                            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-                            datasets: [{ data: [sales.length + 2, sales.length + 5, sales.length, sales.length + 8, sales.length + 4, sales.length + 10, sales.length + 7] }]
-                        }}
-                        width={chartWidth - 40}
-                        height={180}
-                        chartConfig={{
-                            backgroundColor: "#ffffff",
-                            backgroundGradientFrom: "#ffffff",
-                            backgroundGradientTo: "#ffffff",
-                            decimalPlaces: 0,
-                            color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
-                            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                            style: { borderRadius: 16 },
-                            propsForDots: { r: "4", strokeWidth: "2", stroke: "#7C3AED" }
-                        }}
-                        bezier
-                        style={styles.chart}
-                    />
-                </View>
+                {loading ? (
+                    <ActivityIndicator size="large" color="#7C3AED" style={{ marginVertical: 40 }} />
+                ) : regionStats.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <MaterialCommunityIcons name="map-marker-off" size={48} color="#D1D5DB" />
+                        <Text style={styles.emptyText}>No sales data available</Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.regionScroll}
+                        contentContainerStyle={{ gap: 12 }}
+                    >
+                        {regionStats.map(({ region, total, approved, pending }) => {
+                            const colors = getRegionColor(region);
+                            const isSelected = selectedRegion === region;
+                            return (
+                                <Pressable
+                                    key={region}
+                                    style={[
+                                        styles.regionCard,
+                                        { backgroundColor: colors.bg },
+                                        isSelected && styles.regionCardSelected
+                                    ]}
+                                    onPress={() => setSelectedRegion(isSelected ? null : region)}
+                                >
+                                    <View style={styles.regionHeader}>
+                                        <MaterialCommunityIcons
+                                            name={colors.icon as any}
+                                            size={24}
+                                            color={colors.text}
+                                        />
+                                        {isSelected && (
+                                            <View style={[styles.selectedBadge, { backgroundColor: colors.text }]}>
+                                                <MaterialCommunityIcons name="check" size={12} color="white" />
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={[styles.regionName, { color: colors.text }]}>{region}</Text>
+                                    <Text style={[styles.regionTotal, { color: colors.text }]}>{total} Sales</Text>
+                                    <View style={styles.regionStats}>
+                                        <View style={styles.regionStatItem}>
+                                            <View style={[styles.statDot, { backgroundColor: '#10B981' }]} />
+                                            <Text style={styles.regionStatText}>{approved}</Text>
+                                        </View>
+                                        <View style={styles.regionStatItem}>
+                                            <View style={[styles.statDot, { backgroundColor: '#F59E0B' }]} />
+                                            <Text style={styles.regionStatText}>{pending}</Text>
+                                        </View>
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+                    </ScrollView>
+                )}
 
                 {/* Quick Actions */}
                 <Pressable
@@ -149,15 +231,47 @@ export default function MainBranchDashboard() {
                     </LinearGradient>
                 </Pressable>
 
-                {/* Recent Activity */}
-                <Text style={styles.sectionTitle}>Latest Entries</Text>
-                {sales.length === 0 ? (
+                <Pressable
+                    onPress={() => navigation.navigate('TemplateManagement')}
+                    style={({ pressed }) => [styles.actionCard, pressed && { transform: [{ scale: 0.98 }] }, { marginTop: -8 }]}
+                >
+                    <LinearGradient
+                        colors={['#7C3AED', '#5B21B6']}
+                        style={styles.actionGradient}
+                    >
+                        <View style={styles.actionIcon}>
+                            <MaterialCommunityIcons name="file-word-box" size={24} color="white" />
+                        </View>
+                        <View style={styles.actionInfo}>
+                            <Text style={styles.actionTitle}>Warranty Template</Text>
+                            <Text style={styles.actionSub}>Customize your .docx template</Text>
+                        </View>
+                        <MaterialCommunityIcons name="chevron-right" size={24} color="rgba(255,255,255,0.3)" />
+                    </LinearGradient>
+                </Pressable>
+
+                {/* Recent Activity / Region Sales */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>
+                        {selectedRegion ? `${selectedRegion} Sales` : 'Latest Entries'}
+                    </Text>
+                    <Text style={styles.countBadge}>{displaySales.length}</Text>
+                </View>
+
+                {displaySales.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>No activity found</Text>
+                        <Text style={styles.emptyText}>No sales found</Text>
                     </View>
                 ) : (
-                    sales.slice(0, 5).map(s => (
-                        <View key={s.id} style={styles.activityItem}>
+                    displaySales.slice(0, 10).map(s => (
+                        <Pressable
+                            key={s.id}
+                            style={({ pressed }) => [
+                                styles.activityItem,
+                                pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+                            ]}
+                            onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
+                        >
                             <View style={[styles.actIcon, { backgroundColor: s.status === 'approved' ? '#ECFDF5' : '#FFFBEB' }]}>
                                 <MaterialCommunityIcons
                                     name={s.status === 'approved' ? 'check-circle' : 'clock-outline'}
@@ -166,11 +280,14 @@ export default function MainBranchDashboard() {
                                 />
                             </View>
                             <View style={styles.actContent}>
-                                <Text style={styles.actTitle}>{s.productModel}</Text>
-                                <Text style={styles.actSub}>{s.customerName} • {s.branchId}</Text>
+                                <Text style={styles.actTitle}>{s.customerName}</Text>
+                                <Text style={styles.actSub}>{s.productModel} • {s.city}</Text>
                             </View>
-                            <Text style={styles.actDate}>{s.saleDate}</Text>
-                        </View>
+                            <View style={styles.actRight}>
+                                <Text style={styles.actDate}>{s.saleDate}</Text>
+                                <MaterialCommunityIcons name="chevron-right" size={16} color="#D1D5DB" />
+                            </View>
+                        </Pressable>
                     ))
                 )}
             </ScrollView>
@@ -187,7 +304,7 @@ const styles = StyleSheet.create({
     logoutBtn: { cursor: 'pointer' } as any,
     logoutIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center' },
     filterRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-    chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.8)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.5)' },
+    chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.8)', borderWidth: 1, borderColor: '#E5E7EB' },
     chipActive: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
     chipText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
     chipTextActive: { color: 'white' },
@@ -203,23 +320,34 @@ const styles = StyleSheet.create({
     smallStatCard: { flex: 1, borderRadius: 20, padding: 16, justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4 },
     smallStatValue: { fontSize: 24, fontWeight: '800' },
     smallStatLabel: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 8 },
     sectionTitle: { fontSize: 20, fontWeight: '700', color: '#111827' },
     seeAllText: { fontSize: 14, color: '#7C3AED', fontWeight: '600' },
-    chartCard: { backgroundColor: 'rgba(255, 255, 255, 0.8)', borderRadius: 24, padding: 16, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.5)' },
-    chart: { marginVertical: 8, borderRadius: 16 },
-    actionCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 24, shadowColor: '#1F2937', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
+    countBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 13, fontWeight: '700', color: '#7C3AED' },
+    regionScroll: { marginBottom: 24 },
+    regionCard: { width: 140, padding: 16, borderRadius: 20, borderWidth: 2, borderColor: 'transparent' },
+    regionCardSelected: { borderColor: '#7C3AED' },
+    regionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    selectedBadge: { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    regionName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+    regionTotal: { fontSize: 13, fontWeight: '600', opacity: 0.8, marginBottom: 12 },
+    regionStats: { flexDirection: 'row', gap: 12 },
+    regionStatItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    statDot: { width: 8, height: 8, borderRadius: 4 },
+    regionStatText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+    actionCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 16, shadowColor: '#1F2937', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
     actionGradient: { flexDirection: 'row', alignItems: 'center', padding: 20 },
     actionIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
     actionInfo: { flex: 1, marginLeft: 16 },
     actionTitle: { color: 'white', fontSize: 17, fontWeight: '700' },
     actionSub: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 },
-    activityItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.8)', padding: 16, borderRadius: 20, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.5)' },
+    activityItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 16, borderRadius: 20, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: '#F3F4F6' },
     actIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     actContent: { flex: 1 },
     actTitle: { fontSize: 15, fontWeight: '600', color: '#111827' },
     actSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+    actRight: { alignItems: 'flex-end', gap: 4 },
     actDate: { fontSize: 12, color: '#9CA3AF' },
-    emptyState: { padding: 40, alignItems: 'center' },
+    emptyState: { padding: 40, alignItems: 'center', gap: 12 },
     emptyText: { color: '#9CA3AF', fontSize: 15 },
 });

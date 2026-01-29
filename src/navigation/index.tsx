@@ -10,6 +10,7 @@ import CreateSaleStep1 from '../screens/sales/CreateSaleStep1';
 import CreateSaleStep2 from '../screens/sales/CreateSaleStep2';
 import WarrantyCard from '../screens/warranty/WarrantyCard';
 import AnalyticsScreen from '../screens/analytics/AnalyticsScreen';
+import TemplateManagement from '../screens/admin/TemplateManagement';
 import { THEME } from '../constants/config';
 
 const Stack = createNativeStackNavigator();
@@ -34,6 +35,16 @@ function AdminStack() {
                 name="AnalyticsScreen"
                 component={AnalyticsScreen}
                 options={{ title: 'Detailed Analytics' }}
+            />
+            <Stack.Screen
+                name="TemplateManagement"
+                component={TemplateManagement}
+                options={{ title: 'Warranty Template' }}
+            />
+            <Stack.Screen
+                name="WarrantyCard"
+                component={WarrantyCard}
+                options={{ title: 'Sale Details', headerBackTitle: 'Back' }}
             />
         </Stack.Navigator>
     );
