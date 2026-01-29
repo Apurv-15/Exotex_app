@@ -53,13 +53,51 @@ export default function TemplateManagement() {
     const uploadTemplate = async (uri: string, fileName: string) => {
         setUploading(true);
         try {
-            // 1. Create bucket if not exists (handled via SQL usually, but we'll try)
+            // 1. Check if bucket exists
             const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('warranty-templates');
 
-            // Note: If bucket doesn't exist, this might fail. In a real app, 
-            // the bucket should be created in the dashboard.
+            // If bucket doesn't exist, show helpful error
+            if (bucketError) {
+                console.error('Bucket error:', bucketError);
 
-            // 2. Upload file
+                if (Platform.OS === 'web') {
+                    const setupBucket = window.confirm(
+                        '❌ Storage bucket "warranty-templates" not found!\n\n' +
+                        'You need to create this bucket in your Supabase dashboard first.\n\n' +
+                        'Steps:\n' +
+                        '1. Go to Supabase Dashboard → Storage\n' +
+                        '2. Create a new bucket named "warranty-templates"\n' +
+                        '3. Make it public\n' +
+                        '4. Set up read/write policies\n\n' +
+                        'See SUPABASE_STORAGE_SETUP.md for detailed instructions.\n\n' +
+                        'Would you like to use the local default template for now?'
+                    );
+
+                    if (setupBucket) {
+                        // Use local template as fallback
+                        await useLocalTemplate(uri, fileName);
+                        return;
+                    }
+                } else {
+                    Alert.alert(
+                        'Storage Not Set Up',
+                        'The Supabase storage bucket "warranty-templates" needs to be created first.\n\n' +
+                        'See SUPABASE_STORAGE_SETUP.md for instructions.\n\n' +
+                        'Using local template for now.',
+                        [
+                            {
+                                text: 'OK',
+                                onPress: () => useLocalTemplate(uri, fileName)
+                            }
+                        ]
+                    );
+                    return;
+                }
+
+                throw bucketError;
+            }
+
+            // 2. Upload file to Supabase
             const response = await fetch(uri);
             const blob = await response.blob();
 
@@ -71,7 +109,10 @@ export default function TemplateManagement() {
                     upsert: true
                 });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Upload error:', error);
+                throw new Error(`Upload failed: ${error.message}`);
+            }
 
             // 3. Get public URL
             const { data: { publicUrl } } = supabase.storage
@@ -82,12 +123,44 @@ export default function TemplateManagement() {
             await Storage.setItem(TEMPLATE_STORE_KEY, JSON.stringify(config));
             setCurrentTemplate(config);
 
-            Alert.alert('Success', 'Warranty template uploaded successfully!');
+            if (Platform.OS === 'web') {
+                window.alert('✅ Warranty template uploaded successfully!');
+            } else {
+                Alert.alert('Success', 'Warranty template uploaded successfully!');
+            }
         } catch (error: any) {
             console.error('Upload error:', error);
-            Alert.alert('Upload Failed', error.message || 'Could not upload template');
+
+            const errorMsg = error.message || 'Could not upload template';
+
+            if (Platform.OS === 'web') {
+                window.alert(`❌ Upload Failed\n\n${errorMsg}\n\nPlease check SUPABASE_STORAGE_SETUP.md for setup instructions.`);
+            } else {
+                Alert.alert('Upload Failed', errorMsg);
+            }
         } finally {
             setUploading(false);
+        }
+    };
+
+    const useLocalTemplate = async (uri: string, fileName: string) => {
+        try {
+            // Store the local template URI for development/testing
+            const config = {
+                url: uri,
+                name: fileName,
+                isLocal: true
+            };
+            await Storage.setItem(TEMPLATE_STORE_KEY, JSON.stringify(config));
+            setCurrentTemplate(config);
+
+            if (Platform.OS === 'web') {
+                window.alert('✅ Local template configured!\n\nNote: This is for development only. Set up Supabase storage for production.');
+            } else {
+                Alert.alert('Success', 'Local template configured for development use.');
+            }
+        } catch (error) {
+            console.error('Failed to set local template:', error);
         }
     };
 
@@ -130,6 +203,7 @@ export default function TemplateManagement() {
                 )}
             </View>
 
+
             <View style={styles.uploadSection}>
                 <Pressable
                     style={({ pressed }) => [
@@ -155,7 +229,31 @@ export default function TemplateManagement() {
                     </LinearGradient>
                 </Pressable>
                 <Text style={styles.hint}>Supported format: .docx only</Text>
+
+                {/* OR Divider */}
+                <View style={styles.orDivider}>
+                    <View style={styles.orLine} />
+                    <Text style={styles.orText}>OR</Text>
+                    <View style={styles.orLine} />
+                </View>
+
+                {/* Use Default Template Button */}
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.defaultBtn,
+                        pressed && { transform: [{ scale: 0.98 }] }
+                    ]}
+                    onPress={async () => {
+                        const defaultTemplate = require('../../assets/Warranty_pdf_template/WARRANTY CARD.docx');
+                        await useLocalTemplate(defaultTemplate, 'WARRANTY CARD.docx (Default)');
+                    }}
+                >
+                    <MaterialCommunityIcons name="file-document" size={20} color="#7C3AED" />
+                    <Text style={styles.defaultBtnText}>Use Default Template</Text>
+                </Pressable>
+                <Text style={styles.hint}>Uses the bundled WARRANTY CARD.docx file</Text>
             </View>
+
 
             <View style={styles.instructionCard}>
                 <Text style={styles.instructionTitle}>📝 How to create a template?</Text>
@@ -220,7 +318,12 @@ const styles = StyleSheet.create({
     uploadBtn: { width: '100%', borderRadius: 16, overflow: 'hidden' },
     gradientBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 10 },
     uploadBtnText: { color: 'white', fontSize: 17, fontWeight: '700' },
-    hint: { color: '#9CA3AF', fontSize: 12, marginTop: 10 },
+    hint: { color: '#9CA3AF', fontSize: 12, marginTop: 10, textAlign: 'center' },
+    orDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, width: '100%' },
+    orLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
+    orText: { marginHorizontal: 16, color: '#9CA3AF', fontSize: 13, fontWeight: '600' },
+    defaultBtn: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16, backgroundColor: '#F3F4F6', borderWidth: 2, borderColor: '#E5E7EB', borderStyle: 'dashed', gap: 8 },
+    defaultBtnText: { color: '#7C3AED', fontSize: 16, fontWeight: '600' },
     instructionCard: { backgroundColor: '#EFF6FF', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#DBEAFE' },
     instructionTitle: { fontSize: 17, fontWeight: '700', color: '#1E40AF', marginBottom: 12 },
     instructionText: { fontSize: 14, color: '#3B82F6', marginBottom: 16, lineHeight: 20 },
