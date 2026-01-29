@@ -6,12 +6,22 @@ import { Sale } from '../../services/SalesService';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
+import { TemplateService } from '../../services/TemplateService';
+import { Storage } from '../../utils/storage';
 
 export default function WarrantyCard() {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const sale: Sale = route.params?.sale;
     const [loading, setLoading] = useState(false);
+    const [docxLoading, setDocxLoading] = useState(false);
+    const [templateConfig, setTemplateConfig] = useState<any>(null);
+
+    useEffect(() => {
+        Storage.getItem('WARRANTY_TEMPLATE_CONFIG').then((val: string | null) => {
+            if (val) setTemplateConfig(JSON.parse(val));
+        });
+    }, []);
 
     // Animation values
     const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -240,6 +250,70 @@ export default function WarrantyCard() {
 </html>
     `;
 
+    const handleDownloadDocx = async () => {
+        if (!templateConfig) {
+            Alert.alert(
+                'No Template Available',
+                'No custom Word template has been uploaded by the admin. Please contact your administrator to upload the warranty card template.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        setDocxLoading(true);
+        try {
+            console.log('Starting Word document generation...');
+
+            // Format the sale data for the template
+            const templateData = TemplateService.formatSaleDataForTemplate({
+                ...sale,
+                saleDate: formattedDate, // Use pre-formatted date
+            });
+
+            console.log('Formatted template data:', templateData);
+
+            // Validate template before attempting to use it
+            const isValid = await TemplateService.validateTemplate(templateConfig.url);
+            if (!isValid) {
+                throw new Error('Template file is not accessible or has been removed');
+            }
+
+            // Generate the document
+            const result = await TemplateService.fillDocxTemplate(
+                templateConfig.url,
+                templateData,
+                `Warranty_${sale.warrantyId}.docx`
+            );
+
+            if (!result) {
+                throw new Error('Failed to generate document');
+            }
+
+            if (Platform.OS === 'web') {
+                window.alert('✅ Warranty document downloaded successfully!');
+            } else {
+                Alert.alert(
+                    'Success',
+                    'Warranty document generated successfully!',
+                    [{ text: 'OK' }]
+                );
+            }
+        } catch (error: any) {
+            console.error('Docx generation error:', error);
+
+            const errorMessage = error.message || 'Could not generate Word document.';
+            const detailedMessage = `${errorMessage}\n\nIf this problem persists, please check:\n1. The template file is properly formatted\n2. All placeholders use the correct format: {placeholderName}\n3. The template file is accessible`;
+
+            if (Platform.OS === 'web') {
+                window.alert(`❌ Error: ${detailedMessage}`);
+            } else {
+                Alert.alert('Error', detailedMessage, [{ text: 'OK' }]);
+            }
+        } finally {
+            setDocxLoading(false);
+        }
+    };
+
     const handleDownloadPDF = async () => {
         setLoading(true);
         try {
@@ -389,12 +463,31 @@ export default function WarrantyCard() {
                                 </>
                             ) : (
                                 <>
-                                    <MaterialCommunityIcons name="download" size={20} color="white" />
+                                    <MaterialCommunityIcons name="file-pdf-box" size={20} color="white" />
                                     <Text style={styles.downloadButtonText}>Download PDF</Text>
                                 </>
                             )}
                         </LinearGradient>
                     </Pressable>
+
+                    {templateConfig && (
+                        <Pressable
+                            style={({ pressed }) => [styles.docxButton, pressed && !docxLoading && { transform: [{ scale: 0.98 }] }]}
+                            onPress={handleDownloadDocx}
+                            disabled={docxLoading}
+                        >
+                            <View style={styles.docxButtonContent}>
+                                {docxLoading ? (
+                                    <ActivityIndicator color="#2B579A" size="small" />
+                                ) : (
+                                    <MaterialCommunityIcons name="file-word-box" size={20} color="#2B579A" />
+                                )}
+                                <Text style={styles.docxButtonText}>
+                                    {docxLoading ? 'Generating Word...' : 'Download Word (.docx)'}
+                                </Text>
+                            </View>
+                        </Pressable>
+                    )}
 
                     <Pressable
                         style={({ pressed }) => [styles.homeButton, pressed && { opacity: 0.7 }]}
@@ -564,6 +657,25 @@ const styles = StyleSheet.create({
     },
     downloadButtonText: {
         color: 'white',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    docxButton: {
+        backgroundColor: '#EFF6FF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+        overflow: 'hidden',
+    },
+    docxButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 18,
+        gap: 8,
+    },
+    docxButtonText: {
+        color: '#2B579A',
         fontSize: 16,
         fontWeight: '700',
     },
