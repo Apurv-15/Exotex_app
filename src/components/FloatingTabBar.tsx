@@ -5,8 +5,8 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface FloatingTabBarProps {
-    activeTab: 'home' | 'create' | 'fieldvisit' | 'forms';
-    onTabPress: (tab: 'home' | 'create' | 'fieldvisit' | 'forms') => void;
+    activeTab: 'home' | 'create' | 'fieldvisit';
+    onTabPress: (tab: 'home' | 'create' | 'fieldvisit') => void;
 }
 
 export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBarProps) {
@@ -52,7 +52,7 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
         icon,
         activeIcon
     }: {
-        tab: 'home' | 'fieldvisit' | 'forms';
+        tab: 'home' | 'fieldvisit';
         icon: keyof typeof MaterialCommunityIcons.glyphMap;
         activeIcon: keyof typeof MaterialCommunityIcons.glyphMap;
     }) => {
@@ -100,9 +100,6 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
 
             {/* Field Visit Tab */}
             <TabButton tab="fieldvisit" icon="clipboard-text-outline" activeIcon="clipboard-text" />
-
-            {/* Forms Tab (placeholder) */}
-            <TabButton tab="forms" icon="file-document-outline" activeIcon="file-document" />
         </View>
     );
 
