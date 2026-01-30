@@ -22,15 +22,23 @@ Page 6: Static Content (e.g., Contact Information)
 In your editable warranty card page, use these placeholders:
 
 | Placeholder | Description | Example Value |
-|------------|-------------|---------------|
-| `{warrantyId}` | Unique warranty ID | WRT-2024-001 |
-| `{customerName}` | Customer's full name | John Doe |
-| `{phone}` | Customer phone number | +91 9876543210 |
-| `{address}` | Customer address | 123 Main Street |
+|-------------|-------------|---------------|
+| `{warrantyId}` | Unique warranty ID | WAR-490502 |
+| `{customerName}` | Customer's full name | Apurv Deshmukh |
+| `{phone}` | Customer phone number | 9876543210 |
+| `{email}` | Customer email | apurv@example.com |
+| `{address}` | Customer address | 4/402 Highland Residency |
 | `{city}` | Customer city | Mumbai |
-| `{productModel}` | Product model name | EKOTEX-500W |
+| `{productModel}` | Product model name | Inverter Model X |
 | `{serialNumber}` | Product serial number | SN12345678 |
 | `{saleDate}` | Date of sale (formatted) | 29/01/2026 |
+| `{date}` | Installation date | 29/01/2026 |
+| `{executiveName}` | Sales executive name | Rahul Kumar |
+| `{designation}` | Executive designation | Sales Executive |
+| `{plumberName}` | Plumber/Installer name | Vijay Plumber |
+| `{waterTestingBefore}` | TDS before installation | 150 |
+| `{waterTestingAfter}` | TDS after installation | 50 |
+| `{branchId}` | Branch ID | sub1 |
 
 ### How to Add Placeholders
 
