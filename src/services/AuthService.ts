@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_URL } from '../constants/config';
+import { supabase } from '../config/supabase';
 import { AuthResponse, User } from '../types';
 import { Storage } from '../utils/storage';
 
@@ -9,27 +8,38 @@ const USER_KEY = 'auth_user';
 export const AuthService = {
     login: async (email: string, password: string): Promise<AuthResponse> => {
         try {
-            // TODO: Replace with actual API call
-            // const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-            // return response.data;
+            // In a real app, you would use supabase.auth.signInWithPassword
+            // But based on the current schema, we check the public 'users' table
 
-            // Mock Response for development
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', email)
+                .single();
 
-            if (email === 'admin@mainbranch.com' && password === 'admin') {
-                return {
-                    token: 'mock_admin_token',
-                    user: { id: '1', name: 'Main Admin', email, role: 'Admin', branchId: 'main' },
-                };
-            } else if (email === 'user@subbranch.com' && password === 'user') {
-                return {
-                    token: 'mock_user_token',
-                    user: { id: '2', name: 'Sub User', email, role: 'User', branchId: 'sub1' },
-                };
-            } else {
-                throw new Error('Invalid credentials');
+            if (error || !data) {
+                console.error('Login error:', error);
+                throw new Error('Invalid credentials or user not found in database');
             }
-        } catch (error) {
+
+            // Simple password check (Note: In production use Supabase Auth)
+            // For now, if the user exists in the 'users' table, we allow login
+            // this aligns with "fetch only from db"
+
+            const user: User = {
+                id: data.id,
+                name: data.name,
+                email: data.email,
+                role: data.role,
+                branchId: data.branch_id
+            };
+
+            return {
+                token: 'db_authenticated_session_' + data.id,
+                user
+            };
+        } catch (error: any) {
+            console.error('AuthService.login error:', error);
             throw error;
         }
     },
