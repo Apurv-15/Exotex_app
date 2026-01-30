@@ -53,51 +53,7 @@ export default function TemplateManagement() {
     const uploadTemplate = async (uri: string, fileName: string) => {
         setUploading(true);
         try {
-            // 1. Check if bucket exists
-            const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('warranty-templates');
-
-            // If bucket doesn't exist, show helpful error
-            if (bucketError) {
-                console.error('Bucket error:', bucketError);
-
-                if (Platform.OS === 'web') {
-                    const setupBucket = window.confirm(
-                        '❌ Storage bucket "warranty-templates" not found!\n\n' +
-                        'You need to create this bucket in your Supabase dashboard first.\n\n' +
-                        'Steps:\n' +
-                        '1. Go to Supabase Dashboard → Storage\n' +
-                        '2. Create a new bucket named "warranty-templates"\n' +
-                        '3. Make it public\n' +
-                        '4. Set up read/write policies\n\n' +
-                        'See SUPABASE_STORAGE_SETUP.md for detailed instructions.\n\n' +
-                        'Would you like to use the local default template for now?'
-                    );
-
-                    if (setupBucket) {
-                        // Use local template as fallback
-                        await useLocalTemplate(uri, fileName);
-                        return;
-                    }
-                } else {
-                    Alert.alert(
-                        'Storage Not Set Up',
-                        'The Supabase storage bucket "warranty-templates" needs to be created first.\n\n' +
-                        'See SUPABASE_STORAGE_SETUP.md for instructions.\n\n' +
-                        'Using local template for now.',
-                        [
-                            {
-                                text: 'OK',
-                                onPress: () => useLocalTemplate(uri, fileName)
-                            }
-                        ]
-                    );
-                    return;
-                }
-
-                throw bucketError;
-            }
-
-            // 2. Upload file to Supabase
+            // Directly upload file to Supabase (skip getBucket check - it requires admin permissions)
             const response = await fetch(uri);
             const blob = await response.blob();
 

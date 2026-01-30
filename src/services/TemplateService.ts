@@ -6,14 +6,33 @@ import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
 
 export interface WarrantyTemplateData {
+    // Customer Details
     warrantyId: string;
     customerName: string;
     phone: string;
+    email: string;
     address: string;
     city: string;
+
+    // Product Details
     productModel: string;
     serialNumber: string;
-    saleDate: string; // Formatted date string
+
+    // Sale Details
+    saleDate: string;
+    date: string;
+
+    // Executive/Plumber Details
+    executiveName: string;
+    designation: string;
+    plumberName: string;
+
+    // Water Testing
+    waterTestingBefore: string;
+    waterTestingAfter: string;
+
+    // Branch
+    branchId: string;
 }
 
 export const TemplateService = {
@@ -175,21 +194,43 @@ export const TemplateService = {
 
     /**
      * Formats sale data for template filling
+     * Maps all Sale fields to template placeholders
      */
     formatSaleDataForTemplate: (sale: any): WarrantyTemplateData => {
+        const defaultDate = new Date().toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+
         return {
+            // Customer Details
             warrantyId: sale.warrantyId || '',
             customerName: sale.customerName || '',
             phone: sale.phone || '',
+            email: sale.email || '',
             address: sale.address || '',
             city: sale.city || '',
+
+            // Product Details
             productModel: sale.productModel || '',
             serialNumber: sale.serialNumber || '',
-            saleDate: sale.saleDate || new Date().toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            }),
+
+            // Sale Details
+            saleDate: sale.saleDate || defaultDate,
+            date: sale.date || defaultDate,
+
+            // Executive/Plumber Details
+            executiveName: sale.executiveName || '',
+            designation: sale.designation || '',
+            plumberName: sale.plumberName || '',
+
+            // Water Testing
+            waterTestingBefore: sale.waterTestingBefore || '',
+            waterTestingAfter: sale.waterTestingAfter || '',
+
+            // Branch
+            branchId: sale.branchId || '',
         };
     },
 };
