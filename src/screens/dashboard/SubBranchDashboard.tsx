@@ -42,9 +42,11 @@ export default function SubBranchDashboard() {
     const todaySales = sales.filter(s => s.saleDate === new Date().toISOString().split('T')[0]).length;
     const warrantiesGenerated = sales.filter(s => s.warrantyId).length;
 
-    const handleTabPress = (tab: 'home' | 'create' | 'forms') => {
+    const handleTabPress = (tab: 'home' | 'create' | 'fieldvisit' | 'forms') => {
         if (tab === 'create') {
             navigation.navigate('CreateSaleStep1');
+        } else if (tab === 'fieldvisit') {
+            navigation.navigate('FieldVisitForm');
         } else if (tab === 'forms') {
             // Placeholder for future forms tab
             Alert.alert('Coming Soon', 'Forms feature will be available in the next update!');
