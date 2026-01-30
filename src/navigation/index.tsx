@@ -11,6 +11,7 @@ import CreateSaleStep2 from '../screens/sales/CreateSaleStep2';
 import WarrantyCard from '../screens/warranty/WarrantyCard';
 import AnalyticsScreen from '../screens/analytics/AnalyticsScreen';
 import TemplateManagement from '../screens/admin/TemplateManagement';
+import FieldVisitForm from '../screens/fieldvisit/FieldVisitForm';
 import { THEME } from '../constants/config';
 
 const Stack = createNativeStackNavigator();
@@ -72,6 +73,11 @@ function UserStack() {
                 name="WarrantyCard"
                 component={WarrantyCard}
                 options={{ title: 'Warranty Generated', gestureEnabled: false, headerLeft: () => null }}
+            />
+            <Stack.Screen
+                name="FieldVisitForm"
+                component={FieldVisitForm}
+                options={{ title: 'Field Visit Report', headerBackTitle: 'Back' }}
             />
             <Stack.Screen
                 name="AnalyticsScreen"
