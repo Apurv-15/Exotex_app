@@ -8,6 +8,9 @@ import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TemplateService } from '../../services/TemplateService';
 import { Storage } from '../../utils/storage';
+import { Asset } from 'expo-asset';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 
 export default function WarrantyCard() {
     const route = useRoute<any>();
@@ -61,208 +64,307 @@ export default function WarrantyCard() {
     });
 
     // Generate HTML for EKOTEX Warranty Card
-    const generateWarrantyHTML = () => `
+    const generateWarrantyHTML = () => {
+        // Resolve logo asset
+        const logoAsset = Asset.fromModule(LogoImage);
+        // For web, we can use the uri directly or a base64 string if needed.
+        // For native, Asset.fromModule might give a local URI that works in WebView/Print
+        const logoUri = logoAsset.uri;
+
+        return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EKOTEX Warranty Card</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: Arial, sans-serif; 
-            padding: 40px;
-            background: white;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            border: 3px solid #0066cc;
-            padding: 30px;
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
+        
+        .warranty-card {
+            background-color: white;
+            border: 2px solid #000;
+            max-width: 800px;
+            width: 100%;
+            padding: 40px 50px;
+        }
+        
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
         }
-        .logo-text {
-            font-size: 36px;
+        
+        .logo {
+            max-width: 150px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        
+        .company-name {
+            font-size: 48px;
             font-weight: bold;
-            color: #0066cc;
-            letter-spacing: 4px;
+            color: #000;
+            letter-spacing: 8px;
+            margin-bottom: 5px;
         }
+        
         .tagline {
-            font-size: 10px;
-            color: #333;
+            font-size: 14px;
             font-style: italic;
+            color: #333;
+            margin-bottom: 5px;
         }
-        .iso {
-            font-size: 11px;
-            color: #0066cc;
-            margin-top: 5px;
-        }
-        .warranty-title {
-            background: linear-gradient(90deg, #0066cc, #00cc66);
-            color: white;
-            padding: 12px 40px;
-            font-size: 22px;
+        
+        .certification {
+            font-size: 14px;
+            color: #000;
             font-weight: bold;
-            display: inline-block;
-            margin: 20px 0;
-            border-radius: 4px;
         }
+        
+        .warranty-title {
+            background: #000;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 30px auto;
+            max-width: 400px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        
         .divider {
             text-align: center;
-            color: #0066cc;
-            font-size: 20px;
-            margin: 10px 0;
+            color: #000;
+            font-size: 24px;
+            margin: 20px 0;
         }
-        .form-row {
+        
+        .info-row {
             display: flex;
             justify-content: space-between;
-            margin: 15px 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ccc;
+            margin-bottom: 25px;
+            gap: 40px;
         }
-        .form-row.no-border {
-            border-bottom: none;
+        
+        .info-item {
+            flex: 1;
         }
-        .label {
+        
+        .info-label {
             font-weight: bold;
+            font-size: 16px;
             color: #333;
+            display: inline;
         }
-        .value {
-            color: #000;
-            font-weight: 500;
+        
+        .info-value {
+            font-size: 16px;
+            color: #333;
+            display: inline;
         }
+        
         .address-section {
-            margin: 15px 0;
+            margin-bottom: 25px;
         }
-        .address-label {
-            font-weight: bold;
-            color: #333;
+        
+        .address-content {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 15px;
+            margin-top: 5px;
         }
-        .address-value {
-            margin-top: 10px;
-            padding: 10px;
-            border-bottom: 1px solid #ccc;
-            min-height: 60px;
-        }
-        .phone-stamp-row {
+        
+        .phone-dealer-row {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin: 20px 0;
+            margin-bottom: 25px;
+            gap: 30px;
         }
-        .phone-section {
+        
+        .dealer-box {
+            border: 2px solid #333;
+            padding: 15px;
+            min-height: 120px;
+            position: relative;
             flex: 1;
+            max-width: 300px;
         }
-        .stamp-box {
-            width: 180px;
-            height: 100px;
-            border: 1px solid #333;
-            padding: 10px;
-            font-size: 10px;
-        }
-        .stamp-title {
-            font-size: 10px;
+        
+        .dealer-box-label {
+            font-size: 12px;
+            color: #333;
             margin-bottom: 50px;
         }
-        .signature {
-            text-align: right;
-            font-size: 10px;
+        
+        .signature-label {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
             font-style: italic;
+            color: #666;
         }
-        .contact {
-            margin-top: 20px;
+        
+        .contact-section {
+            margin-bottom: 20px;
         }
-        .contact-email {
-            color: #0066cc;
+        
+        .email {
+            color: #000;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .warranty-note {
+            font-size: 12px;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .warranty-note strong {
             font-weight: bold;
         }
-        .notice {
-            margin-top: 15px;
-            font-size: 11px;
-        }
-        .notice-bold {
-            font-weight: bold;
-        }
+        
         .footer {
             text-align: center;
-            margin-top: 30px;
-            font-size: 10px;
+            font-size: 12px;
             color: #666;
             font-style: italic;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 20px 0;
+        }
+        
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            
+            .warranty-card {
+                border: 2px solid #000;
+                max-width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="warranty-card">
         <div class="header">
-            <div class="logo-text">EKOTEX</div>
+            <img src="${logoUri}" alt="Company Logo" class="logo">
+            <div class="company-name">EKOTEX</div>
             <div class="tagline">Energizing Future, eMpowering Excellence.....</div>
-            <div class="iso">AN ISO 9001 - 2015 CERTIFIED COMPANY</div>
-            <div class="warranty-title">WARRANTY CARD</div>
-            <div class="divider">✦</div>
+            <div class="certification">AN ISO 9001 - 2015 CERTIFIED COMPANY</div>
         </div>
-
-        <div class="form-row">
-            <div><span class="label">Bill No :</span> <span class="value">${sale.warrantyId}</span></div>
-            <div><span class="label">Date :</span> <span class="value">${formattedDate}</span></div>
+        
+        <div class="warranty-title">WARRANTY CARD</div>
+        
+        <div class="divider">◆</div>
+        
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Bill No :</span>
+                <span class="info-value">${sale.warrantyId}</span>
+            </div>
+            <div class="info-item" style="text-align: right;">
+                <span class="info-label">Date :</span>
+                <span class="info-value">${formattedDate}</span>
+            </div>
         </div>
-
-        <div class="form-row">
-            <div><span class="label">Name of the Purchaser:</span> <span class="value">${sale.customerName}</span></div>
+        
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Name of the Purchaser:</span>
+                <span class="info-value">${sale.customerName}</span>
+            </div>
         </div>
-
+        
+        <hr>
+        
         <div class="address-section">
-            <div class="address-label">Address:</div>
-            <div class="address-value">
-                ${sale.address}<br>
-                ${sale.city}
+            <div class="info-label">Address:</div>
+            <div class="address-content">
+                <p>${sale.address}</p>
+                <p>${sale.city}</p>
             </div>
         </div>
-
-        <div class="phone-stamp-row">
-            <div class="phone-section">
-                <span class="label">Phone No :</span> <span class="value">${sale.phone}</span>
+        
+        <hr>
+        
+        <div class="phone-dealer-row">
+            <div style="flex: 1;">
+                <span class="info-label">Phone No :</span>
+                <span class="info-value">${sale.phone}</span>
             </div>
-            <div class="stamp-box">
-                <div class="stamp-title">Name and Address of the dealer with Stamp</div>
-                <div class="signature">Signature</div>
+            
+            <div class="dealer-box">
+                <div class="dealer-box-label">Name and Address of the dealer<br>with Stamp</div>
+                <div class="signature-label">Signature</div>
             </div>
         </div>
-
-        <div class="contact">
-            <div>Write us at :</div>
-            <div class="contact-email">ekotexelectricient@gmail.com</div>
+        
+        <div class="contact-section">
+            <div class="info-label">Write us at :</div>
+            <div class="email">ekotexelectricient@gmail.com</div>
         </div>
-
-        <div class="notice">
+        
+        <div class="warranty-note">
             For warranty period please refer to the warranty page in the user manual *<br>
-            <span class="notice-bold">This Warranty is not valid if the above information is not duly filled in.</span>
+            <strong>This Warranty is not valid if the above information is not duly filled in.</strong>
         </div>
-
+        
         <div class="footer">
             Generated on ${new Date().toLocaleString('en-IN')} | Warranty ID: ${sale.warrantyId}
         </div>
     </div>
 </body>
 </html>
-    `;
+        `;
+    };
 
     const handleDownloadDocx = async () => {
-        if (!templateConfig) {
-            Alert.alert(
-                'No Template Available',
-                'No custom Word template has been uploaded by the admin. Please contact your administrator to upload the warranty card template.',
-                [{ text: 'OK' }]
-            );
-            return;
-        }
-
         setDocxLoading(true);
         try {
             console.log('Starting Word document generation...');
+            let templateUri = templateConfig?.url;
+
+            // Use default local template if no admin template is set
+            if (!templateUri) {
+                console.log('Using default local template...');
+                try {
+                    // Load the asset
+                    const asset = Asset.fromModule(require('../../assets/Warranty_pdf_template/WARRANTY CARD.docx'));
+                    await asset.downloadAsync();
+                    templateUri = asset.localUri || asset.uri;
+                } catch (err) {
+                    console.error('Failed to load default template:', err);
+                    throw new Error('Default template not found. Please contact admin to upload a template.');
+                }
+            }
+
+            if (!templateUri) {
+                throw new Error('No template available.');
+            }
 
             // Format the sale data for the template
             const templateData = TemplateService.formatSaleDataForTemplate({
@@ -273,14 +375,14 @@ export default function WarrantyCard() {
             console.log('Formatted template data:', templateData);
 
             // Validate template before attempting to use it
-            const isValid = await TemplateService.validateTemplate(templateConfig.url);
+            const isValid = await TemplateService.validateTemplate(templateUri);
             if (!isValid) {
                 throw new Error('Template file is not accessible or has been removed');
             }
 
             // Generate the document
             const result = await TemplateService.fillDocxTemplate(
-                templateConfig.url,
+                templateUri,
                 templateData,
                 `Warranty_${sale.warrantyId}.docx`
             );
