@@ -200,68 +200,121 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
 });
 
 export const FieldVisitService = {
-    // Upload image to Supabase Storage
-    uploadImage: async (uri: string, visitId: string, index: number): Promise<string> => {
+    // Upload image to Supabase Storage with local fallback
+    uploadImage: async (
+        uri: string,
+        visitId: string,
+        index: number,
+        onProgress?: (progress: number) => void
+    ): Promise<string> => {
+        if (!uri) return '';
+
+        // Check if Supabase is configured
         if (!isSupabaseConfigured()) {
-            console.warn('Supabase not configured, skipping image upload');
-            return uri; // Return local URI as fallback
+            console.warn('Supabase not configured, using local storage');
+            return await FieldVisitService.saveImageLocally(uri, visitId, index);
         }
 
         try {
-            const response = await fetch(uri);
-            let blob = await response.blob();
+            // Check network connectivity
+            const NetInfo = require('@react-native-community/netinfo');
+            const netState = await NetInfo.fetch();
 
-            // Check file size (3MB limit)
-            const MAX_SIZE = 3 * 1024 * 1024;
-            if (blob.size > MAX_SIZE) {
-                console.warn(`Image ${index} exceeds 3MB, compressing...`);
-
-                if (typeof window !== 'undefined' && typeof window.createImageBitmap === 'function') {
-                    const imageBitmap = await createImageBitmap(blob);
-                    const canvas = document.createElement('canvas');
-                    const maxWidth = 1920;
-                    const scale = Math.min(1, maxWidth / imageBitmap.width);
-                    canvas.width = imageBitmap.width * scale;
-                    canvas.height = imageBitmap.height * scale;
-
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
-                        blob = await new Promise<Blob>((resolve) => {
-                            canvas.toBlob(
-                                (compressedBlob) => resolve(compressedBlob || blob),
-                                'image/jpeg',
-                                0.8
-                            );
-                        });
-                    }
-                }
+            if (!netState.isConnected) {
+                console.warn('No network connection, saving locally');
+                return await FieldVisitService.saveImageLocally(uri, visitId, index);
             }
 
-            let fileExt = 'jpg';
-            if (blob.type === 'image/png') fileExt = 'png';
-            else if (blob.type === 'image/webp') fileExt = 'webp';
+            onProgress?.(10); // Starting upload
 
-            const fileName = `${visitId}_${index}_${Date.now()}.${fileExt}`;
+            const fileName = `${visitId}_${index}_${Date.now()}.jpg`;
             const filePath = `field-visit-images/${fileName}`;
+            let fileBody: any;
 
-            const { data, error } = await supabase.storage
+            // Robust reading for Android/iOS
+            try {
+                // Use legacy API for expo-file-system v54+
+                const FileSystem = require('expo-file-system/legacy');
+                const base64 = await FileSystem.readAsStringAsync(uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+
+                onProgress?.(30); // File read complete
+
+                // Use Buffer to handle Base64 to Binary conversion (highly stable on Android)
+                const { Buffer } = require('buffer');
+                fileBody = Buffer.from(base64, 'base64');
+            } catch (readError) {
+                console.warn('FileSystem read failed, using blob fallback...', readError);
+                const response = await fetch(uri);
+                fileBody = await response.blob();
+            }
+
+            onProgress?.(50); // Uploading to server
+
+            const { error: uploadError } = await supabase.storage
                 .from('warranty-images')
-                .upload(filePath, blob, {
-                    contentType: blob.type || 'image/jpeg',
+                .upload(filePath, fileBody, {
+                    contentType: 'image/jpeg',
                     upsert: false,
                 });
 
-            if (error) throw error;
+            if (uploadError) {
+                console.error('Supabase upload error details:', uploadError);
+
+                // Fallback to local storage on upload error
+                console.warn('Upload failed, saving locally instead');
+                return await FieldVisitService.saveImageLocally(uri, visitId, index);
+            }
+
+            onProgress?.(80); // Upload complete, getting URL
 
             const { data: urlData } = supabase.storage
                 .from('warranty-images')
                 .getPublicUrl(filePath);
 
+            onProgress?.(100); // Complete
+
             return urlData.publicUrl;
         } catch (error: any) {
             console.error('Image upload error:', error);
-            throw new Error(error.message || 'Failed to upload image');
+
+            // Fallback to local storage on any error
+            console.warn('Error during upload, saving locally');
+            return await FieldVisitService.saveImageLocally(uri, visitId, index);
+        }
+    },
+
+    // Save image locally as fallback
+    saveImageLocally: async (uri: string, visitId: string, index: number): Promise<string> => {
+        try {
+            // Use legacy API for expo-file-system v54+
+            const FileSystem = require('expo-file-system/legacy');
+            const fileName = `${visitId}_${index}_${Date.now()}.jpg`;
+            const localDir = `${FileSystem.documentDirectory}field-visit-images/`;
+
+            // Create directory if it doesn't exist
+            // Note: makeDirectoryAsync with intermediates: true is safe to call even if dir exists
+            try {
+                await FileSystem.makeDirectoryAsync(localDir, { intermediates: true });
+            } catch (dirError) {
+                // Ignore error if directory already exists
+            }
+
+            const localPath = `${localDir}${fileName}`;
+
+            // Copy image to local storage
+            await FileSystem.copyAsync({
+                from: uri,
+                to: localPath,
+            });
+
+            console.log('Field visit image saved locally:', localPath);
+            return localPath;
+        } catch (error) {
+            console.error('Local save error:', error);
+            // If local save fails, return original URI as last resort
+            return uri;
         }
     },
 
@@ -311,20 +364,30 @@ export const FieldVisitService = {
     // Create new field visit with images
     createFieldVisit: async (
         visitData: Omit<FieldVisit, 'id' | 'status' | 'imageUrls'>,
-        imageUris?: string[]
+        imageUris?: string[],
+        onProgress?: (progress: number) => void
     ): Promise<FieldVisit> => {
         const visitId = `FV-${Math.floor(100000 + Math.random() * 900000)}`;
 
-        // Upload images sequentially
+        // Upload images sequentially with progress tracking
         let imageUrls: string[] = [];
         if (imageUris && imageUris.length > 0) {
-            console.log(`Uploading ${imageUris.length} images sequentially...`);
             for (let i = 0; i < imageUris.length; i++) {
-                console.log(`Uploading image ${i + 1} of ${imageUris.length}...`);
-                const url = await FieldVisitService.uploadImage(imageUris[i], visitId, i);
+                const progressPerImage = 80 / imageUris.length; // Reserve 80% for uploads
+                const baseProgress = i * progressPerImage;
+
+                const url = await FieldVisitService.uploadImage(
+                    imageUris[i],
+                    visitId,
+                    i,
+                    (imgProgress) => {
+                        const totalProgress = baseProgress + (imgProgress * progressPerImage / 100);
+                        onProgress?.(Math.round(totalProgress));
+                    }
+                );
                 imageUrls.push(url);
             }
-            console.log('All images uploaded successfully');
+            onProgress?.(80); // All uploads complete
         }
 
         if (isSupabaseConfigured()) {

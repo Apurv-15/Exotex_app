@@ -81,51 +81,128 @@ const saleToDb = (sale: Partial<Sale>) => ({
 });
 
 export const SalesService = {
-    // Upload image to Supabase Storage
-    uploadImage: async (uri: string, warrantyId: string, index: number): Promise<string> => {
+    // Upload image to Supabase Storage with local fallback
+    uploadImage: async (
+        uri: string,
+        warrantyId: string,
+        index: number,
+        onProgress?: (progress: number) => void
+    ): Promise<string> => {
+        if (!uri) return '';
+
+        // Check if Supabase is configured
         if (!isSupabaseConfigured()) {
-            console.warn('Supabase not configured, skipping image upload');
-            return uri; // Return local URI as fallback
+            console.warn('Supabase not configured, using local storage');
+            return await SalesService.saveImageLocally(uri, warrantyId, index);
         }
 
         try {
-            // Convert image URI to blob
-            const response = await fetch(uri);
-            let blob = await response.blob();
+            // Check network connectivity
+            const NetInfo = require('@react-native-community/netinfo');
+            const netState = await NetInfo.fetch();
 
-            // Check file size (3MB = 3145728 bytes)
-            const MAX_SIZE = 3 * 1024 * 1024; // 3MB
-
-            if (blob.size > MAX_SIZE) {
-                console.warn(`Image ${index} exceeds 3MB, compressing...`);
-                // Simple compression logic removed for brevity, assuming standard usage
+            if (!netState.isConnected) {
+                console.warn('No network connection, saving locally');
+                return await SalesService.saveImageLocally(uri, warrantyId, index);
             }
 
-            // Determine extension from blob type
-            let fileExt = 'jpg';
-            if (blob.type === 'image/png') fileExt = 'png';
-            else if (blob.type === 'image/webp') fileExt = 'webp';
+            onProgress?.(10); // Starting upload
 
-            const fileName = `${warrantyId}_${index}_${Date.now()}.${fileExt}`;
+            const fileName = `${warrantyId}_${index}_${Date.now()}.jpg`;
             const filePath = `sales-images/${fileName}`;
 
-            const { data, error } = await supabase.storage
+            // ---------------------------------------------------------
+            // ROBUST FILE READING FOR ANDROID/IOS
+            // ---------------------------------------------------------
+            let fileBody: any;
+            try {
+                // Use legacy API for expo-file-system v54+
+                const FileSystem = require('expo-file-system/legacy');
+
+                // Read file as Base64
+                const base64 = await FileSystem.readAsStringAsync(uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+
+                onProgress?.(30); // File read complete
+
+                // Convert Base64 to ArrayBuffer (Uint8Array)
+                // This is the most reliable way to upload on React Native Android with Supabase
+                const { Buffer } = require('buffer');
+                const buffer = Buffer.from(base64, 'base64');
+                fileBody = buffer;
+            } catch (readError) {
+                console.warn('FileSystem read failed, trying fetch blob fallback...', readError);
+                // Fallback to fetch blob (works well on iOS, sometimes flaky on Android)
+                const response = await fetch(uri);
+                fileBody = await response.blob();
+            }
+
+            onProgress?.(50); // Uploading to server
+
+            const { error: uploadError } = await supabase.storage
                 .from('warranty-images')
-                .upload(filePath, blob, {
-                    contentType: blob.type || 'image/jpeg',
+                .upload(filePath, fileBody, {
+                    contentType: 'image/jpeg',
                     upsert: false,
                 });
 
-            if (error) throw error;
+            if (uploadError) {
+                console.error('Supabase upload error details:', uploadError);
+                // Fallback to local storage on upload error
+                console.warn('Upload failed, saving locally instead');
+                return await SalesService.saveImageLocally(uri, warrantyId, index);
+            }
+
+            onProgress?.(80); // Upload complete, getting URL
 
             const { data: urlData } = supabase.storage
                 .from('warranty-images')
                 .getPublicUrl(filePath);
 
+            onProgress?.(100); // Complete
+
             return urlData.publicUrl;
         } catch (error: any) {
             console.error('Image upload error:', error);
-            throw new Error(error.message || 'Failed to upload image');
+
+            // Fallback to local storage on any error
+            console.warn('Error during upload, saving locally');
+            return await SalesService.saveImageLocally(uri, warrantyId, index);
+        }
+    },
+
+    // Save image locally as fallback
+    saveImageLocally: async (uri: string, warrantyId: string, index: number): Promise<string> => {
+        try {
+            // Use legacy API for expo-file-system v54+
+            const FileSystem = require('expo-file-system/legacy');
+            const fileName = `${warrantyId}_${index}_${Date.now()}.jpg`;
+            const localDir = `${FileSystem.documentDirectory}warranty-images/`;
+
+            // Create directory if it doesn't exist
+            // Note: makeDirectoryAsync with intermediates: true is safe to call even if dir exists
+            try {
+                await FileSystem.makeDirectoryAsync(localDir, { intermediates: true });
+            } catch (dirError) {
+                // Ignore error if directory already exists, otherwise log it
+                // This bypasses the need for deprecated getInfoAsync check
+            }
+
+            const localPath = `${localDir}${fileName}`;
+
+            // Copy image to local storage
+            await FileSystem.copyAsync({
+                from: uri,
+                to: localPath,
+            });
+
+            console.log('Image saved locally:', localPath);
+            return localPath;
+        } catch (error) {
+            console.error('Local save error:', error);
+            // If local save fails, return original URI as last resort
+            return uri;
         }
     },
 
@@ -180,17 +257,30 @@ export const SalesService = {
     // Create new sale with images
     createSale: async (
         saleData: Omit<Sale, 'id' | 'warrantyId' | 'status' | 'imageUrls'>,
-        imageUris?: string[]
+        imageUris?: string[],
+        onProgress?: (progress: number) => void
     ): Promise<Sale> => {
         const warrantyId = `WAR-${Math.floor(100000 + Math.random() * 900000)}`;
 
-        // Upload images sequentially
+        // Upload images sequentially with progress tracking
         let imageUrls: string[] = [];
         if (imageUris && imageUris.length > 0) {
             for (let i = 0; i < imageUris.length; i++) {
-                const url = await SalesService.uploadImage(imageUris[i], warrantyId, i);
+                const progressPerImage = 80 / imageUris.length; // Reserve 80% for uploads
+                const baseProgress = i * progressPerImage;
+
+                const url = await SalesService.uploadImage(
+                    imageUris[i],
+                    warrantyId,
+                    i,
+                    (imgProgress) => {
+                        const totalProgress = baseProgress + (imgProgress * progressPerImage / 100);
+                        onProgress?.(Math.round(totalProgress));
+                    }
+                );
                 imageUrls.push(url);
             }
+            onProgress?.(80); // All uploads complete
         }
 
         if (isSupabaseConfigured()) {
