@@ -17,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.png';
 
 const { width } = Dimensions.get('window');
 
