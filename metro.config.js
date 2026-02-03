@@ -2,8 +2,8 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-// Add pdf and docx extensions to asset extensions
-config.resolver.assetExts.push('pdf', 'docx');
+// Add pdf, docx and avif extensions to asset extensions
+config.resolver.assetExts.push('pdf', 'docx', 'avif');
 
 // Ensure proper resolution of node_modules
 config.resolver.nodeModulesPaths = [
