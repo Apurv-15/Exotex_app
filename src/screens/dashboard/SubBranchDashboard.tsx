@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Alert, Image, StatusBar } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/config';
 import { SalesService, Sale } from '../../services/SalesService';
@@ -82,7 +82,7 @@ export default function SubBranchDashboard() {
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#F0F7FF', '#FFFFFF']}
+                colors={['#FFFFFF', '#F8FAFC']}
                 style={StyleSheet.absoluteFill}
             />
             <ScrollView
@@ -189,6 +189,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        paddingTop: 10,
         marginBottom: 24,
     },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

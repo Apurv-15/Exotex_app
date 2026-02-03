@@ -53,6 +53,7 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
             <LinearGradient
                 colors={['#FFFFFF', '#F5F5FA']}
