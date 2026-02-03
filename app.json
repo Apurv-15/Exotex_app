@@ -37,9 +37,7 @@
       }
     },
     "owner": "apurv1525",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/a4d861aa-0106-4a73-8b4f-d557bea966f9"
     }
