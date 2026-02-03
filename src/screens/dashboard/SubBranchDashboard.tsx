@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Alert, Image } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/config';
 import { SalesService, Sale } from '../../services/SalesService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 import FloatingTabBar from '../../components/FloatingTabBar';
 
 export default function SubBranchDashboard() {
@@ -95,9 +97,14 @@ export default function SubBranchDashboard() {
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <View>
-                        <Text style={styles.greeting}>Hello, {user?.name}</Text>
-                        <Text style={styles.subtitle}>Make your sales tracking easy</Text>
+                    <View style={styles.headerTitleRow}>
+                        <View style={styles.logoWrapper}>
+                            <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
+                        </View>
+                        <View>
+                            <Text style={styles.greeting}>Hello, {user?.name}</Text>
+                            <Text style={styles.subtitle}>Make your sales tracking easy</Text>
+                        </View>
                     </View>
                     <Pressable
                         onPress={logout}
@@ -188,14 +195,34 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24,
     },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    logoWrapper: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    companyLogo: {
+        width: 32,
+        height: 32,
+    },
     greeting: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
         color: '#1A1A1A',
         letterSpacing: -0.5,
     },
     subtitle: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#6B7280',
         marginTop: 2,
     },

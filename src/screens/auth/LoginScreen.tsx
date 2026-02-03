@@ -11,10 +11,13 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Dimensions,
+    Image,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 
 const { width } = Dimensions.get('window');
 
@@ -62,14 +65,15 @@ export default function LoginScreen() {
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
-                        <LinearGradient
-                            colors={['#7C3AED', '#5B21B6']}
-                            style={styles.logoGradient}
-                        >
-                            <MaterialCommunityIcons name="shield-check" size={36} color="white" />
-                        </LinearGradient>
+                        <View style={styles.logoWrapper}>
+                            <Image
+                                source={LogoImage}
+                                style={styles.companyLogo}
+                                resizeMode="contain"
+                            />
+                        </View>
                     </View>
-                    <Text style={styles.appName}>WarrantyPro</Text>
+                    <Text style={styles.appName}>EKOTEX</Text>
                     <Text style={styles.tagline}>Intelligent Sales & Warranty Management</Text>
                 </View>
 
@@ -205,17 +209,24 @@ const styles = StyleSheet.create({
     logoContainer: {
         marginBottom: 20,
     },
-    logoGradient: {
-        width: 88,
-        height: 88,
-        borderRadius: 24,
+    logoWrapper: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 15,
+        elevation: 10,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    companyLogo: {
+        width: 70,
+        height: 70,
     },
     appName: {
         fontSize: 32,

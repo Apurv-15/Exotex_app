@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 
 export default function CreateSaleStep1() {
     const navigation = useNavigation<any>();
@@ -65,8 +67,15 @@ export default function CreateSaleStep1() {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.header}>
-                    <Text style={styles.title}>New Sale Entry</Text>
-                    <Text style={styles.subtitle}>Enter complete customer and product details</Text>
+                    <View style={styles.headerTitleRow}>
+                        <View style={styles.logoWrapper}>
+                            <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
+                        </View>
+                        <View>
+                            <Text style={styles.title}>New Sale Entry</Text>
+                            <Text style={styles.subtitle}>Enter complete customer and product details</Text>
+                        </View>
+                    </View>
                 </View>
 
                 {/* Customer Information */}
@@ -326,13 +335,33 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         marginTop: 10,
     },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    logoWrapper: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    companyLogo: {
+        width: 32,
+        height: 32,
+    },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
         color: '#1A1A1A',
     },
     subtitle: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#6B7280',
         marginTop: 4,
     },

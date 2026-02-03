@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { SalesService, Sale } from '../../services/SalesService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -90,9 +92,14 @@ export default function MainBranchDashboard() {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Header Section */}
                 <View style={styles.header}>
-                    <View>
-                        <Text style={styles.greeting}>Admin Hub</Text>
-                        <Text style={styles.subtitle}>Welcome back, {user?.name}</Text>
+                    <View style={styles.headerTitleRow}>
+                        <View style={styles.logoWrapper}>
+                            <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
+                        </View>
+                        <View>
+                            <Text style={styles.greeting}>EKOTEX Admin</Text>
+                            <Text style={styles.subtitle}>Welcome back, {user?.name}</Text>
+                        </View>
                     </View>
                     <Pressable onPress={logout} style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}>
                         <View style={styles.logoutIcon}>
@@ -299,6 +306,26 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
     content: { padding: 20, paddingBottom: 40 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 10 },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    logoWrapper: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    companyLogo: {
+        width: 35,
+        height: 35,
+    },
     greeting: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
     subtitle: { fontSize: 14, color: '#6B7280', marginTop: 2 },
     logoutBtn: { cursor: 'pointer' } as any,

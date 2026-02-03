@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, ActivityIndicator, Platform, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../../config/supabase';
 import { Storage } from '../../utils/storage';
 import { LinearGradient } from 'expo-linear-gradient';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 
 const TEMPLATE_STORE_KEY = 'WARRANTY_TEMPLATE_CONFIG';
 
@@ -123,8 +125,15 @@ export default function TemplateManagement() {
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             <View style={styles.header}>
-                <Text style={styles.title}>Template Management</Text>
-                <Text style={styles.subtitle}>Upload and manage your .docx warranty templates</Text>
+                <View style={styles.headerTitleRow}>
+                    <View style={styles.logoWrapper}>
+                        <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
+                    </View>
+                    <View>
+                        <Text style={styles.title}>Template Management</Text>
+                        <Text style={styles.subtitle}>Upload and manage your .docx warranty templates</Text>
+                    </View>
+                </View>
             </View>
 
             <View style={styles.card}>
@@ -256,8 +265,28 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     content: { padding: 20 },
     header: { marginBottom: 32 },
-    title: { fontSize: 28, fontWeight: '800', color: '#111827' },
-    subtitle: { fontSize: 15, color: '#6B7280', marginTop: 4 },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    logoWrapper: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    companyLogo: {
+        width: 35,
+        height: 35,
+    },
+    title: { fontSize: 24, fontWeight: '800', color: '#111827' },
+    subtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
     card: { backgroundColor: 'white', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4, marginBottom: 24 },
     cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
     cardTitle: { fontSize: 17, fontWeight: '700', color: '#374151' },
