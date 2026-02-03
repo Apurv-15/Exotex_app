@@ -73,7 +73,7 @@ export default function LoginScreen() {
                             />
                         </View>
                     </View>
-                    <Text style={styles.appName}>EKOTEX</Text>
+                    <Text style={styles.appName}>EXOTEX</Text>
                     <Text style={styles.tagline}>Intelligent Sales & Warranty Management</Text>
                 </View>
 

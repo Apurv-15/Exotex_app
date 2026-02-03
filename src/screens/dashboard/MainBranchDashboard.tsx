@@ -97,7 +97,7 @@ export default function MainBranchDashboard() {
                             <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
                         </View>
                         <View>
-                            <Text style={styles.greeting}>EKOTEX Admin</Text>
+                            <Text style={styles.greeting}>EXOTEX Admin</Text>
                             <Text style={styles.subtitle}>Welcome back, {user?.name}</Text>
                         </View>
                     </View>
