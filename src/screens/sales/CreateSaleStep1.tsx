@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, Image, StatusBar, KeyboardAvoidingView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +25,26 @@ export default function CreateSaleStep1() {
         productDetailsConfirmed: false,
         paymentConfirmed: false
     });
+
+    const fillDummyData = () => {
+        setFormData({
+            customerName: 'John Doe',
+            phone: '9876543210',
+            email: 'john.doe@example.com',
+            address: '123 Test Street, Sample Area',
+            city: 'Mumbai',
+            date: new Date().toISOString().split('T')[0],
+            waterTestingBefore: '150',
+            waterTestingAfter: '50',
+            executiveName: 'Alex Smith',
+            designation: 'Sales Executive',
+            plumberName: 'Mike Ross',
+            productModel: 'Ekotex Pro Max',
+            serialNumber: 'SN' + Math.floor(Math.random() * 1000000).toString(),
+            productDetailsConfirmed: true,
+            paymentConfirmed: true
+        });
+    };
 
     const isStep1Valid = () => {
         return (
@@ -59,266 +79,287 @@ export default function CreateSaleStep1() {
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#F0F9FF', '#FFFFFF']}
+                colors={['#FFFFFF', '#F8FAFC']}
                 style={StyleSheet.absoluteFill}
             />
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
-                <View style={styles.header}>
-                    <View style={styles.headerTitleRow}>
-                        <View style={styles.logoWrapper}>
-                            <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
-                        </View>
-                        <View>
-                            <Text style={styles.title}>New Sale Entry</Text>
-                            <Text style={styles.subtitle}>Enter complete customer and product details</Text>
-                        </View>
-                    </View>
-                </View>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={{ height: 10 }} />
 
-                {/* Customer Information */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <MaterialCommunityIcons name="account-outline" size={20} color="#7C3AED" />
-                        <Text style={styles.sectionTitle}>Customer Information</Text>
-                    </View>
-                    <View style={styles.card}>
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Customer Name *</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter customer name"
-                                value={formData.customerName}
-                                onChangeText={(text) => setFormData({ ...formData, customerName: text })}
-                            />
+                    {/* Customer Information */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                <MaterialCommunityIcons name="account-outline" size={20} color="#7C3AED" />
+                                <Text style={styles.sectionTitle}>Customer Information</Text>
+                            </View>
+                            <Pressable
+                                onPress={fillDummyData}
+                                style={({ pressed }) => [
+                                    styles.dummyFillBtn,
+                                    pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
+                                ]}
+                            >
+                                <MaterialCommunityIcons name="auto-fix" size={18} color="#7C3AED" />
+                                <Text style={styles.dummyFillText}>Quick Fill</Text>
+                            </Pressable>
                         </View>
-
-                        <View style={styles.row}>
-                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>Mobile No. *</Text>
+                        <View style={styles.card}>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Customer Name *</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="9876543210"
-                                    keyboardType="phone-pad"
-                                    value={formData.phone}
-                                    onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                                    placeholder="Enter customer name"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={formData.customerName}
+                                    onChangeText={(text) => setFormData({ ...formData, customerName: text })}
                                 />
                             </View>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <Text style={styles.label}>Date</Text>
+
+                            <View style={styles.row}>
+                                <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                    <Text style={styles.label}>Mobile No. *</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="9876543210"
+                                        placeholderTextColor="#9CA3AF"
+                                        keyboardType="phone-pad"
+                                        value={formData.phone}
+                                        onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                                    />
+                                </View>
+                                <View style={[styles.inputContainer, { flex: 1 }]}>
+                                    <Text style={styles.label}>Date</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="YYYY-MM-DD"
+                                        placeholderTextColor="#9CA3AF"
+                                        value={formData.date}
+                                        onChangeText={(text) => setFormData({ ...formData, date: text })}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Address *</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="YYYY-MM-DD"
-                                    value={formData.date}
-                                    onChangeText={(text) => setFormData({ ...formData, date: text })}
+                                    placeholder="Enter full address"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={formData.address}
+                                    onChangeText={(text) => setFormData({ ...formData, address: text })}
                                 />
+                            </View>
+
+                            <View style={styles.row}>
+                                <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                    <Text style={styles.label}>City *</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Mumbai"
+                                        placeholderTextColor="#9CA3AF"
+                                        value={formData.city}
+                                        onChangeText={(text) => setFormData({ ...formData, city: text })}
+                                    />
+                                </View>
+                                <View style={[styles.inputContainer, { flex: 1 }]}>
+                                    <Text style={styles.label}>Email (Optional)</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="email@example.com"
+                                        placeholderTextColor="#9CA3AF"
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        value={formData.email}
+                                        onChangeText={(text) => setFormData({ ...formData, email: text })}
+                                    />
+                                </View>
                             </View>
                         </View>
+                    </View>
 
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Address *</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter full address"
-                                value={formData.address}
-                                onChangeText={(text) => setFormData({ ...formData, address: text })}
-                            />
+                    {/* Water Testing */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialCommunityIcons name="water" size={20} color="#3B82F6" />
+                            <Text style={styles.sectionTitle}>Water Testing (PPM)</Text>
                         </View>
+                        <View style={styles.card}>
+                            <View style={styles.row}>
+                                <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                    <Text style={styles.label}>Before PPM</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="150"
+                                        placeholderTextColor="#9CA3AF"
+                                        keyboardType="numeric"
+                                        value={formData.waterTestingBefore}
+                                        onChangeText={(text) => setFormData({ ...formData, waterTestingBefore: text })}
+                                    />
+                                </View>
+                                <View style={[styles.inputContainer, { flex: 1 }]}>
+                                    <Text style={styles.label}>After PPM</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="50"
+                                        placeholderTextColor="#9CA3AF"
+                                        keyboardType="numeric"
+                                        value={formData.waterTestingAfter}
+                                        onChangeText={(text) => setFormData({ ...formData, waterTestingAfter: text })}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+                    </View>
 
-                        <View style={styles.row}>
-                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>City *</Text>
+                    {/* Executive Details */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialCommunityIcons name="account-tie" size={20} color="#10B981" />
+                            <Text style={styles.sectionTitle}>Executive Details</Text>
+                        </View>
+                        <View style={styles.card}>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Executive Name</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Mumbai"
-                                    value={formData.city}
-                                    onChangeText={(text) => setFormData({ ...formData, city: text })}
+                                    placeholder="Enter executive name"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={formData.executiveName}
+                                    onChangeText={(text) => setFormData({ ...formData, executiveName: text })}
                                 />
                             </View>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <Text style={styles.label}>Email (Optional)</Text>
+
+                            <View style={styles.row}>
+                                <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                    <Text style={styles.label}>Designation</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Sales Executive"
+                                        placeholderTextColor="#9CA3AF"
+                                        value={formData.designation}
+                                        onChangeText={(text) => setFormData({ ...formData, designation: text })}
+                                    />
+                                </View>
+                                <View style={[styles.inputContainer, { flex: 1 }]}>
+                                    <Text style={styles.label}>Plumber Name</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Enter plumber name"
+                                        placeholderTextColor="#9CA3AF"
+                                        value={formData.plumberName}
+                                        onChangeText={(text) => setFormData({ ...formData, plumberName: text })}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Product Details */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialCommunityIcons name="cube-outline" size={20} color="#7C3AED" />
+                            <Text style={styles.sectionTitle}>Product Details</Text>
+                        </View>
+                        <View style={styles.card}>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Product Model *</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="email@example.com"
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    value={formData.email}
-                                    onChangeText={(text) => setFormData({ ...formData, email: text })}
+                                    placeholder="e.g. Inverter Model X"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={formData.productModel}
+                                    onChangeText={(text) => setFormData({ ...formData, productModel: text })}
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
+                                <Text style={styles.label}>Serial Number *</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="SN12345678"
+                                    placeholderTextColor="#9CA3AF"
+                                    autoCapitalize="characters"
+                                    value={formData.serialNumber}
+                                    onChangeText={(text) => setFormData({ ...formData, serialNumber: text })}
                                 />
                             </View>
                         </View>
                     </View>
-                </View>
 
-                {/* Water Testing */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <MaterialCommunityIcons name="water" size={20} color="#3B82F6" />
-                        <Text style={styles.sectionTitle}>Water Testing (PPM)</Text>
-                    </View>
-                    <View style={styles.card}>
-                        <View style={styles.row}>
-                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>Before PPM</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="150"
-                                    keyboardType="numeric"
-                                    value={formData.waterTestingBefore}
-                                    onChangeText={(text) => setFormData({ ...formData, waterTestingBefore: text })}
-                                />
-                            </View>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <Text style={styles.label}>After PPM</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="50"
-                                    keyboardType="numeric"
-                                    value={formData.waterTestingAfter}
-                                    onChangeText={(text) => setFormData({ ...formData, waterTestingAfter: text })}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Executive Details */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <MaterialCommunityIcons name="account-tie" size={20} color="#10B981" />
-                        <Text style={styles.sectionTitle}>Executive Details</Text>
-                    </View>
-                    <View style={styles.card}>
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Executive Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter executive name"
-                                value={formData.executiveName}
-                                onChangeText={(text) => setFormData({ ...formData, executiveName: text })}
-                            />
-                        </View>
-
-                        <View style={styles.row}>
-                            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-                                <Text style={styles.label}>Designation</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Sales Executive"
-                                    value={formData.designation}
-                                    onChangeText={(text) => setFormData({ ...formData, designation: text })}
-                                />
-                            </View>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <Text style={styles.label}>Plumber Name</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter plumber name"
-                                    value={formData.plumberName}
-                                    onChangeText={(text) => setFormData({ ...formData, plumberName: text })}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Product Details */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <MaterialCommunityIcons name="cube-outline" size={20} color="#7C3AED" />
-                        <Text style={styles.sectionTitle}>Product Details</Text>
-                    </View>
-                    <View style={styles.card}>
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Product Model *</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. Inverter Model X"
-                                value={formData.productModel}
-                                onChangeText={(text) => setFormData({ ...formData, productModel: text })}
-                            />
-                        </View>
-
-                        <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
-                            <Text style={styles.label}>Serial Number *</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="SN12345678"
-                                autoCapitalize="characters"
-                                value={formData.serialNumber}
-                                onChangeText={(text) => setFormData({ ...formData, serialNumber: text })}
-                            />
-                        </View>
-                    </View>
-                </View>
-
-                {/* Product Details Confirmation */}
-                <View style={styles.section}>
-                    <Pressable
-                        style={styles.checkboxCard}
-                        onPress={() => setFormData({ ...formData, productDetailsConfirmed: !formData.productDetailsConfirmed })}
-                    >
-                        <View style={[styles.checkbox, formData.productDetailsConfirmed && styles.checkboxActive]}>
-                            {formData.productDetailsConfirmed && (
-                                <MaterialCommunityIcons name="check" size={16} color="white" />
-                            )}
-                        </View>
-                        <Text style={styles.checkboxText}>
-                            I hereby confirm that I have explained all the product details to the customer, and the customer has fully understood and acknowledged the same.
-                        </Text>
-                    </Pressable>
-                </View>
-
-                {/* Payment Confirmation */}
-                <View style={styles.section}>
-                    <View style={[styles.card, styles.paymentCard, formData.paymentConfirmed && styles.paymentCardActive]}>
-                        <View style={styles.paymentInfo}>
-                            <MaterialCommunityIcons
-                                name={formData.paymentConfirmed ? "cash-check" : "cash-remove"}
-                                size={24}
-                                color={formData.paymentConfirmed ? "#10B981" : "#EF4444"}
-                            />
-                            <View style={styles.paymentTextContainer}>
-                                <Text style={styles.paymentTitle}>Payment Received?</Text>
-                                <Text style={styles.paymentSubtitle}>Confirm before proceeding</Text>
-                            </View>
-                        </View>
+                    {/* Product Details Confirmation */}
+                    <View style={styles.section}>
                         <Pressable
-                            onPress={() => setFormData({ ...formData, paymentConfirmed: !formData.paymentConfirmed })}
-                            style={[styles.toggleContainer, formData.paymentConfirmed && styles.toggleActive]}
+                            style={styles.checkboxCard}
+                            onPress={() => setFormData({ ...formData, productDetailsConfirmed: !formData.productDetailsConfirmed })}
                         >
-                            <View style={[styles.toggleCircle, formData.paymentConfirmed && styles.toggleCircleActive]} />
+                            <View style={[styles.checkbox, formData.productDetailsConfirmed && styles.checkboxActive]}>
+                                {formData.productDetailsConfirmed && (
+                                    <MaterialCommunityIcons name="check" size={16} color="white" />
+                                )}
+                            </View>
+                            <Text style={styles.checkboxText}>
+                                I hereby confirm that I have explained all the product details to the customer, and the customer has fully understood and acknowledged the same.
+                            </Text>
                         </Pressable>
                     </View>
-                </View>
 
-                <View style={{ height: 120 }} />
-            </ScrollView>
+                    {/* Payment Confirmation */}
+                    <View style={styles.section}>
+                        <View style={[styles.card, styles.paymentCard, formData.paymentConfirmed && styles.paymentCardActive]}>
+                            <View style={styles.paymentInfo}>
+                                <MaterialCommunityIcons
+                                    name={formData.paymentConfirmed ? "cash-check" : "cash-remove"}
+                                    size={24}
+                                    color={formData.paymentConfirmed ? "#10B981" : "#EF4444"}
+                                />
+                                <View style={styles.paymentTextContainer}>
+                                    <Text style={styles.paymentTitle}>Payment Received?</Text>
+                                    <Text style={styles.paymentSubtitle}>Confirm before proceeding</Text>
+                                </View>
+                            </View>
+                            <Pressable
+                                onPress={() => setFormData({ ...formData, paymentConfirmed: !formData.paymentConfirmed })}
+                                style={[styles.toggleContainer, formData.paymentConfirmed && styles.toggleActive]}
+                            >
+                                <View style={[styles.toggleCircle, formData.paymentConfirmed && styles.toggleCircleActive]} />
+                            </Pressable>
+                        </View>
+                    </View>
 
-            {/* Footer Button */}
-            <View style={styles.footer}>
-                <Pressable
-                    style={({ pressed }) => [
-                        styles.button,
-                        !isStep1Valid() && styles.buttonDisabled,
-                        pressed && isStep1Valid() && { opacity: 0.9, transform: [{ scale: 0.98 }] }
-                    ]}
-                    onPress={handleNext}
-                    disabled={!isStep1Valid()}
-                >
-                    <LinearGradient
-                        colors={isStep1Valid() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.gradientButton}
+                    <View style={{ height: 120 }} />
+                </ScrollView>
+
+                {/* Footer Button */}
+                <View style={styles.footer}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.button,
+                            !isStep1Valid() && styles.buttonDisabled,
+                            pressed && isStep1Valid() && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+                        ]}
+                        onPress={handleNext}
+                        disabled={!isStep1Valid()}
                     >
-                        <Text style={styles.buttonText}>Continue to Photos</Text>
-                        <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
-                    </LinearGradient>
-                </Pressable>
-            </View>
+                        <LinearGradient
+                            colors={isStep1Valid() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.gradientButton}
+                        >
+                            <Text style={styles.buttonText}>Continue to Photos</Text>
+                            <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+                        </LinearGradient>
+                    </Pressable>
+                </View>
+            </KeyboardAvoidingView>
         </View>
     );
 }
@@ -330,6 +371,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 20,
+        paddingBottom: 20,
     },
     header: {
         marginBottom: 24,
@@ -371,9 +413,25 @@ const styles = StyleSheet.create({
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
         marginBottom: 12,
-        gap: 8,
-        paddingLeft: 4,
+        paddingHorizontal: 4,
+    },
+    dummyFillBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+        backgroundColor: 'rgba(124, 58, 237, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(124, 58, 237, 0.2)',
+    },
+    dummyFillText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#7C3AED',
     },
     sectionTitle: {
         fontSize: 16,
@@ -381,16 +439,16 @@ const styles = StyleSheet.create({
         color: '#4B5563',
     },
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        borderRadius: 20,
-        padding: 16,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 18,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
+        borderColor: '#E5E7EB',
     },
     row: {
         flexDirection: 'row',
@@ -415,16 +473,16 @@ const styles = StyleSheet.create({
     },
     checkboxCard: {
         flexDirection: 'row',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundColor: '#FFFFFF',
         borderRadius: 16,
         padding: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
+        borderColor: '#E5E7EB',
         gap: 12,
     },
     checkbox: {
@@ -495,15 +553,16 @@ const styles = StyleSheet.create({
         transform: [{ translateX: 24 }],
     },
     footer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: '#FFFFFF',
         padding: 20,
         paddingBottom: Platform.OS === 'ios' ? 40 : 20,
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 10,
     },
     button: {
         borderRadius: 16,

@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, Image, ScrollView, Alert, ActivityIndicator, Platform, StatusBar, KeyboardAvoidingView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SalesService } from '../../services/SalesService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import NetInfo from '@react-native-community/netinfo';
 
 const IMAGE_CONFIG = [
-    { label: 'Product Front', icon: 'image', color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.1)' },
-    { label: 'Serial Number', icon: 'barcode', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)' },
-    { label: 'Invoice/Bill', icon: 'receipt', color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' },
-    { label: 'Installation', icon: 'tools', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)' },
+    { label: 'Product Front (Required)', icon: 'image', color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.1)', required: true },
+    { label: 'Serial Number (Required)', icon: 'barcode', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)', required: true },
+    { label: 'Invoice/Bill (Optional)', icon: 'receipt', color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)', required: false },
+    { label: 'Installation (Optional)', icon: 'tools', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.1)', required: false },
 ];
 
 export default function CreateSaleStep2() {
@@ -22,6 +23,17 @@ export default function CreateSaleStep2() {
 
     const [images, setImages] = useState<string[]>(['', '', '', '']);
     const [submitting, setSubmitting] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number>(0);
+    const [isOnline, setIsOnline] = useState<boolean>(true);
+    const [uploadStatus, setUploadStatus] = useState<string>('');
+
+    // Check network status on mount
+    useEffect(() => {
+        const unsubscribe = NetInfo.addEventListener(state => {
+            setIsOnline(state.isConnected ?? true);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const showAlert = (title: string, message: string) => {
         if (Platform.OS === 'web') {
@@ -59,14 +71,19 @@ export default function CreateSaleStep2() {
     };
 
     const handleSubmit = async () => {
-        const validImagesCount = images.filter(img => img && img.length > 0).length;
+        // Check compulsory images (indexes 0 and 1)
+        const isProductFrontUploaded = !!images[0];
+        const isSerialNoUploaded = !!images[1];
 
-        if (validImagesCount < 4) {
-            showAlert('Images Required', `Please upload all 4 product images. You have uploaded ${validImagesCount}/4 images.`);
+        if (!isProductFrontUploaded || !isSerialNoUploaded) {
+            showAlert('Images Required', 'Please upload at least the Product Front and Serial Number images.');
             return;
         }
 
         setSubmitting(true);
+        setUploadProgress(0);
+        setUploadStatus(isOnline ? 'Uploading images...' : 'Saving locally (offline)...');
+
         try {
             // Filter out empty images
             const validImages = images.filter(img => img && img.length > 0);
@@ -77,126 +94,157 @@ export default function CreateSaleStep2() {
                     saleDate: new Date().toISOString().split('T')[0],
                     branchId: user?.branchId || 'unknown',
                 },
-                validImages // Pass images to be uploaded
+                validImages, // Pass images to be uploaded
+                (progress) => {
+                    setUploadProgress(progress);
+                    if (progress === 100) {
+                        setUploadStatus('Creating warranty card...');
+                    }
+                }
             );
 
+            setUploadStatus('Success!');
             navigation.replace('WarrantyCard', { sale: newSale });
         } catch (error) {
             console.error('Submit error:', error);
-            showAlert('Error', 'Failed to submit sale. Please try again.');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            setUploadStatus('');
+            showAlert('Submission Failed', `Error: ${errorMessage}`);
         } finally {
             setSubmitting(false);
+            setUploadProgress(0);
         }
     };
 
-    const validImagesCount = images.filter(img => img && img.length > 0).length;
-    const allImagesUploaded = validImagesCount === 4;
+    // Check compulsory images logic for UI
+    const compulsoryUploaded = !!images[0] && !!images[1];
+    const totalUploaded = images.filter(img => img && img.length > 0).length;
 
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#F0F9FF', '#FFFFFF']}
+                colors={['#FFFFFF', '#F8FAFC']}
                 style={StyleSheet.absoluteFill}
             />
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={styles.headerIcon}>
-                        <MaterialCommunityIcons name="camera-plus" size={24} color="#7C3AED" />
-                    </View>
-                    <Text style={styles.title}>Upload Product Images</Text>
-                    <Text style={styles.description}>
-                        All 4 images are required to generate the warranty card
-                    </Text>
-                </View>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+            >
+                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                    <View style={{ height: 16 }} />
 
-                {/* Progress Card */}
-                <View style={styles.card}>
-                    <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>Upload Progress</Text>
-                        <Text style={[styles.progressValue, allImagesUploaded && { color: '#10B981' }]}>
-                            {validImagesCount}/4 Files {allImagesUploaded && '✓'}
-                        </Text>
+                    {/* Network Status Warning */}
+                    {!isOnline && (
+                        <View style={styles.offlineWarning}>
+                            <MaterialCommunityIcons name="wifi-off" size={20} color="#F59E0B" />
+                            <Text style={styles.offlineText}>Offline - Images will be saved locally</Text>
+                        </View>
+                    )}
+
+                    {/* Progress Card */}
+                    <View style={styles.card}>
+                        <View style={styles.progressHeader}>
+                            <Text style={styles.progressLabel}>Uploads (2 Required)</Text>
+                            <Text style={[styles.progressValue, compulsoryUploaded && { color: '#10B981' }]}>
+                                {totalUploaded}/4 Files {compulsoryUploaded && '(Ready)'}
+                            </Text>
+                        </View>
+                        <View style={styles.progressBar}>
+                            <LinearGradient
+                                colors={compulsoryUploaded ? ['#10B981', '#059669'] : ['#F59E0B', '#D97706']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={[styles.progressFill, { width: `${(totalUploaded / 4) * 100}%` }]}
+                            />
+                        </View>
                     </View>
-                    <View style={styles.progressBar}>
+
+                    {/* Upload Progress */}
+                    {submitting && uploadProgress > 0 && (
+                        <View style={styles.uploadProgressCard}>
+                            <Text style={styles.uploadStatusText}>{uploadStatus}</Text>
+                            <View style={styles.uploadProgressBar}>
+                                <View style={[styles.uploadProgressFill, { width: `${uploadProgress}%` }]} />
+                            </View>
+                            <Text style={styles.uploadProgressText}>{uploadProgress}%</Text>
+                        </View>
+                    )}
+
+                    {/* Image Grid */}
+                    <View style={styles.imageGrid}>
+                        {IMAGE_CONFIG.map((config, index) => (
+                            <Pressable
+                                key={index}
+                                style={({ pressed }) => [
+                                    styles.imageSlot,
+                                    pressed && { transform: [{ scale: 0.98 }] }
+                                ]}
+                                onPress={() => !images[index] && pickImage(index)}
+                            >
+                                {images[index] ? (
+                                    <View style={styles.imageContainer}>
+                                        <Image
+                                            source={{ uri: images[index] }}
+                                            style={styles.image}
+                                            resizeMode="cover"
+                                        />
+                                        <Pressable
+                                            style={styles.removeButton}
+                                            onPress={() => removeImage(index)}
+                                        >
+                                            <MaterialCommunityIcons name="close" size={16} color="white" />
+                                        </Pressable>
+                                        <View style={styles.imageOverlay}>
+                                            <MaterialCommunityIcons name="check-circle" size={16} color="#10B981" />
+                                            <Text style={styles.imageLabelDone}>{config.label}</Text>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <View style={styles.emptySlot}>
+                                        <View style={[styles.slotIcon, { backgroundColor: config.bg }]}>
+                                            <MaterialCommunityIcons name={config.icon as any} size={24} color={config.color} />
+                                        </View>
+                                        <Text style={styles.slotLabel}>{config.label}</Text>
+                                        <Text style={styles.slotAction}>Tap to upload</Text>
+                                    </View>
+                                )}
+                            </Pressable>
+                        ))}
+                    </View>
+
+                    <View style={{ height: 120 }} />
+                </ScrollView>
+
+                {/* Fixed Bottom */}
+                <View style={styles.footer}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.submitButton,
+                            pressed && !(!compulsoryUploaded || submitting) && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+                            (!compulsoryUploaded || submitting) && styles.submitButtonDisabled
+                        ]}
+                        onPress={handleSubmit}
+                        disabled={submitting || !compulsoryUploaded}
+                    >
                         <LinearGradient
-                            colors={allImagesUploaded ? ['#10B981', '#059669'] : ['#7C3AED', '#5B21B6']}
+                            colors={compulsoryUploaded ? ['#10B981', '#059669'] : ['#E5E7EB', '#D1D5DB']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
-                            style={[styles.progressFill, { width: `${(validImagesCount / 4) * 100}%` }]}
-                        />
-                    </View>
-                </View>
-
-                {/* Image Grid */}
-                <View style={styles.imageGrid}>
-                    {IMAGE_CONFIG.map((config, index) => (
-                        <Pressable
-                            key={index}
-                            style={({ pressed }) => [
-                                styles.imageSlot,
-                                pressed && { transform: [{ scale: 0.98 }] }
-                            ]}
-                            onPress={() => !images[index] && pickImage(index)}
+                            style={styles.gradientButton}
                         >
-                            {images[index] ? (
-                                <View style={styles.imageContainer}>
-                                    <Image source={{ uri: images[index] }} style={styles.image} />
-                                    <Pressable
-                                        style={styles.removeButton}
-                                        onPress={() => removeImage(index)}
-                                    >
-                                        <MaterialCommunityIcons name="close" size={16} color="white" />
-                                    </Pressable>
-                                    <View style={styles.imageOverlay}>
-                                        <MaterialCommunityIcons name="check-circle" size={16} color="#10B981" />
-                                        <Text style={styles.imageLabelDone}>{config.label}</Text>
-                                    </View>
-                                </View>
+                            {submitting ? (
+                                <ActivityIndicator color="white" />
                             ) : (
-                                <View style={styles.emptySlot}>
-                                    <View style={[styles.slotIcon, { backgroundColor: config.bg }]}>
-                                        <MaterialCommunityIcons name={config.icon as any} size={24} color={config.color} />
-                                    </View>
-                                    <Text style={styles.slotLabel}>{config.label}</Text>
-                                    <Text style={styles.slotAction}>Tap to upload</Text>
-                                </View>
+                                <>
+                                    <MaterialCommunityIcons name="shield-check" size={20} color="white" />
+                                    <Text style={styles.submitButtonText}>Generate Warranty</Text>
+                                </>
                             )}
-                        </Pressable>
-                    ))}
+                        </LinearGradient>
+                    </Pressable>
                 </View>
-
-                <View style={{ height: 120 }} />
-            </ScrollView>
-
-            {/* Fixed Bottom */}
-            <View style={styles.footer}>
-                <Pressable
-                    style={({ pressed }) => [
-                        styles.submitButton,
-                        pressed && !(!allImagesUploaded || submitting) && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-                        (!allImagesUploaded || submitting) && styles.submitButtonDisabled
-                    ]}
-                    onPress={handleSubmit}
-                    disabled={submitting || !allImagesUploaded}
-                >
-                    <LinearGradient
-                        colors={allImagesUploaded ? ['#10B981', '#059669'] : ['#E5E7EB', '#D1D5DB']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.gradientButton}
-                    >
-                        {submitting ? (
-                            <ActivityIndicator color="white" />
-                        ) : (
-                            <>
-                                <MaterialCommunityIcons name="shield-check" size={20} color="white" />
-                                <Text style={styles.submitButtonText}>Generate Warranty</Text>
-                            </>
-                        )}
-                    </LinearGradient>
-                </Pressable>
-            </View>
+            </KeyboardAvoidingView>
         </View>
     );
 }
@@ -208,6 +256,7 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 20,
+        paddingBottom: 20,
     },
     header: {
         alignItems: 'center',
@@ -236,17 +285,17 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 24,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 18,
+        marginBottom: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
+        borderColor: '#E5E7EB',
     },
     progressHeader: {
         flexDirection: 'row',
@@ -351,15 +400,16 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     footer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
         padding: 20,
         paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 10,
     },
     submitButton: {
         borderRadius: 16,
@@ -379,5 +429,52 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         fontWeight: '700',
+    },
+    offlineWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 16,
+        gap: 8,
+    },
+    offlineText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#92400E',
+        flex: 1,
+    },
+    uploadProgressCard: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    uploadStatusText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    uploadProgressBar: {
+        height: 6,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
+        overflow: 'hidden',
+        marginBottom: 8,
+    },
+    uploadProgressFill: {
+        height: '100%',
+        backgroundColor: '#10B981',
+        borderRadius: 3,
+    },
+    uploadProgressText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#6B7280',
+        textAlign: 'right',
     },
 });
