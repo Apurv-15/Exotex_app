@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, StatusBar, KeyboardAvoidingView, ActivityIndicator, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { FieldVisitService } from '../../services/FieldVisitService';
 import * as ImagePicker from 'expo-image-picker';
+import NetInfo from '@react-native-community/netinfo';
 
 const TOTAL_STEPS = 3;
 
@@ -14,6 +15,17 @@ export default function FieldVisitForm() {
     const { user } = useAuth();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [isOnline, setIsOnline] = useState(true);
+    const [uploadStatus, setUploadStatus] = useState('');
+
+    // Check network status on mount
+    useEffect(() => {
+        const unsubscribe = NetInfo.addEventListener(state => {
+            setIsOnline(state.isConnected ?? true);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const [formData, setFormData] = useState({
         // SECTION 1: Basic Site & Client Information
@@ -89,6 +101,64 @@ export default function FieldVisitForm() {
         conversionProbability: '',
         visitedBySignature: '',
     });
+
+    const fillDummyData = () => {
+        setFormData({
+            dateOfVisit: new Date().toISOString().split('T')[0],
+            branchName: user?.branchId || 'Branch Alpha',
+            salesEngineerName: user?.name || 'Engineer X',
+            clientCompanyName: 'Industrial Solutions Ltd',
+            siteAddress: 'Industrial Area Phase 2, Plot 45',
+            industryType: 'Manufacturing',
+            contactPersonName: 'Mr. Robert Green',
+            designation: 'Plant Manager',
+            mobileNumber: '9988776655',
+            emailId: 'robert.green@industrialsolutions.com',
+            waterSource: ['Borewell', 'Tank'],
+            waterSourceOther: '',
+            dailyWaterConsumption: '5000 Liters',
+            purposeOfWaterUsage: ['Process', 'Cooling'],
+            purposeOther: '',
+            waterHardnessPPM: '450',
+            scalingIssueObserved: 'Yes',
+            scalingDescription: 'Heavy scaling observed in the main boiler lines.',
+            existingWaterTreatment: 'No',
+            existingSystemDetails: 'Currently using manual chemical dosing only.',
+            problemsFaced: ['Scaling', 'High Maintenance Cost'],
+            problemsOther: '',
+            maintenanceFrequency: 'Monthly',
+            customerExpectations: 'Reduce maintenance downtime and chemical costs.',
+            applicationArea: ['Boiler', 'Cooling Tower'],
+            applicationOther: '',
+            pipeLineSize: '4 Inches',
+            operatingPressure: '6 Bar',
+            operatingTemperature: '85 C',
+            ekotexInstallationFeasible: 'Yes',
+            recommendedEkotexModel: 'Ekotex Ultra 500',
+            quantityRequired: '1',
+            siteConstraints: 'Limited space near the inlet pump.',
+            accessoriesRequired: 'Wall mounting brackets and 4-inch flanges.',
+            customerInterestLevel: 'High',
+            budgetDiscussed: 'Yes',
+            expectedDecisionTimeline: 'Next 10 days',
+            decisionMakerIdentified: 'Yes',
+            existingCompetitorSolution: 'None',
+            competitorPriceRange: 'N/A',
+            customerRemarks: 'Client is frustrated with current breakdown frequency.',
+            sitePhotographsTaken: true,
+            existingSystemPhotographs: true,
+            problemAreaPhotographs: true,
+            drawingsCollected: true,
+            nextActionRequired: ['Quotation', 'Technical Discussion'],
+            nextActionOther: '',
+            responsiblePerson: user?.name || 'Engineer X',
+            expectedFollowUpDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+            salesEngineerRemarks: 'Site visit was successful. Client is ready for a technical demo.',
+            overallSiteAssessment: 'Good',
+            conversionProbability: 'High',
+            visitedBySignature: 'Robert Green',
+        });
+    };
 
     const [images, setImages] = useState<string[]>([]);
 
@@ -196,6 +266,9 @@ export default function FieldVisitForm() {
         }
 
         setLoading(true);
+        setUploadProgress(0);
+        setUploadStatus(isOnline ? 'Uploading photos...' : 'Saving locally (offline)...');
+
         try {
             await FieldVisitService.createFieldVisit(
                 {
@@ -234,17 +307,26 @@ export default function FieldVisitForm() {
                     followUpNotes: formData.nextActionRequired.join(', '),
                     branchId: user?.branchId || '',
                     createdBy: user?.name || '',
-                } as any,
-                images
+                },
+                images,
+                (progress) => {
+                    setUploadProgress(progress);
+                    if (progress === 100) {
+                        setUploadStatus('Finalizing report...');
+                    }
+                }
             );
 
+            setUploadStatus('Success!');
             showAlert('Success', 'Field visit recorded successfully!');
             navigation.goBack();
         } catch (error: any) {
             console.error('Submit error:', error);
             showAlert('Error', error.message || 'Failed to save field visit');
+            setUploadStatus('');
         } finally {
             setLoading(false);
+            setUploadProgress(0);
         }
     };
 
@@ -317,6 +399,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="YYYY-MM-DD"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.dateOfVisit}
                                 onChangeText={(v) => updateField('dateOfVisit', v)}
                             />
@@ -326,6 +409,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Branch"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.branchName}
                                 onChangeText={(v) => updateField('branchName', v)}
                             />
@@ -337,6 +421,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="Your name"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.salesEngineerName}
                             onChangeText={(v) => updateField('salesEngineerName', v)}
                         />
@@ -347,6 +432,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="Enter company name"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.clientCompanyName}
                             onChangeText={(v) => updateField('clientCompanyName', v)}
                         />
@@ -357,6 +443,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="Full site address"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={3}
                             value={formData.siteAddress}
@@ -369,6 +456,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="e.g., Manufacturing, Food Processing"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.industryType}
                             onChangeText={(v) => updateField('industryType', v)}
                         />
@@ -380,6 +468,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Name"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.contactPersonName}
                                 onChangeText={(v) => updateField('contactPersonName', v)}
                             />
@@ -389,6 +478,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Title"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.designation}
                                 onChangeText={(v) => updateField('designation', v)}
                             />
@@ -401,6 +491,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="9876543210"
+                                placeholderTextColor="#9CA3AF"
                                 keyboardType="phone-pad"
                                 value={formData.mobileNumber}
                                 onChangeText={(v) => updateField('mobileNumber', v)}
@@ -411,6 +502,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="email@example.com"
+                                placeholderTextColor="#9CA3AF"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 value={formData.emailId}
@@ -444,6 +536,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={[styles.input, { marginTop: 8 }]}
                                 placeholder="Specify other source"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.waterSourceOther}
                                 onChangeText={(v) => updateField('waterSourceOther', v)}
                             />
@@ -455,6 +548,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="e.g., 50,000 Liters"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.dailyWaterConsumption}
                             onChangeText={(v) => updateField('dailyWaterConsumption', v)}
                         />
@@ -478,6 +572,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={[styles.input, { marginTop: 8 }]}
                                 placeholder="Specify other purpose"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.purposeOther}
                                 onChangeText={(v) => updateField('purposeOther', v)}
                             />
@@ -490,6 +585,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g., 350"
+                                placeholderTextColor="#9CA3AF"
                                 keyboardType="numeric"
                                 value={formData.waterHardnessPPM}
                                 onChangeText={(v) => updateField('waterHardnessPPM', v)}
@@ -512,6 +608,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={[styles.input, styles.textArea]}
                                 placeholder="Describe scaling issue"
+                                placeholderTextColor="#9CA3AF"
                                 multiline
                                 numberOfLines={3}
                                 value={formData.scalingDescription}
@@ -550,6 +647,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={[styles.input, styles.textArea]}
                                 placeholder="Describe existing system"
+                                placeholderTextColor="#9CA3AF"
                                 multiline
                                 numberOfLines={3}
                                 value={formData.existingSystemDetails}
@@ -576,6 +674,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={[styles.input, { marginTop: 8 }]}
                                 placeholder="Specify other problems"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.problemsOther}
                                 onChangeText={(v) => updateField('problemsOther', v)}
                             />
@@ -587,6 +686,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="e.g., Monthly, Quarterly"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.maintenanceFrequency}
                             onChangeText={(v) => updateField('maintenanceFrequency', v)}
                         />
@@ -597,6 +697,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="What does the customer expect?"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={3}
                             value={formData.customerExpectations}
@@ -633,6 +734,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={[styles.input, { marginTop: 8 }]}
                                 placeholder="Specify other area"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.applicationOther}
                                 onChangeText={(v) => updateField('applicationOther', v)}
                             />
@@ -645,6 +747,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g., 4 inch"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.pipeLineSize}
                                 onChangeText={(v) => updateField('pipeLineSize', v)}
                             />
@@ -654,6 +757,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g., 10 bar"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.operatingPressure}
                                 onChangeText={(v) => updateField('operatingPressure', v)}
                             />
@@ -665,6 +769,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="e.g., 80°C"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.operatingTemperature}
                             onChangeText={(v) => updateField('operatingTemperature', v)}
                         />
@@ -694,6 +799,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="Model and capacity recommendation"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={2}
                             value={formData.recommendedEkotexModel}
@@ -707,6 +813,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g., 2 units"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.quantityRequired}
                                 onChangeText={(v) => updateField('quantityRequired', v)}
                             />
@@ -718,6 +825,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="Any constraints or risks"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={3}
                             value={formData.siteConstraints}
@@ -730,6 +838,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="List required accessories"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={2}
                             value={formData.accessoriesRequired}
@@ -789,6 +898,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="e.g., 2 weeks, 1 month"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.expectedDecisionTimeline}
                             onChangeText={(v) => updateField('expectedDecisionTimeline', v)}
                         />
@@ -808,6 +918,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="Competitor products in use"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={2}
                             value={formData.existingCompetitorSolution}
@@ -820,6 +931,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={styles.input}
                             placeholder="e.g., ₹50,000 - ₹1,00,000"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.competitorPriceRange}
                             onChangeText={(v) => updateField('competitorPriceRange', v)}
                         />
@@ -830,6 +942,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="Customer feedback and comparison"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={3}
                             value={formData.customerRemarks}
@@ -864,12 +977,16 @@ export default function FieldVisitForm() {
 
                     {images.length > 0 && (
                         <View style={styles.imageGrid}>
-                            {images.map((_, index) => (
+                            {images.map((uri, index) => (
                                 <View key={index} style={styles.imageContainer}>
+                                    <Image
+                                        source={{ uri }}
+                                        style={{ width: 60, height: 60, borderRadius: 10 }}
+                                        resizeMode="cover"
+                                    />
                                     <Pressable style={styles.removeImageButton} onPress={() => removeImage(index)}>
                                         <MaterialCommunityIcons name="close-circle" size={20} color="#EF4444" />
                                     </Pressable>
-                                    <Text style={styles.imageLabel}>Photo {index + 1}</Text>
                                 </View>
                             ))}
                         </View>
@@ -902,6 +1019,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={[styles.input, { marginTop: 8 }]}
                                 placeholder="Specify other action"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.nextActionOther}
                                 onChangeText={(v) => updateField('nextActionOther', v)}
                             />
@@ -914,6 +1032,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Name"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.responsiblePerson}
                                 onChangeText={(v) => updateField('responsiblePerson', v)}
                             />
@@ -923,6 +1042,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="YYYY-MM-DD"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.expectedFollowUpDate}
                                 onChangeText={(v) => updateField('expectedFollowUpDate', v)}
                             />
@@ -943,6 +1063,7 @@ export default function FieldVisitForm() {
                         <TextInput
                             style={[styles.input, styles.textArea]}
                             placeholder="Your observations and remarks"
+                            placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={4}
                             value={formData.salesEngineerRemarks}
@@ -981,6 +1102,7 @@ export default function FieldVisitForm() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g., 75%"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.conversionProbability}
                                 onChangeText={(v) => updateField('conversionProbability', v)}
                             />
@@ -989,7 +1111,8 @@ export default function FieldVisitForm() {
                             <Text style={styles.label}>Visited By (Name)</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Your name"
+                                placeholder="Service Engineer"
+                                placeholderTextColor="#9CA3AF"
                                 value={formData.visitedBySignature}
                                 onChangeText={(v) => updateField('visitedBySignature', v)}
                             />
@@ -1003,84 +1126,131 @@ export default function FieldVisitForm() {
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#F0F9FF', '#FFFFFF']}
+                colors={['#FFFFFF', '#F8FAFC']}
                 style={StyleSheet.absoluteFill}
             />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <Pressable onPress={handleBack} style={styles.backButton}>
-                    <MaterialCommunityIcons name="arrow-left" size={24} color="#1A1A1A" />
-                </Pressable>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.title}>Field Visit Report</Text>
-                    <Text style={styles.subtitle}>Commercial & Industrial</Text>
-                </View>
-            </View>
-
-            {/* Progress Bar */}
-            <ProgressBar />
-
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
-                {currentStep === 1 && renderStep1()}
-                {currentStep === 2 && renderStep2()}
-                {currentStep === 3 && renderStep3()}
-                <View style={{ height: 100 }} />
-            </ScrollView>
-
-            {/* Footer Buttons */}
-            <View style={styles.footer}>
-                <View style={styles.footerButtons}>
-                    {currentStep > 1 && (
-                        <Pressable style={styles.backBtn} onPress={handleBack}>
-                            <MaterialCommunityIcons name="arrow-left" size={20} color="#6B7280" />
-                            <Text style={styles.backBtnText}>Back</Text>
-                        </Pressable>
-                    )}
-
-                    <Pressable
-                        style={[styles.nextBtn, !canProceed() && styles.btnDisabled]}
-                        onPress={currentStep === TOTAL_STEPS ? handleSubmit : handleNext}
-                        disabled={!canProceed() || loading}
-                    >
-                        <LinearGradient
-                            colors={canProceed() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
-                            style={styles.gradientBtn}
+                <View style={styles.headerSubtitleCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.title}>Field Visit Report</Text>
+                            <Text style={styles.subtitle}>Fill in the technical details of the site visit</Text>
+                        </View>
+                        <Pressable
+                            onPress={fillDummyData}
+                            style={({ pressed }) => [
+                                styles.dummyFillBtn,
+                                pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
+                            ]}
                         >
-                            {loading ? (
-                                <Text style={styles.nextBtnText}>Submitting...</Text>
-                            ) : (
-                                <>
-                                    <Text style={styles.nextBtnText}>
-                                        {currentStep === TOTAL_STEPS ? 'Submit Report' : 'Continue'}
-                                    </Text>
-                                    <MaterialCommunityIcons
-                                        name={currentStep === TOTAL_STEPS ? 'check-circle' : 'arrow-right'}
-                                        size={20}
-                                        color="white"
-                                    />
-                                </>
-                            )}
-                        </LinearGradient>
-                    </Pressable>
+                            <MaterialCommunityIcons name="auto-fix" size={18} color="#7C3AED" />
+                            <Text style={styles.dummyFillText}>Quick Fill</Text>
+                        </Pressable>
+                    </View>
                 </View>
-            </View>
+
+                {/* Network Status Warning */}
+                {!isOnline && (
+                    <View style={styles.offlineWarning}>
+                        <MaterialCommunityIcons name="wifi-off" size={20} color="#92400E" />
+                        <Text style={styles.offlineText}>Offline - Images will be saved locally</Text>
+                    </View>
+                )}
+
+                {/* Progress Bar */}
+                <ProgressBar />
+
+                {/* Upload Progress */}
+                {loading && uploadProgress > 0 && (
+                    <View style={styles.uploadProgressCard}>
+                        <Text style={styles.uploadStatusText}>{uploadStatus}</Text>
+                        <View style={styles.uploadProgressBar}>
+                            <View style={[styles.uploadProgressFillColor, { width: `${uploadProgress}%` }]} />
+                        </View>
+                        <Text style={styles.uploadProgressTextValue}>{uploadProgress}%</Text>
+                    </View>
+                )}
+
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {currentStep === 1 && renderStep1()}
+                    {currentStep === 2 && renderStep2()}
+                    {currentStep === 3 && renderStep3()}
+                    <View style={{ height: 20 }} />
+                </ScrollView>
+
+                {/* Footer Buttons */}
+                <View style={styles.footer}>
+                    <View style={styles.footerButtons}>
+                        {currentStep > 1 && (
+                            <Pressable style={styles.backBtn} onPress={handleBack}>
+                                <MaterialCommunityIcons name="arrow-left" size={20} color="#6B7280" />
+                                <Text style={styles.backBtnText}>Back</Text>
+                            </Pressable>
+                        )}
+
+                        <Pressable
+                            style={[styles.nextBtn, !canProceed() && styles.btnDisabled]}
+                            onPress={currentStep === TOTAL_STEPS ? handleSubmit : handleNext}
+                            disabled={!canProceed() || loading}
+                        >
+                            <LinearGradient
+                                colors={canProceed() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
+                                style={styles.gradientBtn}
+                            >
+                                {loading ? (
+                                    <Text style={styles.nextBtnText}>Submitting...</Text>
+                                ) : (
+                                    <>
+                                        <Text style={styles.nextBtnText}>
+                                            {currentStep === TOTAL_STEPS ? 'Submit Report' : 'Continue'}
+                                        </Text>
+                                        <MaterialCommunityIcons
+                                            name={currentStep === TOTAL_STEPS ? 'check-circle' : 'arrow-right'}
+                                            size={20}
+                                            color="white"
+                                        />
+                                    </>
+                                )}
+                            </LinearGradient>
+                        </Pressable>
+                    </View>
+                </View>
+            </KeyboardAvoidingView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
-    header: {
+    headerSubtitleCard: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        backgroundColor: '#F9FAFB',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    dummyFillBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 60 : 20,
-        paddingBottom: 10,
-        gap: 12,
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: 'rgba(124, 58, 237, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(124, 58, 237, 0.2)',
+    },
+    dummyFillText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#7C3AED',
     },
     backButton: {
         width: 40, height: 40, borderRadius: 12,
@@ -1117,10 +1287,16 @@ const styles = StyleSheet.create({
     sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8, paddingLeft: 4 },
     sectionTitle: { fontSize: 15, fontWeight: '700', color: '#4B5563' },
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 16, padding: 16,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
-        borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     row: { flexDirection: 'row' },
     inputContainer: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
@@ -1176,10 +1352,16 @@ const styles = StyleSheet.create({
 
     // Footer
     footer: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: 16,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
         paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-        borderTopWidth: 1, borderTopColor: '#F3F4F6',
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 10,
     },
     footerButtons: { flexDirection: 'row', gap: 12 },
     backBtn: {
@@ -1195,4 +1377,53 @@ const styles = StyleSheet.create({
         paddingVertical: 16, gap: 8,
     },
     nextBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
+    offlineWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        padding: 12,
+        marginHorizontal: 20,
+        borderRadius: 12,
+        marginTop: 10,
+        gap: 8,
+    },
+    offlineText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#92400E',
+        flex: 1,
+    },
+    uploadProgressCard: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+        padding: 16,
+        marginHorizontal: 20,
+        marginTop: 10,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    uploadStatusText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    uploadProgressBar: {
+        height: 6,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
+        overflow: 'hidden',
+        marginBottom: 8,
+    },
+    uploadProgressFillColor: {
+        height: '100%',
+        backgroundColor: '#10B981',
+        borderRadius: 3,
+    },
+    uploadProgressTextValue: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#6B7280',
+        textAlign: 'right',
+    },
 });

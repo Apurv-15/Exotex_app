@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { SalesService, Sale } from '../../services/SalesService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -283,7 +283,13 @@ export default function MainBranchDashboard() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
     content: { padding: 20, paddingBottom: 40 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 10 },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+        marginTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10
+    },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     logoWrapper: {
         width: 48,
