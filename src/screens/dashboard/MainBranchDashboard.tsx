@@ -83,10 +83,11 @@ export default function MainBranchDashboard() {
     const pending = filteredSales.filter(s => s.status === 'pending').length;
     const approved = filteredSales.filter(s => s.status === 'approved').length;
 
+
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#F0F9FF', '#FFFFFF']}
+                colors={['#FFFFFF', '#F9FAFB']}
                 style={StyleSheet.absoluteFill}
             />
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -108,6 +109,38 @@ export default function MainBranchDashboard() {
                     </Pressable>
                 </View>
 
+                {/* Main Stats Bento Grid */}
+                <View style={styles.bentoGrid}>
+                    <LinearGradient
+                        colors={['#4F46E5', '#4338CA']}
+                        style={styles.mainStatCard}
+                    >
+                        <View style={styles.statTop}>
+                            <View style={styles.statIconWrapper}>
+                                <MaterialCommunityIcons name="chart-bar" size={24} color="#C7D2FE" />
+                            </View>
+                            <View style={styles.statBadge}>
+                                <Text style={styles.badgeText}>+12% vs last month</Text>
+                            </View>
+                        </View>
+                        <View>
+                            <Text style={styles.mainStatValue}>{totalSales}</Text>
+                            <Text style={styles.mainStatLabel}>Total Units Sold</Text>
+                        </View>
+                    </LinearGradient>
+
+                    <View style={styles.bentoColumn}>
+                        <View style={[styles.statBox, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
+                            <Text style={[styles.statBoxValue, { color: '#059669' }]}>{approved}</Text>
+                            <Text style={[styles.statBoxLabel, { color: '#059669' }]}>Approved</Text>
+                        </View>
+                        <View style={[styles.statBox, { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7' }]}>
+                            <Text style={[styles.statBoxValue, { color: '#D97706' }]}>{pending}</Text>
+                            <Text style={[styles.statBoxLabel, { color: '#D97706' }]}>Pending</Text>
+                        </View>
+                    </View>
+                </View>
+
                 {/* Filter Chips */}
                 <View style={styles.filterRow}>
                     {(['All', 'Today', 'Month'] as const).map(f => (
@@ -121,48 +154,18 @@ export default function MainBranchDashboard() {
                     ))}
                 </View>
 
-                {/* Main Stats Bento Grid */}
-                <View style={styles.bentoGrid}>
-                    <View style={styles.bentoRow}>
-                        <LinearGradient
-                            colors={['#7C3AED', '#5B21B6']}
-                            style={styles.mainStatCard}
-                        >
-                            <View style={styles.statHeader}>
-                                <Text style={styles.mainStatLabel}>Total Units Sold</Text>
-                                <MaterialCommunityIcons name="package-variant" size={20} color="rgba(255,255,255,0.6)" />
-                            </View>
-                            <Text style={styles.mainStatValue}>{totalSales}</Text>
-                            <View style={styles.statBadge}>
-                                <Text style={styles.badgeText}>{regionStats.length} Regions</Text>
-                            </View>
-                        </LinearGradient>
-
-                        <View style={styles.bentoColumn}>
-                            <View style={[styles.smallStatCard, { backgroundColor: '#D1FAE5' }]}>
-                                <Text style={[styles.smallStatValue, { color: '#059669' }]}>{approved}</Text>
-                                <Text style={[styles.smallStatLabel, { color: '#059669' }]}>Approved</Text>
-                            </View>
-                            <View style={[styles.smallStatCard, { backgroundColor: '#FEF3C7' }]}>
-                                <Text style={[styles.smallStatValue, { color: '#B45309' }]}>{pending}</Text>
-                                <Text style={[styles.smallStatLabel, { color: '#B45309' }]}>Pending</Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
                 {/* Region-wise Sales Section */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Sales by Region</Text>
+                    <Text style={styles.sectionTitle}>Region Performance</Text>
                     {selectedRegion && (
                         <Pressable onPress={() => setSelectedRegion(null)}>
-                            <Text style={styles.seeAllText}>Show All</Text>
+                            <Text style={styles.seeAllText}>Clear Filter</Text>
                         </Pressable>
                     )}
                 </View>
 
                 {loading ? (
-                    <ActivityIndicator size="large" color="#7C3AED" style={{ marginVertical: 40 }} />
+                    <ActivityIndicator size="large" color="#4F46E5" style={{ marginVertical: 40 }} />
                 ) : regionStats.length === 0 ? (
                     <View style={styles.emptyState}>
                         <MaterialCommunityIcons name="map-marker-off" size={48} color="#D1D5DB" />
@@ -173,7 +176,7 @@ export default function MainBranchDashboard() {
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         style={styles.regionScroll}
-                        contentContainerStyle={{ gap: 12 }}
+                        contentContainerStyle={{ gap: 12, paddingRight: 20 }}
                     >
                         {regionStats.map(({ region, total, approved, pending }) => {
                             const colors = getRegionColor(region);
@@ -183,34 +186,27 @@ export default function MainBranchDashboard() {
                                     key={region}
                                     style={[
                                         styles.regionCard,
-                                        { backgroundColor: colors.bg },
                                         isSelected && styles.regionCardSelected
                                     ]}
                                     onPress={() => setSelectedRegion(isSelected ? null : region)}
                                 >
-                                    <View style={styles.regionHeader}>
+                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
                                         <MaterialCommunityIcons
                                             name={colors.icon as any}
-                                            size={24}
+                                            size={20}
                                             color={colors.text}
                                         />
-                                        {isSelected && (
-                                            <View style={[styles.selectedBadge, { backgroundColor: colors.text }]}>
-                                                <MaterialCommunityIcons name="check" size={12} color="white" />
-                                            </View>
-                                        )}
                                     </View>
-                                    <Text style={[styles.regionName, { color: colors.text }]}>{region}</Text>
-                                    <Text style={[styles.regionTotal, { color: colors.text }]}>{total} Sales</Text>
-                                    <View style={styles.regionStats}>
-                                        <View style={styles.regionStatItem}>
-                                            <View style={[styles.statDot, { backgroundColor: '#10B981' }]} />
-                                            <Text style={styles.regionStatText}>{approved}</Text>
-                                        </View>
-                                        <View style={styles.regionStatItem}>
-                                            <View style={[styles.statDot, { backgroundColor: '#F59E0B' }]} />
-                                            <Text style={styles.regionStatText}>{pending}</Text>
-                                        </View>
+                                    <Text style={styles.regionName}>{region}</Text>
+                                    <Text style={styles.regionTotal}>{total} Sales</Text>
+
+                                    <View style={styles.progressBar}>
+                                        <View
+                                            style={[
+                                                styles.progressFill,
+                                                { width: `${(approved / (total || 1)) * 100}%`, backgroundColor: colors.text }
+                                            ]}
+                                        />
                                     </View>
                                 </Pressable>
                             );
@@ -219,50 +215,34 @@ export default function MainBranchDashboard() {
                 )}
 
                 {/* Quick Actions */}
-                <Pressable
-                    onPress={() => navigation.navigate('AnalyticsScreen')}
-                    style={({ pressed }) => [styles.actionCard, pressed && { transform: [{ scale: 0.98 }] }]}
-                >
-                    <LinearGradient
-                        colors={['#1F2937', '#111827']}
-                        style={styles.actionGradient}
+                <View style={styles.actionGrid}>
+                    <Pressable
+                        onPress={() => navigation.navigate('AnalyticsScreen')}
+                        style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
                     >
-                        <View style={styles.actionIcon}>
-                            <MaterialCommunityIcons name="lightning-bolt" size={24} color="#FBBF24" />
+                        <View style={[styles.actionIconCircle, { backgroundColor: '#EEF2FF' }]}>
+                            <MaterialCommunityIcons name="chart-timeline-variant" size={24} color="#4F46E5" />
                         </View>
-                        <View style={styles.actionInfo}>
-                            <Text style={styles.actionTitle}>Deep Analytics</Text>
-                            <Text style={styles.actionSub}>Check branch performance</Text>
-                        </View>
-                        <MaterialCommunityIcons name="chevron-right" size={24} color="rgba(255,255,255,0.3)" />
-                    </LinearGradient>
-                </Pressable>
+                        <Text style={styles.actionBtnTitle}>Analytics</Text>
+                    </Pressable>
 
-                <Pressable
-                    onPress={() => navigation.navigate('TemplateManagement')}
-                    style={({ pressed }) => [styles.actionCard, pressed && { transform: [{ scale: 0.98 }] }, { marginTop: -8 }]}
-                >
-                    <LinearGradient
-                        colors={['#7C3AED', '#5B21B6']}
-                        style={styles.actionGradient}
+                    <Pressable
+                        onPress={() => navigation.navigate('TemplateManagement')}
+                        style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
                     >
-                        <View style={styles.actionIcon}>
-                            <MaterialCommunityIcons name="file-word-box" size={24} color="white" />
+                        <View style={[styles.actionIconCircle, { backgroundColor: '#FDF4FF' }]}>
+                            <MaterialCommunityIcons name="file-document-edit-outline" size={24} color="#C026D3" />
                         </View>
-                        <View style={styles.actionInfo}>
-                            <Text style={styles.actionTitle}>Warranty Template</Text>
-                            <Text style={styles.actionSub}>Customize your .docx template</Text>
-                        </View>
-                        <MaterialCommunityIcons name="chevron-right" size={24} color="rgba(255,255,255,0.3)" />
-                    </LinearGradient>
-                </Pressable>
+                        <Text style={styles.actionBtnTitle}>Templates</Text>
+                    </Pressable>
+                </View>
 
-                {/* Recent Activity / Region Sales */}
-                <View style={styles.sectionHeader}>
+                {/* Recent Activity List */}
+                <View style={styles.listHeader}>
                     <Text style={styles.sectionTitle}>
-                        {selectedRegion ? `${selectedRegion} Sales` : 'Latest Entries'}
+                        {selectedRegion ? `${selectedRegion} Sales` : 'Recent Transactions'}
                     </Text>
-                    <Text style={styles.countBadge}>{displaySales.length}</Text>
+                    {/* <Text style={styles.countBadge}>{displaySales.length}</Text> */}
                 </View>
 
                 {displaySales.length === 0 ? (
@@ -274,25 +254,23 @@ export default function MainBranchDashboard() {
                         <Pressable
                             key={s.id}
                             style={({ pressed }) => [
-                                styles.activityItem,
-                                pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+                                styles.listItem,
+                                pressed && { backgroundColor: '#F9FAFB' }
                             ]}
                             onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
                         >
-                            <View style={[styles.actIcon, { backgroundColor: s.status === 'approved' ? '#ECFDF5' : '#FFFBEB' }]}>
-                                <MaterialCommunityIcons
-                                    name={s.status === 'approved' ? 'check-circle' : 'clock-outline'}
-                                    size={18}
-                                    color={s.status === 'approved' ? '#10B981' : '#F59E0B'}
-                                />
+                            <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? '#ECFDF5' : '#FFFBEB' }]}>
+                                <Text style={{ fontSize: 16 }}>
+                                    {s.status === 'approved' ? '✅' : '⏳'}
+                                </Text>
                             </View>
-                            <View style={styles.actContent}>
-                                <Text style={styles.actTitle}>{s.customerName}</Text>
-                                <Text style={styles.actSub}>{s.productModel} • {s.city}</Text>
+                            <View style={styles.listContent}>
+                                <Text style={styles.listTitle}>{s.customerName}</Text>
+                                <Text style={styles.listSub}>{s.productModel}</Text>
                             </View>
-                            <View style={styles.actRight}>
-                                <Text style={styles.actDate}>{s.saleDate}</Text>
-                                <MaterialCommunityIcons name="chevron-right" size={16} color="#D1D5DB" />
+                            <View style={styles.listRight}>
+                                <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                <Text style={styles.listCity}>{s.city}</Text>
                             </View>
                         </Pressable>
                     ))
@@ -308,73 +286,72 @@ const styles = StyleSheet.create({
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 10 },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     logoWrapper: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 48,
+        height: 48,
+        borderRadius: 16,
         backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5,
         borderWidth: 1,
-        borderColor: '#F3F4F6',
+        borderColor: '#E5E7EB',
     },
     companyLogo: {
-        width: 35,
-        height: 35,
+        width: 32,
+        height: 32,
     },
-    greeting: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-    subtitle: { fontSize: 14, color: '#6B7280', marginTop: 2 },
-    logoutBtn: { cursor: 'pointer' } as any,
-    logoutIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center' },
-    filterRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-    chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.8)', borderWidth: 1, borderColor: '#E5E7EB' },
-    chipActive: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
-    chipText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-    chipTextActive: { color: 'white' },
-    bentoGrid: { marginBottom: 24 },
-    bentoRow: { flexDirection: 'row', gap: 12 },
-    mainStatCard: { flex: 1.5, borderRadius: 24, padding: 20, justifyContent: 'space-between', minHeight: 160, shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
-    statHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    mainStatLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600' },
-    mainStatValue: { color: 'white', fontSize: 32, fontWeight: '800', marginVertical: 8 },
-    statBadge: { backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    badgeText: { color: 'white', fontSize: 11, fontWeight: '700' },
+    greeting: { fontSize: 20, fontWeight: '700', color: '#111827', letterSpacing: -0.5 },
+    subtitle: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+    logoutBtn: { padding: 8 },
+    logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center' },
+
+    bentoGrid: { flexDirection: 'row', gap: 12, marginBottom: 28, height: 160 },
+    mainStatCard: { flex: 1.6, borderRadius: 24, padding: 20, justifyContent: 'space-between', elevation: 4, shadowColor: '#4F46E5', shadowOpacity: 0.2, shadowOffset: { height: 8, width: 0 }, shadowRadius: 12 },
+    statTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    statIconWrapper: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+    statBadge: { backgroundColor: '#312E81', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    badgeText: { color: '#C7D2FE', fontSize: 10, fontWeight: '700' },
+    mainStatValue: { color: 'white', fontSize: 36, fontWeight: '800', lineHeight: 40 },
+    mainStatLabel: { color: '#C7D2FE', fontSize: 14, fontWeight: '500' },
+
     bentoColumn: { flex: 1, gap: 12 },
-    smallStatCard: { flex: 1, borderRadius: 20, padding: 16, justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4 },
-    smallStatValue: { fontSize: 24, fontWeight: '800' },
-    smallStatLabel: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 8 },
-    sectionTitle: { fontSize: 20, fontWeight: '700', color: '#111827' },
-    seeAllText: { fontSize: 14, color: '#7C3AED', fontWeight: '600' },
-    countBadge: { backgroundColor: '#EDE9FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 13, fontWeight: '700', color: '#7C3AED' },
-    regionScroll: { marginBottom: 24 },
-    regionCard: { width: 140, padding: 16, borderRadius: 20, borderWidth: 2, borderColor: 'transparent' },
-    regionCardSelected: { borderColor: '#7C3AED' },
-    regionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    selectedBadge: { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-    regionName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-    regionTotal: { fontSize: 13, fontWeight: '600', opacity: 0.8, marginBottom: 12 },
-    regionStats: { flexDirection: 'row', gap: 12 },
-    regionStatItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    statDot: { width: 8, height: 8, borderRadius: 4 },
-    regionStatText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
-    actionCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 16, shadowColor: '#1F2937', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
-    actionGradient: { flexDirection: 'row', alignItems: 'center', padding: 20 },
-    actionIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-    actionInfo: { flex: 1, marginLeft: 16 },
-    actionTitle: { color: 'white', fontSize: 17, fontWeight: '700' },
-    actionSub: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 },
-    activityItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 16, borderRadius: 20, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: '#F3F4F6' },
-    actIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-    actContent: { flex: 1 },
-    actTitle: { fontSize: 15, fontWeight: '600', color: '#111827' },
-    actSub: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-    actRight: { alignItems: 'flex-end', gap: 4 },
-    actDate: { fontSize: 12, color: '#9CA3AF' },
+    statBox: { flex: 1, borderRadius: 20, padding: 16, justifyContent: 'center', borderWidth: 1 },
+    statBoxValue: { fontSize: 20, fontWeight: '800', marginBottom: 2 },
+    statBoxLabel: { fontSize: 12, fontWeight: '600' },
+
+    filterRow: { flexDirection: 'row', gap: 8, marginBottom: 28 },
+    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: 'transparent' },
+    chipActive: { backgroundColor: '#111827' },
+    chipText: { fontSize: 13, fontWeight: '600', color: '#4B5563' },
+    chipTextActive: { color: 'white' },
+
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+    seeAllText: { fontSize: 13, color: '#4F46E5', fontWeight: '600' },
+
+    regionScroll: { marginBottom: 32 },
+    regionCard: { width: 150, padding: 16, borderRadius: 20, backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E7EB', marginRight: 4, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+    regionCardSelected: { borderColor: '#4F46E5', backgroundColor: '#EEF2FF' },
+    regionIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+    regionName: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 2 },
+    regionTotal: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
+    progressBar: { height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, width: '100%' },
+    progressFill: { height: '100%', borderRadius: 2 },
+
+    actionGrid: { flexDirection: 'row', gap: 12, marginBottom: 32 },
+    actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'white', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+    actionIconCircle: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    actionBtnTitle: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
+
+    listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    listItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    listIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    listContent: { flex: 1 },
+    listTitle: { fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 2 },
+    listSub: { fontSize: 13, color: '#6B7280' },
+    listRight: { alignItems: 'flex-end' },
+    listDate: { fontSize: 12, color: '#9CA3AF', marginBottom: 4, fontWeight: '500' },
+    listCity: { fontSize: 11, color: '#6B7280', backgroundColor: '#F3F4F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+
     emptyState: { padding: 40, alignItems: 'center', gap: 12 },
     emptyText: { color: '#9CA3AF', fontSize: 15 },
 });

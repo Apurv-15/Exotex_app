@@ -48,13 +48,14 @@ export default function LoginScreen() {
         }
     };
 
+
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
             <LinearGradient
-                colors={['#F0F9FF', '#FFFFFF']}
+                colors={['#FFFFFF', '#F5F5FA']}
                 style={StyleSheet.absoluteFill}
             />
             <ScrollView
@@ -88,11 +89,11 @@ export default function LoginScreen() {
                         <View style={styles.inputWrapper}>
                             <Text style={styles.label}>Email Address</Text>
                             <View style={styles.inputContainer}>
-                                <MaterialCommunityIcons name="email-outline" size={20} color="#7C3AED" style={styles.inputIcon} />
+                                <MaterialCommunityIcons name="email-outline" size={20} color="#6366F1" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="your@email.com"
-                                    placeholderTextColor="#9CA3AF"
+                                    placeholderTextColor="#A1A1AA"
                                     value={email}
                                     onChangeText={setEmail}
                                     autoCapitalize="none"
@@ -104,11 +105,11 @@ export default function LoginScreen() {
                         <View style={styles.inputWrapper}>
                             <Text style={styles.label}>Password</Text>
                             <View style={styles.inputContainer}>
-                                <MaterialCommunityIcons name="lock-outline" size={20} color="#7C3AED" style={styles.inputIcon} />
+                                <MaterialCommunityIcons name="lock-outline" size={20} color="#6366F1" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
                                     placeholder="••••••••"
-                                    placeholderTextColor="#9CA3AF"
+                                    placeholderTextColor="#A1A1AA"
                                     value={password}
                                     onChangeText={setPassword}
                                     secureTextEntry={!showPassword}
@@ -117,7 +118,7 @@ export default function LoginScreen() {
                                     <MaterialCommunityIcons
                                         name={showPassword ? "eye-off-outline" : "eye-outline"}
                                         size={20}
-                                        color="#9CA3AF"
+                                        color="#A1A1AA"
                                     />
                                 </Pressable>
                             </View>
@@ -133,7 +134,7 @@ export default function LoginScreen() {
                             disabled={loading}
                         >
                             <LinearGradient
-                                colors={['#7C3AED', '#5B21B6']}
+                                colors={['#6366F1', '#4F46E5']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={styles.gradientButton}
@@ -151,38 +152,28 @@ export default function LoginScreen() {
                     </View>
                 </View>
 
-                {/* Demo Accounts */}
+                {/* Demo Accounts - Simplified */}
                 <View style={styles.demoSection}>
-                    <Text style={styles.demoTitle}>Quick Access Demo</Text>
-                    <View style={styles.demoCard}>
+                    <Text style={styles.demoTitle}>Quick Access</Text>
+                    <View style={styles.demoRowContainer}>
                         <Pressable
-                            style={({ pressed }) => [styles.demoRow, pressed && { opacity: 0.7 }]}
+                            style={styles.demoChip}
                             onPress={() => login('admin@mainbranch.com', 'admin')}
                         >
-                            <View style={[styles.demoBadge, { backgroundColor: '#EDE9FE' }]}>
-                                <MaterialCommunityIcons name="shield-account" size={18} color="#7C3AED" />
+                            <View style={[styles.demoIcon, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
+                                <MaterialCommunityIcons name="shield-account-outline" size={16} color="#4F46E5" />
                             </View>
-                            <View style={styles.demoInfo}>
-                                <Text style={styles.demoRole}>Master Administrator</Text>
-                                <Text style={styles.demoCredentials}>Full access to all branches</Text>
-                            </View>
-                            <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+                            <Text style={styles.demoChipText}>Admin Info</Text>
                         </Pressable>
 
-                        <View style={styles.demoDivider} />
-
                         <Pressable
-                            style={({ pressed }) => [styles.demoRow, pressed && { opacity: 0.7 }]}
+                            style={styles.demoChip}
                             onPress={() => login('user@subbranch.com', 'user')}
                         >
-                            <View style={[styles.demoBadge, { backgroundColor: '#F0FDF4' }]}>
-                                <MaterialCommunityIcons name="account" size={18} color="#10B981" />
+                            <View style={[styles.demoIcon, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+                                <MaterialCommunityIcons name="account-outline" size={16} color="#059669" />
                             </View>
-                            <View style={styles.demoInfo}>
-                                <Text style={styles.demoRole}>Branch Executive</Text>
-                                <Text style={styles.demoCredentials}>Manage sales & local warranties</Text>
-                            </View>
-                            <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+                            <Text style={styles.demoChipText}>User Info</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -200,95 +191,91 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         justifyContent: 'center',
         padding: 24,
-        paddingVertical: 64,
+        paddingVertical: 40,
     },
     header: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: 32,
     },
     logoContainer: {
-        marginBottom: 20,
+        marginBottom: 16,
     },
     logoWrapper: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 88,
+        height: 88,
+        borderRadius: 24,
         backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 15,
-        elevation: 10,
-        borderWidth: 1,
-        borderColor: '#F3F4F6',
+        shadowColor: '#4F46E5',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 8,
     },
     companyLogo: {
-        width: 70,
-        height: 70,
+        width: 56,
+        height: 56,
     },
     appName: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: '#1A1A1A',
-        letterSpacing: -1,
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#111827',
+        letterSpacing: -0.5,
     },
     tagline: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#6B7280',
-        marginTop: 6,
+        marginTop: 4,
         fontWeight: '500',
     },
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        borderRadius: 32,
-        padding: 32,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 24,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 20,
-        elevation: 4,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
+        shadowRadius: 12,
+        elevation: 2,
         marginBottom: 32,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
     },
     welcomeSection: {
-        marginBottom: 32,
+        marginBottom: 24,
         alignItems: 'center',
     },
     welcomeText: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#1A1A1A',
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#111827',
     },
     subtitle: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#6B7280',
-        marginTop: 6,
+        marginTop: 4,
     },
     form: {},
     inputWrapper: {
-        marginBottom: 24,
+        marginBottom: 20,
     },
     label: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#9CA3AF',
-        marginBottom: 10,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
         marginLeft: 4,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F9FAFB',
-        borderRadius: 18,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#F3F4F6',
+        borderColor: '#E5E7EB',
         paddingHorizontal: 16,
-        height: 60,
+        height: 56,
     },
     inputIcon: {
         marginRight: 12,
@@ -296,82 +283,77 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         fontSize: 16,
-        color: '#1A1A1A',
-        fontWeight: '600',
+        color: '#111827',
+        fontWeight: '500',
     },
     eyeButton: {
         padding: 8,
     },
     loginButton: {
-        borderRadius: 20,
+        borderRadius: 18,
         overflow: 'hidden',
-        marginTop: 12,
-        shadowColor: '#7C3AED',
+        marginTop: 8,
+        shadowColor: '#4F46E5',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
         shadowRadius: 16,
-        elevation: 8,
+        elevation: 6,
     },
     gradientButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 20,
-        gap: 12,
+        paddingVertical: 18,
+        gap: 10,
     },
     loginButtonText: {
         color: 'white',
-        fontSize: 18,
-        fontWeight: '800',
+        fontSize: 16,
+        fontWeight: '700',
     },
     demoSection: {
         alignItems: 'center',
+        width: '100%',
     },
     demoTitle: {
         fontSize: 12,
-        fontWeight: '800',
+        fontWeight: '700',
         color: '#9CA3AF',
         marginBottom: 16,
         textTransform: 'uppercase',
-        letterSpacing: 1.5,
+        letterSpacing: 1,
     },
-    demoCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.6)',
-        borderRadius: 24,
-        padding: 20,
-        width: '100%',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
+    demoRowContainer: {
+        flexDirection: 'row',
+        gap: 16,
     },
-    demoRow: {
+    demoChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 100,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
     },
-    demoBadge: {
-        width: 44,
-        height: 44,
+    demoIcon: {
+        width: 28,
+        height: 28,
         borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 16,
+        marginRight: 10,
+        borderWidth: 1,
     },
-    demoInfo: {
-        flex: 1,
-    },
-    demoRole: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#1A1A1A',
-    },
-    demoCredentials: {
+    demoChipText: {
         fontSize: 13,
-        color: '#6B7280',
-        marginTop: 2,
-    },
-    demoDivider: {
-        height: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        marginVertical: 12,
+        fontWeight: '600',
+        color: '#374151',
     },
 });
