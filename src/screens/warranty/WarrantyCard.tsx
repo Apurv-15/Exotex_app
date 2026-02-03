@@ -10,7 +10,7 @@ import { TemplateService } from '../../services/TemplateService';
 import { Storage } from '../../utils/storage';
 import { Asset } from 'expo-asset';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.png';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 
 export default function WarrantyCard() {
     const route = useRoute<any>();

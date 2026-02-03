@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.png';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
 
 const screenWidth = Dimensions.get('window').width;
 
