@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, StatusBar, KeyboardAvoidingView, ActivityIndicator, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { FieldVisitService } from '../../services/FieldVisitService';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
+import MeshBackground from '../../components/MeshBackground';
+import GlassPanel from '../../components/GlassPanel';
 
 const TOTAL_STEPS = 3;
 
@@ -383,7 +384,6 @@ export default function FieldVisitForm() {
         </View>
     );
 
-    // STEP 1: Site & Client + Water Details
     const renderStep1 = () => (
         <>
             {/* Section 1: Basic Site & Client Information */}
@@ -392,7 +392,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="office-building" size={20} color="#7C3AED" />
                     <Text style={styles.sectionTitle}>1. Basic Site & Client Information</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.row}>
                         <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
                             <Text style={styles.label}>Date of Site Visit</Text>
@@ -510,7 +510,7 @@ export default function FieldVisitForm() {
                             />
                         </View>
                     </View>
-                </View>
+                </GlassPanel>
             </View>
 
             {/* Section 2: Water Source & Water Quality Details */}
@@ -519,7 +519,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="water" size={20} color="#3B82F6" />
                     <Text style={styles.sectionTitle}>2. Water Source & Quality Details</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Water Source *</Text>
                         <View style={styles.checkboxGrid}>
@@ -616,12 +616,11 @@ export default function FieldVisitForm() {
                             />
                         </View>
                     )}
-                </View>
+                </GlassPanel>
             </View>
         </>
     );
 
-    // STEP 2: Existing System + Application + Technical
     const renderStep2 = () => (
         <>
             {/* Section 3: Existing System & Problem Identification */}
@@ -630,7 +629,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="cog-outline" size={20} color="#EF4444" />
                     <Text style={styles.sectionTitle}>3. Existing System & Problems</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Existing Water Treatment / Softener System</Text>
                         <View style={styles.radioGroup}>
@@ -704,7 +703,7 @@ export default function FieldVisitForm() {
                             onChangeText={(v) => updateField('customerExpectations', v)}
                         />
                     </View>
-                </View>
+                </GlassPanel>
             </View>
 
             {/* Section 4: Area of Application */}
@@ -713,7 +712,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="factory" size={20} color="#F59E0B" />
                     <Text style={styles.sectionTitle}>4. Area of Application</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Application Area</Text>
                         <View style={styles.checkboxGrid}>
@@ -774,16 +773,16 @@ export default function FieldVisitForm() {
                             onChangeText={(v) => updateField('operatingTemperature', v)}
                         />
                     </View>
-                </View>
+                </GlassPanel>
             </View>
 
-            {/* Section 5: Technical & Commercial Observations */}
+            {/* Section 5: Technical Observations */}
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                     <MaterialCommunityIcons name="clipboard-check" size={20} color="#10B981" />
                     <Text style={styles.sectionTitle}>5. Technical Observations</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Ekotex Installation Feasible</Text>
                         <View style={styles.radioGroup}>
@@ -845,12 +844,11 @@ export default function FieldVisitForm() {
                             onChangeText={(v) => updateField('accessoriesRequired', v)}
                         />
                     </View>
-                </View>
+                </GlassPanel>
             </View>
         </>
     );
 
-    // STEP 3: Commercial + Competitor + Photos + Follow-up + Remarks
     const renderStep3 = () => (
         <>
             {/* Section 6: Commercial Discussion Summary */}
@@ -859,7 +857,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="handshake" size={20} color="#8B5CF6" />
                     <Text style={styles.sectionTitle}>6. Commercial Discussion</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Customer Interest Level *</Text>
                         <View style={styles.radioGroup}>
@@ -903,7 +901,7 @@ export default function FieldVisitForm() {
                             onChangeText={(v) => updateField('expectedDecisionTimeline', v)}
                         />
                     </View>
-                </View>
+                </GlassPanel>
             </View>
 
             {/* Section 7: Competitor & Market Information */}
@@ -912,7 +910,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="account-group" size={20} color="#EC4899" />
                     <Text style={styles.sectionTitle}>7. Competitor Information</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Existing Competitor Solution (if any)</Text>
                         <TextInput
@@ -949,7 +947,7 @@ export default function FieldVisitForm() {
                             onChangeText={(v) => updateField('customerRemarks', v)}
                         />
                     </View>
-                </View>
+                </GlassPanel>
             </View>
 
             {/* Section 8: Photographs & Attachments */}
@@ -958,7 +956,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="camera" size={20} color="#06B6D4" />
                     <Text style={styles.sectionTitle}>8. Photographs & Attachments</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.checkboxGrid}>
                         <Checkbox label="Site Photographs Taken" checked={formData.sitePhotographsTaken}
                             onPress={() => updateField('sitePhotographsTaken', !formData.sitePhotographsTaken)} />
@@ -991,7 +989,7 @@ export default function FieldVisitForm() {
                             ))}
                         </View>
                     )}
-                </View>
+                </GlassPanel>
             </View>
 
             {/* Section 9: Follow-up & Action Plan */}
@@ -1000,7 +998,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="calendar-clock" size={20} color="#F97316" />
                     <Text style={styles.sectionTitle}>9. Follow-up & Action Plan</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Next Action Required</Text>
                         <View style={styles.checkboxGrid}>
@@ -1048,7 +1046,7 @@ export default function FieldVisitForm() {
                             />
                         </View>
                     </View>
-                </View>
+                </GlassPanel>
             </View>
 
             {/* Section 10: Executive Remarks */}
@@ -1057,7 +1055,7 @@ export default function FieldVisitForm() {
                     <MaterialCommunityIcons name="comment-text" size={20} color="#6366F1" />
                     <Text style={styles.sectionTitle}>10. Executive Remarks</Text>
                 </View>
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Sales / Engineer Remarks</Text>
                         <TextInput
@@ -1118,28 +1116,20 @@ export default function FieldVisitForm() {
                             />
                         </View>
                     </View>
-                </View>
+                </GlassPanel>
             </View>
         </>
     );
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#FFFFFF', '#F8FAFC']}
-                style={StyleSheet.absoluteFill}
-            />
+        <MeshBackground>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
                 <View style={styles.headerSubtitleCard}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.title}>Field Visit Report</Text>
-                            <Text style={styles.subtitle}>Fill in the technical details of the site visit</Text>
-                        </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
                         <Pressable
                             onPress={fillDummyData}
                             style={({ pressed }) => [
@@ -1200,10 +1190,7 @@ export default function FieldVisitForm() {
                             onPress={currentStep === TOTAL_STEPS ? handleSubmit : handleNext}
                             disabled={!canProceed() || loading}
                         >
-                            <LinearGradient
-                                colors={canProceed() ? ['#7C3AED', '#5B21B6'] : ['#E5E7EB', '#D1D5DB']}
-                                style={styles.gradientBtn}
-                            >
+                            <View style={[styles.gradientBtn, { backgroundColor: canProceed() ? '#74C69D' : '#E5E7EB' }]}>
                                 {loading ? (
                                     <Text style={styles.nextBtnText}>Submitting...</Text>
                                 ) : (
@@ -1218,12 +1205,12 @@ export default function FieldVisitForm() {
                                         />
                                     </>
                                 )}
-                            </LinearGradient>
+                            </View>
                         </Pressable>
                     </View>
                 </View>
             </KeyboardAvoidingView>
-        </View>
+        </MeshBackground>
     );
 }
 
@@ -1232,9 +1219,7 @@ const styles = StyleSheet.create({
     headerSubtitleCard: {
         paddingHorizontal: 20,
         paddingVertical: 12,
-        backgroundColor: '#F9FAFB',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        backgroundColor: 'transparent',
     },
     dummyFillBtn: {
         flexDirection: 'row',
@@ -1262,7 +1247,7 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: 14, color: '#6B7280', marginTop: 2 },
 
     // Progress Bar
-    progressContainer: { paddingHorizontal: 20, paddingVertical: 16, backgroundColor: 'white' },
+    progressContainer: { paddingHorizontal: 20, paddingVertical: 16, backgroundColor: 'transparent' },
     progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
     progressText: { fontSize: 14, fontWeight: '600', color: '#4B5563' },
     progressPercent: { fontSize: 14, fontWeight: '700', color: '#7C3AED' },
@@ -1287,20 +1272,13 @@ const styles = StyleSheet.create({
     sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8, paddingLeft: 4 },
     sectionTitle: { fontSize: 15, fontWeight: '700', color: '#4B5563' },
     card: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'transparent',
         borderRadius: 16,
         padding: 18,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
     },
     row: { flexDirection: 'row' },
-    inputContainer: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-    label: { fontSize: 11, fontWeight: '600', color: '#9CA3AF', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+    inputContainer: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(243, 244, 246, 0.3)' },
+    label: { fontSize: 11, fontWeight: '600', color: '#6B7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
     input: { fontSize: 15, color: '#1A1A1A', paddingVertical: 4 },
     textArea: { minHeight: 60, textAlignVertical: 'top' },
 
@@ -1329,7 +1307,7 @@ const styles = StyleSheet.create({
     assessmentButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
     assessmentButton: {
         paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
-        backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB',
+        backgroundColor: 'rgba(243, 244, 246, 0.5)', borderWidth: 1, borderColor: 'rgba(229, 231, 235, 0.5)',
     },
     assessmentButtonActive: { borderColor: 'transparent' },
     assessmentButtonText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
@@ -1339,12 +1317,12 @@ const styles = StyleSheet.create({
     uploadButton: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         padding: 14, borderRadius: 12, borderWidth: 2, borderColor: '#7C3AED',
-        borderStyle: 'dashed', backgroundColor: '#F9FAFB', gap: 8, marginTop: 12,
+        borderStyle: 'dashed', backgroundColor: 'rgba(249, 250, 251, 0.3)', gap: 8, marginTop: 12,
     },
     uploadButtonText: { fontSize: 14, color: '#7C3AED', fontWeight: '600' },
     imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
     imageContainer: {
-        width: 60, height: 60, borderRadius: 10, backgroundColor: '#F3F4F6',
+        width: 60, height: 60, borderRadius: 10, backgroundColor: 'rgba(243, 244, 246, 0.5)',
         justifyContent: 'center', alignItems: 'center', position: 'relative',
     },
     removeImageButton: { position: 'absolute', top: -6, right: -6, zIndex: 1 },
@@ -1352,22 +1330,15 @@ const styles = StyleSheet.create({
 
     // Footer
     footer: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'transparent',
         padding: 16,
         paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-        borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 10,
     },
     footerButtons: { flexDirection: 'row', gap: 12 },
     backBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12,
-        backgroundColor: '#F3F4F6', gap: 6,
+        backgroundColor: 'rgba(243, 244, 246, 0.8)', gap: 6,
     },
     backBtnText: { fontSize: 15, color: '#6B7280', fontWeight: '600' },
     nextBtn: { flex: 1, borderRadius: 12, overflow: 'hidden' },
@@ -1380,7 +1351,7 @@ const styles = StyleSheet.create({
     offlineWarning: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FEF3C7',
+        backgroundColor: 'rgba(254, 243, 199, 0.8)',
         padding: 12,
         marginHorizontal: 20,
         borderRadius: 12,
@@ -1394,13 +1365,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     uploadProgressCard: {
-        backgroundColor: '#F9FAFB',
+        backgroundColor: 'rgba(249, 250, 251, 0.8)',
         borderRadius: 12,
         padding: 16,
         marginHorizontal: 20,
         marginTop: 10,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: 'rgba(229, 231, 235, 0.5)',
     },
     uploadStatusText: {
         fontSize: 14,
@@ -1410,7 +1381,7 @@ const styles = StyleSheet.create({
     },
     uploadProgressBar: {
         height: 6,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: 'rgba(229, 231, 235, 0.5)',
         borderRadius: 3,
         overflow: 'hidden',
         marginBottom: 8,

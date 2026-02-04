@@ -318,14 +318,94 @@ export const FieldVisitService = {
         }
     },
 
-    // Get all field visits
-    getFieldVisits: async (): Promise<FieldVisit[]> => {
+    // Get field visit stats (counts)
+    getFieldVisitStats: async (branchId?: string): Promise<{ total: number; completed: number; pending: number }> => {
+        if (isSupabaseConfigured()) {
+            try {
+                let query = supabase.from('field_visits').select('*', { count: 'exact', head: true });
+                if (branchId) query = query.eq('branch_id', branchId);
+                const { count: total } = await query;
+
+                let cQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'completed');
+                if (branchId) cQuery = cQuery.eq('branch_id', branchId);
+                const { count: completed } = await cQuery;
+
+                let pQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+                if (branchId) pQuery = pQuery.eq('branch_id', branchId);
+                const { count: pending } = await pQuery;
+
+                return {
+                    total: total || 0,
+                    completed: completed || 0,
+                    pending: pending || 0
+                };
+            } catch (error) {
+                console.error('Supabase visit stats error:', error);
+            }
+        }
+
+        const visits = await FieldVisitService.getFieldVisits();
+        const filtered = branchId ? visits.filter(v => v.branchId === branchId) : visits;
+        return {
+            total: filtered.length,
+            completed: filtered.filter(v => v.status === 'completed').length,
+            pending: filtered.filter(v => v.status === 'pending').length
+        };
+    },
+
+    // Get region-wise visit stats
+    getFieldVisitRegionStats: async (): Promise<Array<{ region: string; total: number; completed: number; pending: number }>> => {
         if (isSupabaseConfigured()) {
             try {
                 const { data, error } = await supabase
                     .from('field_visits')
+                    .select('city, status');
+
+                if (error) throw error;
+
+                const grouped: Record<string, { region: string; total: number; completed: number; pending: number }> = {};
+                (data || []).forEach(item => {
+                    const region = item.city || 'Unknown';
+                    if (!grouped[region]) {
+                        grouped[region] = { region, total: 0, completed: 0, pending: 0 };
+                    }
+                    grouped[region].total++;
+                    if (item.status === 'completed') grouped[region].completed++;
+                    if (item.status === 'pending') grouped[region].pending++;
+                });
+
+                return Object.values(grouped).sort((a, b) => b.total - a.total);
+            } catch (error) {
+                console.error('Supabase visit region stats error:', error);
+            }
+        }
+
+        const visits = await FieldVisitService.getFieldVisits();
+        const grouped: Record<string, any> = {};
+        visits.forEach(v => {
+            const region = v.city || 'Unknown';
+            if (!grouped[region]) grouped[region] = { region, total: 0, completed: 0, pending: 0 };
+            grouped[region].total++;
+            if (v.status === 'completed') grouped[region].completed++;
+            if (v.status === 'pending') grouped[region].pending++;
+        });
+        return Object.values(grouped).sort((a, b) => b.total - a.total);
+    },
+
+    // Get all field visits
+    getFieldVisits: async (limit?: number): Promise<FieldVisit[]> => {
+        if (isSupabaseConfigured()) {
+            try {
+                let query = supabase
+                    .from('field_visits')
                     .select('*')
                     .order('created_at', { ascending: false });
+
+                if (limit) {
+                    query = query.limit(limit);
+                }
+
+                const { data, error } = await query;
 
                 if (error) throw error;
                 return (data || []).map(dbToFieldVisit);
