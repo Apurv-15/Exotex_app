@@ -5,6 +5,9 @@ import { BarChart } from 'react-native-chart-kit';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SalesService, Sale } from '../../services/SalesService';
 import { useAuth } from '../../context/AuthContext';
+import MeshBackground from '../../components/MeshBackground';
+import GlassPanel from '../../components/GlassPanel';
+import { THEME } from '../../constants/theme';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -54,11 +57,7 @@ export default function AnalyticsScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#F0F9FF', '#FFFFFF']}
-                style={StyleSheet.absoluteFill}
-            />
+        <MeshBackground>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <View style={styles.headerIcon}>
@@ -68,7 +67,7 @@ export default function AnalyticsScreen() {
                     <Text style={styles.subtitle}>Branch performance overview</Text>
                 </View>
 
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.cardHeader}>
                         <MaterialCommunityIcons name="office-building" size={20} color="#7C3AED" />
                         <Text style={styles.cardTitle}>Sales by Branch</Text>
@@ -84,9 +83,9 @@ export default function AnalyticsScreen() {
                         showValuesOnTopOfBars
                         fromZero
                     />
-                </View>
+                </GlassPanel>
 
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.cardHeader}>
                         <MaterialCommunityIcons name="trophy" size={20} color="#F59E0B" />
                         <Text style={styles.cardTitle}>Top Selling Models</Text>
@@ -112,9 +111,9 @@ export default function AnalyticsScreen() {
                             </View>
                         ))
                     )}
-                </View>
+                </GlassPanel>
 
-                <View style={styles.card}>
+                <GlassPanel style={styles.card}>
                     <View style={styles.cardHeader}>
                         <MaterialCommunityIcons name="information-outline" size={20} color="#3B82F6" />
                         <Text style={styles.cardTitle}>Overall Stats</Text>
@@ -131,9 +130,9 @@ export default function AnalyticsScreen() {
                         <Text style={styles.summaryLabel}>Verified Sales</Text>
                         <Text style={styles.summaryValue}>{sales.filter(s => s.status === 'approved').length}</Text>
                     </View>
-                </View>
+                </GlassPanel>
             </ScrollView>
-        </View>
+        </MeshBackground>
     );
 }
 
