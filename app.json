@@ -4,11 +4,11 @@
     "slug": "Warranty_manage_app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/company_logo.png",
+    "icon": "./assets/company_logo.jpeg",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/company_logo.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -18,7 +18,7 @@
     "android": {
       "package": "com.exotex.warrantymanager",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/company_logo.png",
+        "foregroundImage": "./assets/company_logo.jpeg",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
