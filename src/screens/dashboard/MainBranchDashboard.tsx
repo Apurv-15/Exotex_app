@@ -1,24 +1,29 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
+import { FieldVisitService } from '../../services/FieldVisitService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { LineChart } from 'react-native-chart-kit';
+import MeshBackground from '../../components/MeshBackground';
+import GlassPanel from '../../components/GlassPanel';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.jpeg';
 
 const screenWidth = Dimensions.get('window').width;
 
-// Region colors for visual distinction
+// Region colors for visual distinction (updated for mint theme)
 const REGION_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
-    'Mumbai': { bg: '#EDE9FE', text: '#7C3AED', icon: 'city' },
-    'Delhi': { bg: '#FEF3C7', text: '#B45309', icon: 'city-variant' },
-    'Bangalore': { bg: '#D1FAE5', text: '#059669', icon: 'office-building' },
+    'Mumbai': { bg: '#D1FAE5', text: '#059669', icon: 'city' },
+    'Delhi': { bg: '#FEF3C7', text: '#D97706', icon: 'city-variant' },
+    'Bangalore': { bg: '#E0E7FF', text: '#4F46E5', icon: 'office-building' },
     'Chennai': { bg: '#DBEAFE', text: '#2563EB', icon: 'home-city' },
     'Kolkata': { bg: '#FCE7F3', text: '#DB2777', icon: 'city-variant-outline' },
-    'Hyderabad': { bg: '#FEE2E2', text: '#DC2626', icon: 'domain' },
-    'Pune': { bg: '#E0E7FF', text: '#4F46E5', icon: 'town-hall' },
+    'Hyderabad': { bg: '#FFEDD5', text: '#EA580C', icon: 'domain' },
+    'Pune': { bg: '#F3E8FF', text: '#9333EA', icon: 'town-hall' },
     'default': { bg: '#F3F4F6', text: '#6B7280', icon: 'map-marker' },
 };
 
@@ -28,17 +33,66 @@ export default function MainBranchDashboard() {
     const { logout, user } = useAuth();
     const navigation = useNavigation<any>();
     const [sales, setSales] = useState<Sale[]>([]);
+    const [fieldVisits, setFieldVisits] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'All' | 'Today' | 'Month'>('All');
     const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+    const [salesStats, setSalesStats] = useState({ total: 0, pending: 0, approved: 0 });
+    const [visitStats, setVisitStats] = useState({ total: 0, completed: 0, pending: 0 });
+    const [regionStats, setRegionStats] = useState<Array<{ region: string; total: number; approved: number; pending: number }>>([]);
+    const [visitRegionStats, setVisitRegionStats] = useState<Array<{ region: string; total: number; completed: number; pending: number }>>([]);
+    const [showAllSales, setShowAllSales] = useState(false);
+
+    const fetchData = useCallback(async (isInitial: boolean = true) => {
+        // Only show full loader on initial mount or when we really have no data
+        if (isInitial) setLoading(true);
+
+        try {
+            const [visitsData, sStatsData, vsStatsData, rStatsData, vrStatsData] = await Promise.all([
+                FieldVisitService.getFieldVisits(5),
+                SalesService.getSalesStats(),
+                FieldVisitService.getFieldVisitStats(),
+                SalesService.getRegionStats(),
+                FieldVisitService.getFieldVisitRegionStats()
+            ]);
+
+            setFieldVisits(visitsData);
+            setSalesStats(sStatsData);
+            setVisitStats(vsStatsData);
+            setRegionStats(rStatsData);
+            setVisitRegionStats(vrStatsData);
+
+            // Fetch initial 3 sales if it's the first load
+            if (isInitial && !showAllSales) {
+                const salesData = await SalesService.getSales(3);
+                setSales(salesData);
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    }, [showAllSales]);
 
     useFocusEffect(useCallback(() => {
-        setLoading(true);
-        SalesService.getAllSales()
-            .then(setSales)
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, []));
+        fetchData(true);
+    }, [fetchData]));
+
+    const handleViewMoreToggle = async () => {
+        if (!showAllSales && sales.length <= 3) {
+            // Fetch everything only if we haven't already
+            setLoading(true);
+            try {
+                const allSales = await SalesService.getAllSales();
+                setSales(allSales);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        setShowAllSales(!showAllSales);
+    };
 
     // Filter by time
     const filteredSales = useMemo(() => {
@@ -51,95 +105,151 @@ export default function MainBranchDashboard() {
         });
     }, [sales, filter]);
 
-    // Group sales by city/region
-    const salesByRegion = useMemo(() => {
-        const grouped: Record<string, Sale[]> = {};
-        filteredSales.forEach(sale => {
-            const region = sale.city || 'Unknown';
-            if (!grouped[region]) grouped[region] = [];
-            grouped[region].push(sale);
-        });
-        return grouped;
-    }, [filteredSales]);
-
-    // Get region stats
-    const regionStats = useMemo(() => {
-        return Object.entries(salesByRegion)
-            .map(([region, regionSales]) => ({
-                region,
-                total: regionSales.length,
-                approved: regionSales.filter(s => s.status === 'approved').length,
-                pending: regionSales.filter(s => s.status === 'pending').length,
-            }))
-            .sort((a, b) => b.total - a.total);
-    }, [salesByRegion]);
-
     // Display sales (filtered by region if selected)
-    const displaySales = selectedRegion
-        ? salesByRegion[selectedRegion] || []
-        : filteredSales;
+    const displaySales = useMemo(() => {
+        let list = filteredSales;
+        if (selectedRegion) {
+            list = list.filter(s => s.city === selectedRegion);
+        }
+        return list;
+    }, [filteredSales, selectedRegion]);
 
-    const totalSales = filteredSales.length;
-    const pending = filteredSales.filter(s => s.status === 'pending').length;
-    const approved = filteredSales.filter(s => s.status === 'approved').length;
+    const totalSalesCount = salesStats.total;
+    const totalVisitsCount = visitStats.total;
+    const pendingVisitsCount = visitStats.pending;
+
+    // Real data for visit analytics graph
+    const visitGraphData = useMemo(() => {
+        // Get last 7 days
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const today = new Date();
+        const labels: string[] = [];
+        const counts: number[] = [];
+
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            labels.push(days[date.getDay()]);
+
+            // Count visits for this day
+            const dayVisits = fieldVisits.filter(visit => {
+                const visitDate = new Date(visit.visitDate);
+                return visitDate.toDateString() === date.toDateString();
+            }).length;
+
+            counts.push(dayVisits);
+        }
+
+        return {
+            labels,
+            datasets: [{
+                data: counts.length > 0 && counts.some(c => c > 0) ? counts : [0, 0, 0, 0, 0, 0, 0],
+                color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                strokeWidth: 2
+            }]
+        };
+    }, [fieldVisits]);
+
+    // Calculate top selling models from real sales data
+    const topSellingModels = useMemo(() => {
+        const productStats = sales.reduce((acc: any, sale) => {
+            acc[sale.productModel] = (acc[sale.productModel] || 0) + 1;
+            return acc;
+        }, {});
+
+        return Object.entries(productStats)
+            .map(([name, units]: [string, any]) => ({ name, units }))
+            .sort((a, b) => b.units - a.units)
+            .slice(0, 3);
+    }, [sales]);
 
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#FFFFFF', '#F9FAFB']}
-                style={StyleSheet.absoluteFill}
-            />
+        <MeshBackground>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Header Section */}
                 <View style={styles.header}>
                     <View style={styles.headerTitleRow}>
-                        <View style={styles.logoWrapper}>
+                        <GlassPanel style={styles.logoWrapper} intensity={40}>
                             <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
-                        </View>
+                        </GlassPanel>
                         <View>
                             <Text style={styles.greeting}>EXOTEX Admin</Text>
                             <Text style={styles.subtitle}>Welcome back, {user?.name}</Text>
                         </View>
                     </View>
                     <Pressable onPress={logout} style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}>
-                        <View style={styles.logoutIcon}>
-                            <MaterialCommunityIcons name="logout" size={20} color="#EF4444" />
-                        </View>
+                        <GlassPanel style={styles.logoutIcon}>
+                            <MaterialCommunityIcons name="logout" size={20} color={THEME.colors.error} />
+                        </GlassPanel>
                     </Pressable>
                 </View>
 
                 {/* Main Stats Bento Grid */}
                 <View style={styles.bentoGrid}>
                     <LinearGradient
-                        colors={['#4F46E5', '#4338CA']}
+                        colors={[THEME.colors.secondary, '#58A47D']}
                         style={styles.mainStatCard}
                     >
                         <View style={styles.statTop}>
                             <View style={styles.statIconWrapper}>
-                                <MaterialCommunityIcons name="chart-bar" size={24} color="#C7D2FE" />
+                                <MaterialCommunityIcons name="chart-bar" size={24} color={THEME.colors.mintLight} />
                             </View>
                             <View style={styles.statBadge}>
-                                <Text style={styles.badgeText}>+12% vs last month</Text>
+                                <Text style={styles.badgeText}>+12%</Text>
                             </View>
                         </View>
                         <View>
-                            <Text style={styles.mainStatValue}>{totalSales}</Text>
+                            <Text style={styles.mainStatValue}>{totalSalesCount}</Text>
                             <Text style={styles.mainStatLabel}>Total Units Sold</Text>
                         </View>
                     </LinearGradient>
 
                     <View style={styles.bentoColumn}>
-                        <View style={[styles.statBox, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
-                            <Text style={[styles.statBoxValue, { color: '#059669' }]}>{approved}</Text>
-                            <Text style={[styles.statBoxLabel, { color: '#059669' }]}>Approved</Text>
-                        </View>
-                        <View style={[styles.statBox, { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7' }]}>
-                            <Text style={[styles.statBoxValue, { color: '#D97706' }]}>{pending}</Text>
-                            <Text style={[styles.statBoxLabel, { color: '#D97706' }]}>Pending</Text>
-                        </View>
+                        <GlassPanel style={[styles.statBox, { backgroundColor: THEME.colors.mintLight + '80' }]}>
+                            <Text style={[styles.statBoxValue, { color: '#047857' }]}>{totalVisitsCount}</Text>
+                            <Text style={[styles.statBoxLabel, { color: '#065F46' }]}>Field Visits</Text>
+                        </GlassPanel>
+                        <GlassPanel style={[styles.statBox, { backgroundColor: '#FEF3C780' }]}>
+                            <Text style={[styles.statBoxValue, { color: '#D97706' }]}>{pendingVisitsCount}</Text>
+                            <Text style={[styles.statBoxLabel, { color: '#B45309' }]}>Pending Visits</Text>
+                        </GlassPanel>
                     </View>
                 </View>
+
+                {/* Visit Analytics Graph */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Visit Analytics</Text>
+                </View>
+                <GlassPanel style={styles.graphCard}>
+                    <LineChart
+                        data={visitGraphData}
+                        width={screenWidth - 48}
+                        height={180}
+                        chartConfig={{
+                            backgroundColor: 'transparent',
+                            backgroundGradientFrom: '#ffffff',
+                            backgroundGradientTo: '#ffffff',
+                            decimalPlaces: 0,
+                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                            propsForDots: {
+                                r: '4',
+                                strokeWidth: '2',
+                                stroke: '#10B981'
+                            },
+                            style: {
+                                borderRadius: 16
+                            }
+                        }}
+                        bezier
+                        style={{
+                            marginVertical: 8,
+                            borderRadius: 16,
+                            paddingRight: 40
+                        }}
+                    />
+                </GlassPanel>
 
                 {/* Filter Chips */}
                 <View style={styles.filterRow}>
@@ -154,9 +264,61 @@ export default function MainBranchDashboard() {
                     ))}
                 </View>
 
-                {/* Region-wise Sales Section */}
+                {/* Visit Region Performance */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Region Performance</Text>
+                    <Text style={styles.sectionTitle}>Visit Hubs (Region Wise)</Text>
+                </View>
+                {loading ? (
+                    <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
+                ) : visitRegionStats.length === 0 ? (
+                    <GlassPanel style={styles.emptyState}>
+                        <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
+                        <Text style={styles.emptyText}>No visit data available</Text>
+                    </GlassPanel>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.regionScroll}
+                        contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                    >
+                        {visitRegionStats.map(({ region, total, completed, pending }) => {
+                            const colors = getRegionColor(region);
+                            return (
+                                <GlassPanel
+                                    key={region}
+                                    style={styles.regionCard}
+                                >
+                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                        <MaterialCommunityIcons
+                                            name={colors.icon as any}
+                                            size={20}
+                                            color={colors.text}
+                                        />
+                                    </View>
+                                    <Text style={styles.regionName}>{region}</Text>
+                                    <Text style={styles.regionTotal}>{total} Visits</Text>
+
+                                    <View style={styles.progressBar}>
+                                        <View
+                                            style={[
+                                                styles.progressFill,
+                                                { width: `${(completed / (total || 1)) * 100}%` as any, backgroundColor: colors.text }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={{ fontSize: 10, color: THEME.colors.textSecondary, marginTop: 4 }}>
+                                        {completed} Done • {pending} Left
+                                    </Text>
+                                </GlassPanel>
+                            );
+                        })}
+                    </ScrollView>
+                )}
+
+                {/* Sales Region Performance */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Sales Region Performance</Text>
                     {selectedRegion && (
                         <Pressable onPress={() => setSelectedRegion(null)}>
                             <Text style={styles.seeAllText}>Clear Filter</Text>
@@ -165,12 +327,12 @@ export default function MainBranchDashboard() {
                 </View>
 
                 {loading ? (
-                    <ActivityIndicator size="large" color="#4F46E5" style={{ marginVertical: 40 }} />
+                    <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
                 ) : regionStats.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <MaterialCommunityIcons name="map-marker-off" size={48} color="#D1D5DB" />
+                    <GlassPanel style={styles.emptyState}>
+                        <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
                         <Text style={styles.emptyText}>No sales data available</Text>
-                    </View>
+                    </GlassPanel>
                 ) : (
                     <ScrollView
                         horizontal
@@ -184,30 +346,33 @@ export default function MainBranchDashboard() {
                             return (
                                 <Pressable
                                     key={region}
-                                    style={[
-                                        styles.regionCard,
-                                        isSelected && styles.regionCardSelected
-                                    ]}
                                     onPress={() => setSelectedRegion(isSelected ? null : region)}
                                 >
-                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
-                                        <MaterialCommunityIcons
-                                            name={colors.icon as any}
-                                            size={20}
-                                            color={colors.text}
-                                        />
-                                    </View>
-                                    <Text style={styles.regionName}>{region}</Text>
-                                    <Text style={styles.regionTotal}>{total} Sales</Text>
+                                    <GlassPanel
+                                        style={[
+                                            styles.regionCard,
+                                            isSelected && styles.regionCardSelected
+                                        ]}
+                                    >
+                                        <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                            <MaterialCommunityIcons
+                                                name={colors.icon as any}
+                                                size={20}
+                                                color={colors.text}
+                                            />
+                                        </View>
+                                        <Text style={styles.regionName}>{region}</Text>
+                                        <Text style={styles.regionTotal}>{total} Sales</Text>
 
-                                    <View style={styles.progressBar}>
-                                        <View
-                                            style={[
-                                                styles.progressFill,
-                                                { width: `${(approved / (total || 1)) * 100}%`, backgroundColor: colors.text }
-                                            ]}
-                                        />
-                                    </View>
+                                        <View style={styles.progressBar}>
+                                            <View
+                                                style={[
+                                                    styles.progressFill,
+                                                    { width: `${(approved / (total || 1)) * 100}%` as any, backgroundColor: colors.text }
+                                                ]}
+                                            />
+                                        </View>
+                                    </GlassPanel>
                                 </Pressable>
                             );
                         })}
@@ -220,29 +385,65 @@ export default function MainBranchDashboard() {
                         onPress={() => navigation.navigate('AnalyticsScreen')}
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
                     >
-                        <View style={[styles.actionIconCircle, { backgroundColor: '#EEF2FF' }]}>
-                            <MaterialCommunityIcons name="chart-timeline-variant" size={24} color="#4F46E5" />
-                        </View>
-                        <Text style={styles.actionBtnTitle}>Analytics</Text>
+                        <GlassPanel style={styles.actionPanel}>
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#EEF2FF' }]}>
+                                <MaterialCommunityIcons name="chart-timeline-variant" size={24} color="#4F46E5" />
+                            </View>
+                            <Text style={styles.actionBtnTitle}>Analytics</Text>
+                        </GlassPanel>
                     </Pressable>
 
                     <Pressable
                         onPress={() => navigation.navigate('TemplateManagement')}
                         style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
                     >
-                        <View style={[styles.actionIconCircle, { backgroundColor: '#FDF4FF' }]}>
-                            <MaterialCommunityIcons name="file-document-edit-outline" size={24} color="#C026D3" />
-                        </View>
-                        <Text style={styles.actionBtnTitle}>Templates</Text>
+                        <GlassPanel style={styles.actionPanel}>
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#FDF4FF' }]}>
+                                <MaterialCommunityIcons name="file-document-edit-outline" size={24} color="#C026D3" />
+                            </View>
+                            <Text style={styles.actionBtnTitle}>Templates</Text>
+                        </GlassPanel>
                     </Pressable>
                 </View>
+
+                {/* Top Selling Models */}
+                <View style={styles.sectionHeader}>
+                    <MaterialCommunityIcons name="trophy" size={20} color="#F59E0B" />
+                    <Text style={styles.sectionTitle}>Top Selling Models</Text>
+                </View>
+                <GlassPanel style={styles.topModelsCard}>
+                    {topSellingModels.length === 0 ? (
+                        <Text style={styles.emptyText}>No sales data available</Text>
+                    ) : (
+                        topSellingModels.map((product, index) => (
+                            <View key={index} style={styles.productRow}>
+                                <View style={[styles.productRank, {
+                                    backgroundColor: index === 0 ? '#EDE9FE' : index === 1 ? '#D1FAE5' : '#FEF3C7'
+                                }]}>
+                                    <Text style={[styles.rankText, {
+                                        color: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
+                                    }]}>{index + 1}</Text>
+                                </View>
+                                <View style={styles.productInfo}>
+                                    <Text style={styles.productName}>{product.name}</Text>
+                                    <View style={styles.productProgressBar}>
+                                        <View style={[styles.productProgressFill, {
+                                            width: `${(product.units / (topSellingModels[0]?.units || 1)) * 100}%` as any,
+                                            backgroundColor: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
+                                        }]} />
+                                    </View>
+                                </View>
+                                <Text style={styles.productUnits}>{product.units}</Text>
+                            </View>
+                        ))
+                    )}
+                </GlassPanel>
 
                 {/* Recent Activity List */}
                 <View style={styles.listHeader}>
                     <Text style={styles.sectionTitle}>
-                        {selectedRegion ? `${selectedRegion} Sales` : 'Recent Transactions'}
+                        {selectedRegion ? `${selectedRegion} Sales` : 'Recent Warranty'}
                     </Text>
-                    {/* <Text style={styles.countBadge}>{displaySales.length}</Text> */}
                 </View>
 
                 {displaySales.length === 0 ? (
@@ -250,114 +451,205 @@ export default function MainBranchDashboard() {
                         <Text style={styles.emptyText}>No sales found</Text>
                     </View>
                 ) : (
-                    displaySales.slice(0, 10).map(s => (
-                        <Pressable
-                            key={s.id}
-                            style={({ pressed }) => [
-                                styles.listItem,
-                                pressed && { backgroundColor: '#F9FAFB' }
-                            ]}
-                            onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
-                        >
-                            <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? '#ECFDF5' : '#FFFBEB' }]}>
-                                <Text style={{ fontSize: 16 }}>
-                                    {s.status === 'approved' ? '✅' : '⏳'}
+                    <GlassPanel style={{ padding: 8 }}>
+                        {(showAllSales ? displaySales : displaySales.slice(0, 3)).map((s, index) => (
+                            <Pressable
+                                key={s.id}
+                                style={({ pressed }) => [
+                                    styles.listItem,
+                                    pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
+                                    index === displaySales.length - 1 && { borderBottomWidth: 0 }
+                                ]}
+                                onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
+                            >
+                                <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? THEME.colors.mintLight : '#FFFBEB' }]}>
+                                    <View style={styles.statusIndicator}>
+                                        <MaterialCommunityIcons
+                                            name={s.status === 'approved' ? 'check-circle' : 'clock-outline'}
+                                            size={20}
+                                            color={s.status === 'approved' ? THEME.colors.success : THEME.colors.warning}
+                                        />
+                                    </View>
+                                </View>
+                                <View style={styles.listContent}>
+                                    <Text style={styles.listTitle}>{s.customerName}</Text>
+                                    <Text style={styles.listSub}>{s.productModel}</Text>
+                                </View>
+                                <View style={styles.listRight}>
+                                    <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                    <Text style={styles.listCity}>{s.city}</Text>
+                                </View>
+                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
+                            </Pressable>
+                        ))}
+
+                        {/* View More / Show Less Button */}
+                        {(salesStats.total > 3 || showAllSales) && (
+                            <Pressable
+                                onPress={handleViewMoreToggle}
+                                style={({ pressed }) => [
+                                    styles.viewMoreBtn,
+                                    pressed && { opacity: 0.7 }
+                                ]}
+                            >
+                                <Text style={styles.viewMoreText}>
+                                    {showAllSales ? 'Show Less' : `View More Transactions (${salesStats.total - 3} more)`}
                                 </Text>
-                            </View>
-                            <View style={styles.listContent}>
-                                <Text style={styles.listTitle}>{s.customerName}</Text>
-                                <Text style={styles.listSub}>{s.productModel}</Text>
-                            </View>
-                            <View style={styles.listRight}>
-                                <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                <Text style={styles.listCity}>{s.city}</Text>
-                            </View>
-                        </Pressable>
-                    ))
+                                <MaterialCommunityIcons
+                                    name={showAllSales ? "chevron-up" : "chevron-down"}
+                                    size={20}
+                                    color={THEME.colors.primary}
+                                />
+                            </Pressable>
+                        )}
+                    </GlassPanel>
                 )}
             </ScrollView>
-        </View>
+        </MeshBackground>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
-    content: { padding: 20, paddingBottom: 40 },
+    content: { padding: 20, paddingBottom: 40, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10 },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 24,
-        marginTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10
     },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     logoWrapper: {
         width: 48,
         height: 48,
         borderRadius: 16,
-        backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
     },
     companyLogo: {
         width: 32,
         height: 32,
     },
-    greeting: { fontSize: 20, fontWeight: '700', color: '#111827', letterSpacing: -0.5 },
-    subtitle: { fontSize: 13, color: '#6B7280', marginTop: 1 },
-    logoutBtn: { padding: 8 },
-    logoutIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center' },
+    greeting: { fontSize: 20, fontFamily: THEME.fonts.bold, color: THEME.colors.text, letterSpacing: -0.5 },
+    subtitle: { fontSize: 13, color: THEME.colors.textSecondary, marginTop: 1 },
+    logoutBtn: {},
+    logoutIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
     bentoGrid: { flexDirection: 'row', gap: 12, marginBottom: 28, height: 160 },
-    mainStatCard: { flex: 1.6, borderRadius: 24, padding: 20, justifyContent: 'space-between', elevation: 4, shadowColor: '#4F46E5', shadowOpacity: 0.2, shadowOffset: { height: 8, width: 0 }, shadowRadius: 12 },
+    mainStatCard: { flex: 1.6, borderRadius: 24, padding: 20, justifyContent: 'space-between', elevation: 4, shadowColor: THEME.colors.secondary, shadowOpacity: 0.4, shadowOffset: { height: 8, width: 0 }, shadowRadius: 12 },
     statTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     statIconWrapper: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-    statBadge: { backgroundColor: '#312E81', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    badgeText: { color: '#C7D2FE', fontSize: 10, fontWeight: '700' },
-    mainStatValue: { color: 'white', fontSize: 36, fontWeight: '800', lineHeight: 40 },
-    mainStatLabel: { color: '#C7D2FE', fontSize: 14, fontWeight: '500' },
+    statBadge: { backgroundColor: 'rgba(0,0,0,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    badgeText: { color: 'white', fontSize: 10, fontFamily: THEME.fonts.bold },
+    mainStatValue: { color: 'white', fontSize: 36, fontFamily: THEME.fonts.black, lineHeight: 40 },
+    mainStatLabel: { color: THEME.colors.mintLight, fontSize: 14, fontFamily: THEME.fonts.semiBold },
+
+    graphCard: { padding: 16, borderRadius: 24, marginBottom: 28, backgroundColor: 'rgba(255,255,255,0.7)' },
 
     bentoColumn: { flex: 1, gap: 12 },
-    statBox: { flex: 1, borderRadius: 20, padding: 16, justifyContent: 'center', borderWidth: 1 },
-    statBoxValue: { fontSize: 20, fontWeight: '800', marginBottom: 2 },
-    statBoxLabel: { fontSize: 12, fontWeight: '600' },
+    statBox: { flex: 1, borderRadius: 20, padding: 16, justifyContent: 'center' },
+    statBoxValue: { fontSize: 20, fontFamily: THEME.fonts.black, marginBottom: 2 },
+    statBoxLabel: { fontSize: 12, fontFamily: THEME.fonts.bold },
 
     filterRow: { flexDirection: 'row', gap: 8, marginBottom: 28 },
-    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: 'transparent' },
-    chipActive: { backgroundColor: '#111827' },
-    chipText: { fontSize: 13, fontWeight: '600', color: '#4B5563' },
+    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.5)', borderWidth: 1, borderColor: 'transparent' },
+    chipActive: { backgroundColor: THEME.colors.text },
+    chipText: { fontSize: 13, fontFamily: THEME.fonts.semiBold, color: THEME.colors.textSecondary },
     chipTextActive: { color: 'white' },
 
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-    seeAllText: { fontSize: 13, color: '#4F46E5', fontWeight: '600' },
+    sectionTitle: { fontSize: 18, fontFamily: THEME.fonts.bold, color: THEME.colors.text },
+    seeAllText: { fontSize: 13, color: THEME.colors.secondary, fontFamily: THEME.fonts.bold },
 
     regionScroll: { marginBottom: 32 },
-    regionCard: { width: 150, padding: 16, borderRadius: 20, backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E7EB', marginRight: 4, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
-    regionCardSelected: { borderColor: '#4F46E5', backgroundColor: '#EEF2FF' },
+    regionCard: { width: 150, padding: 16, borderRadius: 20, marginRight: 0 },
+    regionCardSelected: { borderColor: THEME.colors.secondary, borderWidth: 2 },
     regionIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-    regionName: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 2 },
-    regionTotal: { fontSize: 13, color: '#6B7280', marginBottom: 12 },
-    progressBar: { height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, width: '100%' },
+    regionName: { fontSize: 15, fontFamily: THEME.fonts.bold, color: THEME.colors.text, marginBottom: 2 },
+    regionTotal: { fontSize: 13, color: THEME.colors.textSecondary, marginBottom: 12 },
+    progressBar: { height: 4, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 2, width: '100%' },
     progressFill: { height: '100%', borderRadius: 2 },
 
     actionGrid: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-    actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'white', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+    actionButton: { flex: 1 },
+    actionPanel: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 20 },
     actionIconCircle: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    actionBtnTitle: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
+    actionBtnTitle: { fontSize: 15, fontFamily: THEME.fonts.bold, color: THEME.colors.text },
 
     listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    listItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    listItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 8 },
     listIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     listContent: { flex: 1 },
-    listTitle: { fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 2 },
-    listSub: { fontSize: 13, color: '#6B7280' },
+    listTitle: { fontSize: 15, fontFamily: THEME.fonts.bold, color: THEME.colors.text, marginBottom: 2 },
+    listSub: { fontSize: 13, color: THEME.colors.textSecondary },
     listRight: { alignItems: 'flex-end' },
-    listDate: { fontSize: 12, color: '#9CA3AF', marginBottom: 4, fontWeight: '500' },
-    listCity: { fontSize: 11, color: '#6B7280', backgroundColor: '#F3F4F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+    listDate: { fontSize: 12, color: THEME.colors.textSecondary, marginBottom: 4, fontFamily: THEME.fonts.semiBold },
+    listCity: { fontSize: 11, color: THEME.colors.textSecondary, backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
 
-    emptyState: { padding: 40, alignItems: 'center', gap: 12 },
-    emptyText: { color: '#9CA3AF', fontSize: 15 },
+    emptyState: { padding: 40, alignItems: 'center', gap: 12, borderRadius: 20 },
+    emptyText: { color: THEME.colors.textSecondary, fontSize: 15, fontFamily: THEME.fonts.semiBold },
+    statusIndicator: {
+        width: 24,
+        height: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    viewMoreBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        gap: 4,
+    },
+    viewMoreText: {
+        fontSize: 13,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.primary,
+    },
+    topModelsCard: {
+        padding: 20,
+        borderRadius: 24,
+        marginBottom: 32
+    },
+    productRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)'
+    },
+    productRank: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12
+    },
+    rankText: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold
+    },
+    productInfo: { flex: 1 },
+    productName: {
+        fontSize: 15,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
+        marginBottom: 6
+    },
+    productProgressBar: {
+        height: 6,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        borderRadius: 3,
+        overflow: 'hidden'
+    },
+    productProgressFill: {
+        height: '100%',
+        borderRadius: 3
+    },
+    productUnits: {
+        fontSize: 18,
+        fontFamily: THEME.fonts.black,
+        marginLeft: 12,
+        color: THEME.colors.text
+    },
 });

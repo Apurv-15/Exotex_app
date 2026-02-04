@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { THEME } from '../constants/config';
+import { THEME } from '../constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import GlassPanel from './GlassPanel';
 
 interface DashboardCardProps {
     title: string;
@@ -13,7 +14,7 @@ interface DashboardCardProps {
 
 export default function DashboardCard({ title, value, icon, color = THEME.colors.primary, style }: DashboardCardProps) {
     return (
-        <View style={[styles.card, style]}>
+        <GlassPanel style={[styles.card, style]}>
             <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
                 <MaterialCommunityIcons name={icon} size={24} color={color} />
             </View>
@@ -21,28 +22,22 @@ export default function DashboardCard({ title, value, icon, color = THEME.colors
                 <Text style={styles.value}>{value}</Text>
                 <Text style={styles.title}>{title}</Text>
             </View>
-        </View>
+        </GlassPanel>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: 'white',
-        borderRadius: THEME.borderRadius.l,
         padding: THEME.spacing.m,
         flexDirection: 'row',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
         marginBottom: THEME.spacing.m,
+        borderRadius: THEME.borderRadius.xl,
     },
     iconContainer: {
         width: 48,
         height: 48,
-        borderRadius: 24,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: THEME.spacing.m,
@@ -51,14 +46,16 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     value: {
-        fontSize: 24,
-        fontWeight: '700',
+        fontSize: 28,
+        fontFamily: THEME.fonts.bold,
         color: THEME.colors.text,
         marginBottom: 2,
     },
     title: {
         fontSize: 13,
+        fontFamily: THEME.fonts.semiBold,
         color: THEME.colors.textSecondary,
-        fontWeight: '500',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
 });
