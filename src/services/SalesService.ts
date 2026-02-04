@@ -206,14 +206,96 @@ export const SalesService = {
         }
     },
 
-    // Get all sales
-    getSales: async (): Promise<Sale[]> => {
+    // Get sales stats (counts)
+    getSalesStats: async (branchId?: string): Promise<{ total: number; pending: number; approved: number }> => {
         if (isSupabaseConfigured()) {
             try {
+                let query = supabase.from('sales').select('*', { count: 'exact', head: true });
+                if (branchId) query = query.eq('branch_id', branchId);
+                const { count: total } = await query;
+
+                let pQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+                if (branchId) pQuery = pQuery.eq('branch_id', branchId);
+                const { count: pending } = await pQuery;
+
+                let aQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'approved');
+                if (branchId) aQuery = aQuery.eq('branch_id', branchId);
+                const { count: approved } = await aQuery;
+
+                return {
+                    total: total || 0,
+                    pending: pending || 0,
+                    approved: approved || 0
+                };
+            } catch (error) {
+                console.error('Supabase stats error:', error);
+            }
+        }
+
+        const sales = await SalesService.getSales();
+        const filtered = branchId ? sales.filter(s => s.branchId === branchId) : sales;
+        return {
+            total: filtered.length,
+            pending: filtered.filter(s => s.status === 'pending').length,
+            approved: filtered.filter(s => s.status === 'approved').length
+        };
+    },
+
+    // Get region-wise sales stats
+    getRegionStats: async (): Promise<Array<{ region: string; total: number; approved: number; pending: number }>> => {
+        if (isSupabaseConfigured()) {
+            try {
+                // Fetch just city and status for all sales to group them
                 const { data, error } = await supabase
+                    .from('sales')
+                    .select('city, status');
+
+                if (error) throw error;
+
+                const grouped: Record<string, { region: string; total: number; approved: number; pending: number }> = {};
+                (data || []).forEach(item => {
+                    const region = item.city || 'Unknown';
+                    if (!grouped[region]) {
+                        grouped[region] = { region, total: 0, approved: 0, pending: 0 };
+                    }
+                    grouped[region].total++;
+                    if (item.status === 'approved') grouped[region].approved++;
+                    if (item.status === 'pending') grouped[region].pending++;
+                });
+
+                return Object.values(grouped).sort((a, b) => b.total - a.total);
+            } catch (error) {
+                console.error('Supabase region stats error:', error);
+            }
+        }
+
+        // Fallback to local
+        const sales = await SalesService.getSales();
+        const grouped: Record<string, any> = {};
+        sales.forEach(sale => {
+            const region = sale.city || 'Unknown';
+            if (!grouped[region]) grouped[region] = { region, total: 0, approved: 0, pending: 0 };
+            grouped[region].total++;
+            if (sale.status === 'approved') grouped[region].approved++;
+            if (sale.status === 'pending') grouped[region].pending++;
+        });
+        return Object.values(grouped).sort((a, b) => b.total - a.total);
+    },
+
+    // Get all sales
+    getSales: async (limit?: number): Promise<Sale[]> => {
+        if (isSupabaseConfigured()) {
+            try {
+                let query = supabase
                     .from('sales')
                     .select('*')
                     .order('created_at', { ascending: false });
+
+                if (limit) {
+                    query = query.limit(limit);
+                }
+
+                const { data, error } = await query;
 
                 if (error) throw error;
                 return (data || []).map(dbToSale);
@@ -250,8 +332,8 @@ export const SalesService = {
     },
 
     // Get all sales (alias)
-    getAllSales: async (): Promise<Sale[]> => {
-        return await SalesService.getSales();
+    getAllSales: async (limit?: number): Promise<Sale[]> => {
+        return await SalesService.getSales(limit);
     },
 
     // Create new sale with images

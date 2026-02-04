@@ -1,13 +1,28 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, Image, StatusBar, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, Image, StatusBar, KeyboardAvoidingView, Modal } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import MeshBackground from '../../components/MeshBackground';
+import GlassPanel from '../../components/GlassPanel';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.avif';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.jpeg';
+
+const PRODUCT_MODELS = [
+    'EKO-GREEN G3',
+    'EKO-GREEN G5',
+    'EKO-GREEN G6',
+    'EKO-GREEN G33',
+    'EKO-GREEN G130',
+    'EKO-GREEN G230',
+    'EKO-GREEN G330',
+    'EKO-GREEN G530',
+    'EKO-GREEN G600',
+];
 
 export default function CreateSaleStep1() {
     const navigation = useNavigation<any>();
+    const [showModelDropdown, setShowModelDropdown] = useState(false);
     const [formData, setFormData] = useState({
         customerName: '',
         phone: '',
@@ -39,7 +54,7 @@ export default function CreateSaleStep1() {
             executiveName: 'Alex Smith',
             designation: 'Sales Executive',
             plumberName: 'Mike Ross',
-            productModel: 'Ekotex Pro Max',
+            productModel: 'EKO-GREEN G130',
             serialNumber: 'SN' + Math.floor(Math.random() * 1000000).toString(),
             productDetailsConfirmed: true,
             paymentConfirmed: true
@@ -77,11 +92,7 @@ export default function CreateSaleStep1() {
     };
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#FFFFFF', '#F8FAFC']}
-                style={StyleSheet.absoluteFill}
-            />
+        <MeshBackground>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
@@ -111,7 +122,7 @@ export default function CreateSaleStep1() {
                                 <Text style={styles.dummyFillText}>Quick Fill</Text>
                             </Pressable>
                         </View>
-                        <View style={styles.card}>
+                        <GlassPanel style={styles.card}>
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>Customer Name *</Text>
                                 <TextInput
@@ -182,7 +193,7 @@ export default function CreateSaleStep1() {
                                     />
                                 </View>
                             </View>
-                        </View>
+                        </GlassPanel>
                     </View>
 
                     {/* Water Testing */}
@@ -191,7 +202,7 @@ export default function CreateSaleStep1() {
                             <MaterialCommunityIcons name="water" size={20} color="#3B82F6" />
                             <Text style={styles.sectionTitle}>Water Testing (PPM)</Text>
                         </View>
-                        <View style={styles.card}>
+                        <GlassPanel style={styles.card}>
                             <View style={styles.row}>
                                 <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
                                     <Text style={styles.label}>Before PPM</Text>
@@ -216,7 +227,7 @@ export default function CreateSaleStep1() {
                                     />
                                 </View>
                             </View>
-                        </View>
+                        </GlassPanel>
                     </View>
 
                     {/* Executive Details */}
@@ -225,7 +236,7 @@ export default function CreateSaleStep1() {
                             <MaterialCommunityIcons name="account-tie" size={20} color="#10B981" />
                             <Text style={styles.sectionTitle}>Executive Details</Text>
                         </View>
-                        <View style={styles.card}>
+                        <GlassPanel style={styles.card}>
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>Executive Name</Text>
                                 <TextInput
@@ -259,7 +270,7 @@ export default function CreateSaleStep1() {
                                     />
                                 </View>
                             </View>
-                        </View>
+                        </GlassPanel>
                     </View>
 
                     {/* Product Details */}
@@ -268,16 +279,18 @@ export default function CreateSaleStep1() {
                             <MaterialCommunityIcons name="cube-outline" size={20} color="#7C3AED" />
                             <Text style={styles.sectionTitle}>Product Details</Text>
                         </View>
-                        <View style={styles.card}>
+                        <GlassPanel style={styles.card}>
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>Product Model *</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="e.g. Inverter Model X"
-                                    placeholderTextColor="#9CA3AF"
-                                    value={formData.productModel}
-                                    onChangeText={(text) => setFormData({ ...formData, productModel: text })}
-                                />
+                                <Pressable
+                                    style={styles.dropdownTrigger}
+                                    onPress={() => setShowModelDropdown(true)}
+                                >
+                                    <Text style={[styles.dropdownText, !formData.productModel && styles.placeholderText]}>
+                                        {formData.productModel || 'Select product model'}
+                                    </Text>
+                                    <MaterialCommunityIcons name="chevron-down" size={20} color="#9CA3AF" />
+                                </Pressable>
                             </View>
 
                             <View style={[styles.inputContainer, { borderBottomWidth: 0 }]}>
@@ -291,7 +304,65 @@ export default function CreateSaleStep1() {
                                     onChangeText={(text) => setFormData({ ...formData, serialNumber: text })}
                                 />
                             </View>
-                        </View>
+                        </GlassPanel>
+
+                        {/* Product Model Dropdown Modal */}
+                        <Modal
+                            visible={showModelDropdown}
+                            transparent
+                            animationType="fade"
+                            onRequestClose={() => setShowModelDropdown(false)}
+                        >
+                            <Pressable
+                                style={styles.modalOverlay}
+                                onPress={() => setShowModelDropdown(false)}
+                            >
+                                <View style={styles.dropdownContainer}>
+                                    <View style={styles.dropdownHeader}>
+                                        <Text style={styles.dropdownTitle}>Select Product Model</Text>
+                                        <Pressable onPress={() => setShowModelDropdown(false)}>
+                                            <MaterialCommunityIcons name="close" size={24} color="#6B7280" />
+                                        </Pressable>
+                                    </View>
+                                    <ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
+                                        {PRODUCT_MODELS.map((model) => (
+                                            <Pressable
+                                                key={model}
+                                                style={({ pressed }) => [
+                                                    styles.dropdownItem,
+                                                    formData.productModel === model && styles.dropdownItemSelected,
+                                                    pressed && { backgroundColor: '#F3F4F6' }
+                                                ]}
+                                                onPress={() => {
+                                                    setFormData({ ...formData, productModel: model });
+                                                    setShowModelDropdown(false);
+                                                }}
+                                            >
+                                                <View style={[
+                                                    styles.modelIcon,
+                                                    formData.productModel === model && styles.modelIconSelected
+                                                ]}>
+                                                    <MaterialCommunityIcons
+                                                        name="water-outline"
+                                                        size={20}
+                                                        color={formData.productModel === model ? '#7C3AED' : '#9CA3AF'}
+                                                    />
+                                                </View>
+                                                <Text style={[
+                                                    styles.dropdownItemText,
+                                                    formData.productModel === model && styles.dropdownItemTextSelected
+                                                ]}>
+                                                    {model}
+                                                </Text>
+                                                {formData.productModel === model && (
+                                                    <MaterialCommunityIcons name="check-circle" size={20} color="#7C3AED" />
+                                                )}
+                                            </Pressable>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            </Pressable>
+                        </Modal>
                     </View>
 
                     {/* Product Details Confirmation */}
@@ -313,7 +384,7 @@ export default function CreateSaleStep1() {
 
                     {/* Payment Confirmation */}
                     <View style={styles.section}>
-                        <View style={[styles.card, styles.paymentCard, formData.paymentConfirmed && styles.paymentCardActive]}>
+                        <GlassPanel style={[styles.card, styles.paymentCard, formData.paymentConfirmed && styles.paymentCardActive]}>
                             <View style={styles.paymentInfo}>
                                 <MaterialCommunityIcons
                                     name={formData.paymentConfirmed ? "cash-check" : "cash-remove"}
@@ -331,7 +402,7 @@ export default function CreateSaleStep1() {
                             >
                                 <View style={[styles.toggleCircle, formData.paymentConfirmed && styles.toggleCircleActive]} />
                             </Pressable>
-                        </View>
+                        </GlassPanel>
                     </View>
 
                     <View style={{ height: 120 }} />
@@ -360,7 +431,7 @@ export default function CreateSaleStep1() {
                     </Pressable>
                 </View>
             </KeyboardAvoidingView>
-        </View>
+        </MeshBackground>
     );
 }
 
@@ -581,6 +652,85 @@ const styles = StyleSheet.create({
     buttonText: {
         color: 'white',
         fontSize: 16,
+        fontWeight: '700',
+    },
+    dropdownTrigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+    },
+    dropdownText: {
+        fontSize: 16,
+        color: '#1A1A1A',
+    },
+    placeholderText: {
+        color: '#9CA3AF',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    dropdownContainer: {
+        backgroundColor: 'white',
+        borderRadius: 20,
+        width: '100%',
+        maxHeight: '70%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    dropdownHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    dropdownTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    dropdownList: {
+        maxHeight: 400,
+    },
+    dropdownItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        gap: 12,
+    },
+    dropdownItemSelected: {
+        backgroundColor: '#F9FAFB',
+    },
+    modelIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: '#F3F4F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modelIconSelected: {
+        backgroundColor: '#EDE9FE',
+    },
+    dropdownItemText: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#4B5563',
+    },
+    dropdownItemTextSelected: {
+        color: '#7C3AED',
         fontWeight: '700',
     },
 });
