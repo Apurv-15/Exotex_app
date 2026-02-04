@@ -1,25 +1,36 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Alert, Image, StatusBar } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Dimensions, StatusBar, Alert } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { THEME } from '../../constants/config';
+import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { FieldVisitService } from '../../services/FieldVisitService';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { LineChart } from 'react-native-chart-kit';
+import MeshBackground from '../../components/MeshBackground';
+import GlassPanel from '../../components/GlassPanel';
 // @ts-ignore
 import FloatingTabBar from '../../components/FloatingTabBar';
+
+const { width } = Dimensions.get('window');
 
 export default function SubBranchDashboard() {
     const { logout, user } = useAuth();
     const navigation = useNavigation<any>();
     const [sales, setSales] = useState<Sale[]>([]);
+    const [fieldVisits, setFieldVisits] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [period, setPeriod] = useState<'7d' | '30d' | '1y'>('7d');
 
     const fetchSales = useCallback(async () => {
         try {
             const data = await SalesService.getSalesByBranch(user?.branchId || '');
             setSales(data);
+
+            // Fetch field visits
+            const visits = await FieldVisitService.getFieldVisitsByBranch(user?.branchId || '');
+            setFieldVisits(visits);
         } catch (error) {
             console.error(error);
         } finally {
@@ -42,6 +53,110 @@ export default function SubBranchDashboard() {
     const totalSales = sales.length;
     const todaySales = sales.filter(s => s.saleDate === new Date().toISOString().split('T')[0]).length;
     const warrantiesGenerated = sales.filter(s => s.warrantyId).length;
+    const fieldVisitsCompleted = fieldVisits.length;
+
+    // Data generation based on period
+    const getChartData = () => {
+        let labels = [];
+        let warrantyData = [];
+        let fieldVisitData = [];
+
+        if (period === '7d') {
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toISOString().split('T')[0];
+                labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+                warrantyData.push(sales.filter(s => s.saleDate === dateStr && s.warrantyId).length);
+                fieldVisitData.push(fieldVisits.filter(v => v.visitDate === dateStr).length);
+            }
+        } else if (period === '30d') {
+            // Group by 5 days for 30 days view
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - (i * 5));
+                labels.push(date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }));
+
+                // Simplified aggregation for dummy/real
+                let wCount = 0;
+                let vCount = 0;
+                for (let j = 0; j < 5; j++) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - (i * 5 + j));
+                    const ds = d.toISOString().split('T')[0];
+                    wCount += sales.filter(s => s.saleDate === ds && s.warrantyId).length;
+                    vCount += fieldVisits.filter(v => v.visitDate === ds).length;
+                }
+                warrantyData.push(wCount);
+                fieldVisitData.push(vCount);
+            }
+        } else {
+            // Yearly view - last 6 months
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                labels.push(date.toLocaleDateString('en-US', { month: 'short' }));
+
+                const month = date.getMonth();
+                const year = date.getFullYear();
+                warrantyData.push(sales.filter(s => {
+                    const sd = new Date(s.saleDate);
+                    return sd.getMonth() === month && sd.getFullYear() === year && s.warrantyId;
+                }).length);
+                fieldVisitData.push(fieldVisits.filter(v => {
+                    const vd = new Date(v.visitDate);
+                    return vd.getMonth() === month && vd.getFullYear() === year;
+                }).length);
+            }
+        }
+
+        // Add dummy data if empty to show the graph
+        const hasW = warrantyData.some(v => v > 0);
+        const hasV = fieldVisitData.some(v => v > 0);
+
+        if (!hasW && !hasV) {
+            warrantyData = period === '7d' ? [1, 3, 2, 4, 3, 5, 4] : [10, 15, 8, 20, 12, 18];
+            fieldVisitData = period === '7d' ? [0, 1, 0, 2, 1, 2, 1] : [2, 5, 3, 6, 4, 5];
+        }
+
+        return {
+            labels,
+            datasets: [
+                {
+                    data: warrantyData,
+                    color: (opacity = 1) => `rgba(116, 198, 157, ${opacity})`,
+                    strokeWidth: 2.5
+                },
+                {
+                    data: fieldVisitData,
+                    color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
+                    strokeWidth: 2.5
+                }
+            ],
+            legend: ['Warranties', 'Field Visits']
+        };
+    };
+
+    const chartData = getChartData();
+
+    const handleLogout = () => {
+        const logoutTask = () => logout();
+
+        if (Platform.OS === 'web') {
+            if (window.confirm('Do you want to log out?')) {
+                logoutTask();
+            }
+        } else {
+            Alert.alert(
+                'Logout',
+                'Do you want to log out?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Log Out', style: 'destructive', onPress: logoutTask }
+                ]
+            );
+        }
+    };
 
     const handleTabPress = (tab: 'home' | 'create' | 'fieldvisit') => {
         if (tab === 'create') {
@@ -49,306 +164,534 @@ export default function SubBranchDashboard() {
         } else if (tab === 'fieldvisit') {
             navigation.navigate('FieldVisitForm');
         }
-        // 'home' tab - already on home, do nothing
     };
 
     const renderSaleItem = (item: Sale) => (
-        <Pressable
+        <GlassPanel
             key={item.id}
-            style={({ pressed }) => [styles.saleItem, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
-            onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
+            style={styles.saleItem}
         >
-            <View style={[styles.saleIcon, { backgroundColor: item.status === 'approved' ? '#E8F5E9' : '#FFF3E0' }]}>
-                <MaterialCommunityIcons
-                    name={item.status === 'approved' ? 'check-circle' : 'clock-outline'}
-                    size={20}
-                    color={item.status === 'approved' ? '#4CAF50' : '#FF9800'}
-                />
-            </View>
-            <View style={styles.saleInfo}>
-                <Text style={styles.productName}>{item.productModel}</Text>
-                <Text style={styles.customerName}>{item.customerName}</Text>
-            </View>
-            <View style={styles.saleMeta}>
-                <Text style={styles.date}>{item.saleDate}</Text>
-                <Text style={[styles.status, { color: item.status === 'approved' ? '#4CAF50' : '#FF9800' }]}>
-                    {item.status.toUpperCase()}
-                </Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" style={{ marginLeft: 8 }} />
-        </Pressable>
+            <Pressable
+                onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
+                style={({ pressed }) => [styles.saleItemContent, pressed && { opacity: 0.7 }]}
+            >
+                <View style={[styles.saleIcon, { backgroundColor: item.status === 'approved' ? THEME.colors.mintLight : '#FEF3C7' }]}>
+                    <MaterialCommunityIcons
+                        name={item.status === 'approved' ? 'check-circle' : 'clock-outline'}
+                        size={20}
+                        color={item.status === 'approved' ? THEME.colors.success : THEME.colors.warning}
+                    />
+                </View>
+                <View style={styles.saleInfo}>
+                    <Text style={styles.productName}>{item.productModel}</Text>
+                    <Text style={styles.customerName}>{item.customerName}</Text>
+                </View>
+                <View style={styles.saleMeta}>
+                    <Text style={styles.date}>{item.saleDate}</Text>
+                    <Text style={[styles.status, { color: item.status === 'approved' ? THEME.colors.success : THEME.colors.warning }]}>
+                        {item.status.toUpperCase()}
+                    </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
+            </Pressable>
+        </GlassPanel>
     );
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#FFFFFF', '#F8FAFC']}
-                style={StyleSheet.absoluteFill}
-            />
+        <MeshBackground>
             <ScrollView
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     Platform.OS !== 'web' ? (
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.colors.primary} />
                     ) : undefined
                 }
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <View style={styles.headerTitleRow}>
-                        <View>
-                            <Text style={styles.greeting}>Hello, {user?.name}</Text>
-                            <Text style={styles.subtitle}>Make your sales tracking easy</Text>
-                        </View>
-                    </View>
                     <Pressable
-                        onPress={logout}
-                        style={({ pressed }) => [styles.avatarContainer, pressed && { opacity: 0.7 }]}
+                        onPress={handleLogout}
+                        style={({ pressed }) => [
+                            styles.headerTitleRow,
+                            pressed && { opacity: 0.7 }
+                        ]}
                     >
                         <View style={styles.avatar}>
+                            {/* Placeholder for user image if available, else initial */}
+                            {/* <Image source={{ uri: '...' }} style={styles.avatarImg} /> */}
                             <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
+                            <View style={styles.onlineBadge} />
+                        </View>
+                        <View>
+                            <Text style={styles.subtitle}>EXOTEX System</Text>
+                            <Text style={styles.greeting}>{user?.name}</Text>
                         </View>
                     </Pressable>
+                    <GlassPanel style={styles.notificationBtn}>
+                        <MaterialCommunityIcons name="bell-outline" size={24} color={THEME.colors.text} />
+                    </GlassPanel>
                 </View>
 
-                {/* Bento Grid Stats */}
-                <View style={styles.bentoGrid}>
-                    {/* Large Card - Total Sales */}
-                    <Pressable
-                        style={({ pressed }) => [styles.bentoCardLarge, pressed && { transform: [{ scale: 0.98 }] }]}
-                        onPress={() => navigation.navigate('AnalyticsScreen')}
-                    >
-                        <View style={styles.bentoIconPurple}>
-                            <MaterialCommunityIcons name="chart-line" size={24} color="#7C3AED" />
+                {/* Header Subtitle Card */}
+                <View style={{ marginBottom: 16 }} />
+
+                {/* Total Sales Graph Card */}
+                <GlassPanel style={styles.graphCard}>
+                    <View style={styles.graphHeader}>
+                        <View>
+                            <Text style={styles.graphTitle}>Activity Overview</Text>
+                            <View style={styles.amountSelectorRow}>
+                                <Text style={styles.graphAmount}>{warrantiesGenerated + fieldVisitsCompleted}</Text>
+                                <View style={styles.periodSelector}>
+                                    <Pressable onPress={() => setPeriod('7d')} style={[styles.periodBtn, period === '7d' && styles.periodBtnActive]}>
+                                        <Text style={[styles.periodBtnText, period === '7d' && styles.periodBtnTextActive]}>7D</Text>
+                                    </Pressable>
+                                    <Pressable onPress={() => setPeriod('30d')} style={[styles.periodBtn, period === '30d' && styles.periodBtnActive]}>
+                                        <Text style={[styles.periodBtnText, period === '30d' && styles.periodBtnTextActive]}>1M</Text>
+                                    </Pressable>
+                                    <Pressable onPress={() => setPeriod('1y')} style={[styles.periodBtn, period === '1y' && styles.periodBtnActive]}>
+                                        <Text style={[styles.periodBtnText, period === '1y' && styles.periodBtnTextActive]}>1Y</Text>
+                                    </Pressable>
+                                </View>
+                            </View>
                         </View>
-                        <Text style={styles.bentoValue}>{totalSales}</Text>
-                        <Text style={styles.bentoLabel}>Total Sales</Text>
-                        <Text style={styles.bentoSubtext}>Tap to view analytics</Text>
-                    </Pressable>
+                        <View style={styles.trendBadge}>
+                            <MaterialIcons name="trending-up" size={14} color="white" />
+                            <Text style={styles.trendText}>+12.5%</Text>
+                        </View>
+                    </View>
 
-                    <View style={styles.bentoRight}>
-                        {/* Small Card - Today */}
-                        <Pressable style={({ pressed }) => [styles.bentoCardSmall, styles.bentoYellow, pressed && { transform: [{ scale: 0.98 }] }]}>
-                            <View style={styles.newBadge}>
-                                <Text style={styles.newBadgeText}>Today</Text>
+                    <LineChart
+                        data={chartData}
+                        width={width - 48} // More responsive width
+                        height={120}
+                        withInnerLines={false}
+                        withOuterLines={false}
+                        withVerticalLines={false}
+                        withHorizontalLines={false}
+                        withDots={true}
+                        withShadow={false}
+                        formatYLabel={(label) => Math.round(parseFloat(label)).toString()}
+                        chartConfig={{
+                            backgroundColor: "transparent",
+                            backgroundGradientFrom: "transparent",
+                            backgroundGradientTo: "transparent",
+                            decimalPlaces: 0,
+                            color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
+                            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                            style: {
+                                borderRadius: 16
+                            },
+                            propsForDots: {
+                                r: "3",
+                                strokeWidth: 1.5,
+                                stroke: "#ffffff"
+                            },
+                            strokeWidth: 2,
+                            propsForLabels: {
+                                fontSize: 9,
+                            }
+                        }}
+                        bezier
+                        style={{
+                            paddingRight: 35, // Adjust for Y labels
+                            marginTop: 8,
+                            marginLeft: -10,
+                        }}
+                    />
+                    {/* Legend */}
+                    <View style={styles.legendRow}>
+                        <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: THEME.colors.secondary }]} />
+                            <Text style={styles.legendText}>Warranties</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#7C3AED' }]} />
+                            <Text style={styles.legendText}>Field Visits</Text>
+                        </View>
+                    </View>
+
+                </GlassPanel>
+
+                {/* Stats Grid */}
+                <View style={styles.statsGrid}>
+                    <GlassPanel style={styles.statCard}>
+                        <View style={styles.statIconWrapperVerify}>
+                            <MaterialIcons name="verified-user" size={20} color={THEME.colors.secondary} />
+                        </View>
+                        <View>
+                            <Text style={styles.statValue}>{warrantiesGenerated}</Text>
+                            <Text style={styles.statLabel}>ACTIVE WARRANTIES</Text>
+                        </View>
+                    </GlassPanel>
+                    <GlassPanel style={styles.statCard}>
+                        <View style={styles.statIconWrapperPending}>
+                            <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
+                        </View>
+                        <View>
+                            <Text style={styles.statValue}>{fieldVisitsCompleted}</Text>
+                            <Text style={styles.statLabel}>FIELD VISITS</Text>
+                        </View>
+                    </GlassPanel>
+                </View>
+
+                {/* Quick Actions */}
+                <View style={styles.sectionCmd}>
+                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.actionBtn,
+                                { flex: 1 },
+                                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                            ]}
+                            onPress={() => navigation.navigate('CreateSaleStep1')}
+                        >
+                            <View style={styles.actionIcon}>
+                                <MaterialIcons name="add" size={20} color="white" />
                             </View>
-                            <Text style={styles.bentoValueDark}>{todaySales}</Text>
-                            <Text style={styles.bentoLabelDark}>Sales Today</Text>
+                            <Text style={styles.actionText}>New Warranty</Text>
                         </Pressable>
-
-                        {/* Small Card - Warranties */}
-                        <Pressable style={({ pressed }) => [styles.bentoCardSmall, styles.bentoDark, pressed && { transform: [{ scale: 0.98 }] }]}>
-                            <View style={styles.bentoIconDark}>
-                                <MaterialCommunityIcons name="shield-check" size={20} color="#FFF" />
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.actionBtn,
+                                { flex: 1 },
+                                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                            ]}
+                            onPress={() => navigation.navigate('FieldVisitForm')}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
                             </View>
-                            <Text style={styles.bentoValueLight}>{warrantiesGenerated}</Text>
-                            <Text style={styles.bentoLabelLight}>Warranties</Text>
+                            <Text style={styles.actionText}>Field Visit</Text>
                         </Pressable>
                     </View>
                 </View>
 
-                {/* Recent Sales Section */}
+                {/* Recent Warranties Section */}
                 <View style={styles.recentHeader}>
-                    <Text style={styles.sectionTitle}>Recent Sales</Text>
-                    <Pressable onPress={logout} style={({ pressed }) => pressed && { opacity: 0.7 }}>
-                        <Text style={styles.seeAllText}>Logout</Text>
+                    <Text style={styles.sectionTitle}>Recent Warranties</Text>
+                    <Pressable onPress={() => navigation.navigate('WarrantiesList')}>
+                        <Text style={styles.seeAllText}>View More</Text>
                     </Pressable>
                 </View>
 
-                {sales.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <MaterialCommunityIcons name="inbox-outline" size={48} color="#C7C7CC" />
-                        <Text style={styles.emptyText}>No sales recorded yet</Text>
-                        <Text style={styles.emptySubtext}>Create your first sale to get started</Text>
-                    </View>
-                ) : (
-                    sales.map(item => renderSaleItem(item))
-                )}
+                <GlassPanel style={styles.listContainer}>
+                    {sales.filter(s => s.warrantyId).length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <MaterialCommunityIcons name="inbox-outline" size={32} color={THEME.colors.textSecondary} />
+                            <Text style={styles.emptyText}>No warranties yet</Text>
+                        </View>
+                    ) : (
+                        sales.filter(s => s.warrantyId).slice(0, 3).map(item => (
+                            <Pressable
+                                key={item.id}
+                                style={styles.listItem}
+                                onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
+                            >
+                                <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                    <MaterialIcons name="verified-user" size={20} color={THEME.colors.success} />
+                                </View>
+                                <View style={styles.listInfo}>
+                                    <Text style={styles.listTitle}>{item.productModel}</Text>
+                                    <Text style={styles.listSub}>{item.customerName} • {item.city}</Text>
+                                </View>
+                                <View style={styles.listAmount}>
+                                    <Text style={styles.amountText}>{item.warrantyId}</Text>
+                                    <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                </View>
+                            </Pressable>
+                        ))
+                    )}
+                </GlassPanel>
 
-                {/* Bottom spacing for floating tab bar */}
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Floating Tab Bar */}
             <FloatingTabBar activeTab="home" onTabPress={handleTabPress} />
-        </View>
+        </MeshBackground>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-    },
     content: {
-        padding: 20,
-        paddingBottom: 120,
+        padding: 16,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 50,
+        paddingBottom: 100,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 10,
-        marginBottom: 24,
+        marginBottom: 16,
     },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    greeting: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#1A1A1A',
-        letterSpacing: -0.5,
-    },
-    subtitle: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginTop: 2,
-    },
-    avatarContainer: {
-        cursor: 'pointer',
-    } as any,
     avatar: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#7C3AED',
+        backgroundColor: 'white',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
+        borderWidth: 2,
+        borderColor: 'white',
+        shadowColor: 'black',
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 5,
     },
     avatarText: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 20,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text
     },
-    bentoGrid: {
-        flexDirection: 'row',
-        gap: 12,
-        marginBottom: 20,
+    onlineBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 12,
+        height: 12,
+        backgroundColor: '#4ADE80',
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: 'white'
     },
-    bentoCardLarge: {
-        flex: 1,
-        backgroundColor: 'rgba(237, 233, 254, 0.7)',
-        borderRadius: 24,
-        padding: 20,
-        minHeight: 180,
-        justifyContent: 'flex-end',
-        cursor: 'pointer',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
-    } as any,
-    bentoIconPurple: {
+    subtitle: {
+        fontSize: 12,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    greeting: {
+        fontSize: 20,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.text,
+        lineHeight: 24,
+    },
+    notificationBtn: {
         width: 44,
         height: 44,
-        borderRadius: 12,
-        backgroundColor: 'rgba(124, 58, 237, 0.15)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 'auto',
-    },
-    bentoValue: {
-        fontSize: 42,
-        fontWeight: '700',
-        color: '#5B21B6',
-        marginTop: 12,
-    },
-    bentoLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#7C3AED',
-    },
-    bentoSubtext: {
-        fontSize: 12,
-        color: '#8B5CF6',
-        marginTop: 2,
-    },
-    bentoRight: {
-        flex: 1,
-        gap: 12,
-    },
-    bentoCardSmall: {
-        flex: 1,
         borderRadius: 22,
-        padding: 16,
-        justifyContent: 'center',
-        cursor: 'pointer',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
-    } as any,
-    bentoYellow: {
-        backgroundColor: 'rgba(254, 243, 199, 0.7)',
-    },
-    bentoDark: {
-        backgroundColor: '#1F2937',
-    },
-    newBadge: {
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        backgroundColor: '#F59E0B',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-    },
-    newBadgeText: {
-        color: 'white',
-        fontSize: 10,
-        fontWeight: '700',
-    },
-    bentoIconDark: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.15)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+        backgroundColor: 'rgba(255,255,255,0.4)'
     },
-    bentoValueDark: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: '#92400E',
-    },
-    bentoLabelDark: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#B45309',
-    },
-    bentoValueLight: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    bentoLabelLight: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: 'rgba(255,255,255,0.7)',
-    },
-    createButton: {
-        marginBottom: 24,
-        borderRadius: 18,
-        overflow: 'hidden',
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 8,
-    },
-    gradientButton: {
+    navPills: {
         flexDirection: 'row',
+        padding: 6,
+        borderRadius: 100,
+        marginBottom: 24,
+    },
+    navPill: {
+        flex: 1,
+        paddingVertical: 10,
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 18,
+        borderRadius: 100,
+    },
+    navPillActive: {
+        backgroundColor: 'white',
+        shadowColor: 'black',
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    navPillText: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.textSecondary,
+    },
+    navPillTextActive: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
+    },
+    graphCard: {
+        borderRadius: 20,
+        padding: 14,
+        marginBottom: 16,
+        minHeight: 220,
+        justifyContent: 'space-between'
+    },
+    graphHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 4,
+    },
+    graphTitle: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+    },
+    graphAmount: {
+        fontSize: 32,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.text,
+        letterSpacing: -0.5,
+        lineHeight: 38,
+    },
+    graphSubtitle: {
+        fontSize: 11,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.textSecondary,
+    },
+    amountSelectorRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
         gap: 8,
     },
-    createButtonText: {
-        color: 'white',
-        fontSize: 17,
-        fontWeight: '700',
+    periodSelector: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(0,0,0,0.04)',
+        borderRadius: 8,
+        padding: 2,
+    },
+    periodBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    periodBtnActive: {
+        backgroundColor: 'white',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    periodBtnText: {
+        fontSize: 9,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+    },
+    periodBtnTextActive: {
+        color: THEME.colors.secondary,
+    },
+    trendBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: THEME.colors.primary,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 6,
+        gap: 3
+    },
+    trendText: {
+        color: '#166534',
+        fontSize: 10,
+        fontFamily: THEME.fonts.bold,
+    },
+    barViz: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        height: 60,
+        marginTop: -30, // overlap chart slightly
+    },
+    barVizItem: {
+        width: '14%',
+        borderRadius: 8,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+    },
+    legendRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 16,
+        marginTop: 8,
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    legendDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    legendText: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.textSecondary,
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+    },
+    statCard: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 16,
+        height: 110,
+        justifyContent: 'space-between',
+    },
+    statIconWrapperVerify: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: THEME.colors.mintLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    statIconWrapperPending: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#D1FAE5', // Using specific mint shade
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 24,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.text,
+        lineHeight: 28,
+    },
+    statLabel: {
+        fontSize: 9,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+        letterSpacing: 0.8,
+    },
+    sectionCmd: {
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.text,
+        marginBottom: 12,
+    },
+    actionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: 'white',
+        borderRadius: 100,
+        gap: 12,
+        shadowColor: THEME.colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    actionIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: THEME.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionText: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
     },
     recentHeader: {
         flexDirection: 'row',
@@ -356,79 +699,66 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 16,
     },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1A1A1A',
-    },
     seeAllText: {
         fontSize: 14,
-        color: '#EF4444',
-        fontWeight: '600',
-        cursor: 'pointer',
-    } as any,
-    saleItem: {
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        padding: 16,
-        borderRadius: 20,
-        marginBottom: 12,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.secondary,
+    },
+    listContainer: {
+        padding: 8,
+        borderRadius: 24,
+    },
+    listItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.03,
-        shadowRadius: 12,
-        elevation: 2,
-        cursor: 'pointer',
-    } as any,
-    saleIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    listIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 14,
+        marginRight: 16,
     },
-    saleInfo: {
+    listInfo: {
         flex: 1,
     },
-    productName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1A1A1A',
+    listTitle: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
     },
-    customerName: {
-        fontSize: 13,
-        color: '#6B7280',
-        marginTop: 2,
+    listSub: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+        textTransform: 'uppercase',
     },
-    saleMeta: {
+    listAmount: {
         alignItems: 'flex-end',
     },
-    date: {
-        fontSize: 12,
-        color: '#9CA3AF',
+    amountText: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.text,
     },
-    status: {
-        fontSize: 11,
-        fontWeight: '700',
-        marginTop: 4,
+    dateText: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
     },
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: 40,
-    },
-    emptyText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#888',
-        marginTop: 12,
-    },
-    emptySubtext: {
-        fontSize: 13,
-        color: '#AAA',
-        marginTop: 4,
-    },
+    saleItem: { marginBottom: 10, borderRadius: 24 },
+    saleItemContent: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+    saleIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    saleInfo: { flex: 1 },
+    productName: { fontFamily: THEME.fonts.bold, fontSize: 15, color: THEME.colors.text },
+    customerName: { fontFamily: THEME.fonts.semiBold, fontSize: 12, color: THEME.colors.textSecondary },
+    saleMeta: { alignItems: 'flex-end' },
+    date: { fontSize: 11, fontFamily: THEME.fonts.semiBold, color: THEME.colors.textSecondary },
+    status: { fontSize: 10, fontFamily: THEME.fonts.bold },
+    emptyState: { padding: 40, alignItems: 'center', gap: 12 },
+    emptyText: { color: THEME.colors.textSecondary, fontSize: 14, fontFamily: THEME.fonts.semiBold },
 });
