@@ -7,6 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
+import MeshBackground from '../../components/MeshBackground';
+import GlassPanel from '../../components/GlassPanel';
 
 const IMAGE_CONFIG = [
     { label: 'Product Front (Required)', icon: 'image', color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.1)', required: true },
@@ -121,11 +123,7 @@ export default function CreateSaleStep2() {
     const totalUploaded = images.filter(img => img && img.length > 0).length;
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#FFFFFF', '#F8FAFC']}
-                style={StyleSheet.absoluteFill}
-            />
+        <MeshBackground>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
@@ -143,7 +141,7 @@ export default function CreateSaleStep2() {
                     )}
 
                     {/* Progress Card */}
-                    <View style={styles.card}>
+                    <GlassPanel style={styles.card}>
                         <View style={styles.progressHeader}>
                             <Text style={styles.progressLabel}>Uploads (2 Required)</Text>
                             <Text style={[styles.progressValue, compulsoryUploaded && { color: '#10B981' }]}>
@@ -158,7 +156,7 @@ export default function CreateSaleStep2() {
                                 style={[styles.progressFill, { width: `${(totalUploaded / 4) * 100}%` }]}
                             />
                         </View>
-                    </View>
+                    </GlassPanel>
 
                     {/* Upload Progress */}
                     {submitting && uploadProgress > 0 && (
@@ -245,7 +243,7 @@ export default function CreateSaleStep2() {
                     </Pressable>
                 </View>
             </KeyboardAvoidingView>
-        </View>
+        </MeshBackground>
     );
 }
 
