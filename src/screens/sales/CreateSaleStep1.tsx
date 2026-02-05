@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
-import { SoundManager } from '../../utils/SoundManager';
+// import { SoundManager } from '../../utils/SoundManager';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 
@@ -92,7 +92,7 @@ export default function CreateSaleStep1() {
             return;
         }
 
-        SoundManager.playNext();
+        // SoundManager.playNext();
         navigation.navigate('CreateSaleStep2', { formData });
     };
 

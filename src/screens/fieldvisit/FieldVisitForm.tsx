@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
-import { SoundManager } from '../../utils/SoundManager';
+// import { SoundManager } from '../../utils/SoundManager';
 
 const TOTAL_STEPS = 3;
 
@@ -249,7 +249,7 @@ export default function FieldVisitForm() {
             return;
         }
         if (currentStep < TOTAL_STEPS) {
-            SoundManager.playNext();
+            // SoundManager.playNext();
             setCurrentStep(currentStep + 1);
         }
     };
@@ -321,7 +321,7 @@ export default function FieldVisitForm() {
             );
 
             setUploadStatus('Success!');
-            SoundManager.playSuccess();
+            // SoundManager.playSuccess();
             showAlert('Success', 'Field visit recorded successfully!');
             navigation.goBack();
         } catch (error: any) {
