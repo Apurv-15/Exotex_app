@@ -410,9 +410,8 @@ export default function SubBranchDashboard() {
                         {/* Recent Warranties Section */}
                         <View style={styles.recentHeader}>
                             <Text style={styles.sectionTitle}>Recent Warranties</Text>
-                            <Pressable onPress={() => navigation.navigate('WarrantiesList')}>
-                                <Text style={styles.seeAllText}>View More</Text>
-                            </Pressable>
+                            {/* TODO: Create WarrantiesList screen */}
+                            <Text style={styles.seeAllText}>View More</Text>
                         </View>
 
                         <GlassPanel style={styles.listContainer}>
