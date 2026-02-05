@@ -21,7 +21,7 @@ export default function SubBranchDashboard() {
     const [fieldVisits, setFieldVisits] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [period, setPeriod] = useState<'7d' | '30d' | '1y'>('7d');
+    const [period, setPeriod] = useState<'Today' | '7d' | '30d' | '1y'>('7d');
 
     const fetchSales = useCallback(async () => {
         try {
@@ -50,10 +50,43 @@ export default function SubBranchDashboard() {
         fetchSales();
     }, [fetchSales]);
 
-    const totalSales = sales.length;
-    const todaySales = sales.filter(s => s.saleDate === new Date().toISOString().split('T')[0]).length;
-    const warrantiesGenerated = sales.filter(s => s.warrantyId).length;
-    const fieldVisitsCompleted = fieldVisits.length;
+    const filteredSales = useMemo(() => {
+        const now = new Date();
+        return sales.filter(s => {
+            if (period === '7d') {
+                const date = new Date(s.saleDate);
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(now.getDate() - 7);
+                return date >= sevenDaysAgo;
+            }
+            if (period === 'Today') return new Date(s.saleDate).toDateString() === now.toDateString();
+            if (period === '30d') {
+                const date = new Date(s.saleDate);
+                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            }
+            if (period === '1y') return new Date(s.saleDate).getFullYear() === now.getFullYear();
+            return true;
+        });
+    }, [sales, period]);
+
+    const filteredVisits = useMemo(() => {
+        const now = new Date();
+        return fieldVisits.filter(v => {
+            const date = new Date(v.visitDate);
+            if (period === '7d') {
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(now.getDate() - 7);
+                return date >= sevenDaysAgo;
+            }
+            if (period === 'Today') return date.toDateString() === now.toDateString();
+            if (period === '30d') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            if (period === '1y') return date.getFullYear() === now.getFullYear();
+            return true;
+        });
+    }, [fieldVisits, period]);
+
+    const warrantiesGenerated = filteredSales.filter(s => s.warrantyId).length;
+    const fieldVisitsCompleted = filteredVisits.length;
 
     // Data generation based on period
     const getChartData = () => {
@@ -61,12 +94,13 @@ export default function SubBranchDashboard() {
         let warrantyData = [];
         let fieldVisitData = [];
 
-        if (period === '7d') {
-            for (let i = 6; i >= 0; i--) {
+        if (period === '7d' || period === 'Today') {
+            const daysToStep = period === 'Today' ? 1 : 7;
+            for (let i = daysToStep - 1; i >= 0; i--) {
                 const date = new Date();
                 date.setDate(date.getDate() - i);
                 const dateStr = date.toISOString().split('T')[0];
-                labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+                labels.push(period === 'Today' ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' }));
                 warrantyData.push(sales.filter(s => s.saleDate === dateStr && s.warrantyId).length);
                 fieldVisitData.push(fieldVisits.filter(v => v.visitDate === dateStr).length);
             }
@@ -108,15 +142,6 @@ export default function SubBranchDashboard() {
                     return vd.getMonth() === month && vd.getFullYear() === year;
                 }).length);
             }
-        }
-
-        // Add dummy data if empty to show the graph
-        const hasW = warrantyData.some(v => v > 0);
-        const hasV = fieldVisitData.some(v => v > 0);
-
-        if (!hasW && !hasV) {
-            warrantyData = period === '7d' ? [1, 3, 2, 4, 3, 5, 4] : [10, 15, 8, 20, 12, 18];
-            fieldVisitData = period === '7d' ? [0, 1, 0, 2, 1, 2, 1] : [2, 5, 3, 6, 4, 5];
         }
 
         return {
@@ -244,6 +269,9 @@ export default function SubBranchDashboard() {
                             <View style={styles.amountSelectorRow}>
                                 <Text style={styles.graphAmount}>{warrantiesGenerated + fieldVisitsCompleted}</Text>
                                 <View style={styles.periodSelector}>
+                                    <Pressable onPress={() => setPeriod('Today')} style={[styles.periodBtn, period === 'Today' && styles.periodBtnActive]}>
+                                        <Text style={[styles.periodBtnText, period === 'Today' && styles.periodBtnTextActive]}>1D</Text>
+                                    </Pressable>
                                     <Pressable onPress={() => setPeriod('7d')} style={[styles.periodBtn, period === '7d' && styles.periodBtnActive]}>
                                         <Text style={[styles.periodBtnText, period === '7d' && styles.periodBtnTextActive]}>7D</Text>
                                     </Pressable>
@@ -274,9 +302,9 @@ export default function SubBranchDashboard() {
                         withShadow={false}
                         formatYLabel={(label) => Math.round(parseFloat(label)).toString()}
                         chartConfig={{
-                            backgroundColor: "transparent",
-                            backgroundGradientFrom: "transparent",
-                            backgroundGradientTo: "transparent",
+                            backgroundColor: "#ffffff",
+                            backgroundGradientFrom: "#ffffff",
+                            backgroundGradientTo: "#ffffff",
                             decimalPlaces: 0,
                             color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
                             labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
@@ -417,7 +445,7 @@ export default function SubBranchDashboard() {
 const styles = StyleSheet.create({
     content: {
         padding: 16,
-        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 50,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
         paddingBottom: 100,
     },
     header: {
