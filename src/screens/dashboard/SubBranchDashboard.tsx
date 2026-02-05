@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Dimensions, StatusBar, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Platform, Dimensions, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
@@ -261,180 +261,191 @@ export default function SubBranchDashboard() {
                 {/* Header Subtitle Card */}
                 <View style={{ marginBottom: 16 }} />
 
-                {/* Total Sales Graph Card */}
-                <GlassPanel style={styles.graphCard}>
-                    <View style={styles.graphHeader}>
-                        <View>
-                            <Text style={styles.graphTitle}>Activity Overview</Text>
-                            <View style={styles.amountSelectorRow}>
-                                <Text style={styles.graphAmount}>{warrantiesGenerated + fieldVisitsCompleted}</Text>
-                                <View style={styles.periodSelector}>
-                                    <Pressable onPress={() => setPeriod('Today')} style={[styles.periodBtn, period === 'Today' && styles.periodBtnActive]}>
-                                        <Text style={[styles.periodBtnText, period === 'Today' && styles.periodBtnTextActive]}>1D</Text>
-                                    </Pressable>
-                                    <Pressable onPress={() => setPeriod('7d')} style={[styles.periodBtn, period === '7d' && styles.periodBtnActive]}>
-                                        <Text style={[styles.periodBtnText, period === '7d' && styles.periodBtnTextActive]}>7D</Text>
-                                    </Pressable>
-                                    <Pressable onPress={() => setPeriod('30d')} style={[styles.periodBtn, period === '30d' && styles.periodBtnActive]}>
-                                        <Text style={[styles.periodBtnText, period === '30d' && styles.periodBtnTextActive]}>1M</Text>
-                                    </Pressable>
-                                    <Pressable onPress={() => setPeriod('1y')} style={[styles.periodBtn, period === '1y' && styles.periodBtnActive]}>
-                                        <Text style={[styles.periodBtnText, period === '1y' && styles.periodBtnTextActive]}>1Y</Text>
-                                    </Pressable>
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <GlassPanel style={styles.loadingPanel}>
+                            <ActivityIndicator size="large" color={THEME.colors.secondary} />
+                            <Text style={styles.loadingText}>Loading your data...</Text>
+                        </GlassPanel>
+                    </View>
+                ) : (
+                    <>
+                        {/* Total Sales Graph Card */}
+                        <GlassPanel style={styles.graphCard}>
+                            <View style={styles.graphHeader}>
+                                <View>
+                                    <Text style={styles.graphTitle}>Activity Overview</Text>
+                                    <View style={styles.amountSelectorRow}>
+                                        <Text style={styles.graphAmount}>{warrantiesGenerated + fieldVisitsCompleted}</Text>
+                                        <View style={styles.periodSelector}>
+                                            <Pressable onPress={() => setPeriod('Today')} style={[styles.periodBtn, period === 'Today' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === 'Today' && styles.periodBtnTextActive]}>1D</Text>
+                                            </Pressable>
+                                            <Pressable onPress={() => setPeriod('7d')} style={[styles.periodBtn, period === '7d' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === '7d' && styles.periodBtnTextActive]}>7D</Text>
+                                            </Pressable>
+                                            <Pressable onPress={() => setPeriod('30d')} style={[styles.periodBtn, period === '30d' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === '30d' && styles.periodBtnTextActive]}>1M</Text>
+                                            </Pressable>
+                                            <Pressable onPress={() => setPeriod('1y')} style={[styles.periodBtn, period === '1y' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === '1y' && styles.periodBtnTextActive]}>1Y</Text>
+                                            </Pressable>
+                                        </View>
+                                    </View>
+                                </View>
+                                <View style={styles.trendBadge}>
+                                    <MaterialIcons name="trending-up" size={14} color="white" />
+                                    <Text style={styles.trendText}>+12.5%</Text>
                                 </View>
                             </View>
-                        </View>
-                        <View style={styles.trendBadge}>
-                            <MaterialIcons name="trending-up" size={14} color="white" />
-                            <Text style={styles.trendText}>+12.5%</Text>
-                        </View>
-                    </View>
 
-                    <LineChart
-                        data={chartData}
-                        width={width - 48} // More responsive width
-                        height={120}
-                        withInnerLines={false}
-                        withOuterLines={false}
-                        withVerticalLines={false}
-                        withHorizontalLines={false}
-                        withDots={true}
-                        withShadow={false}
-                        formatYLabel={(label) => Math.round(parseFloat(label)).toString()}
-                        chartConfig={{
-                            backgroundColor: "#ffffff",
-                            backgroundGradientFrom: "#ffffff",
-                            backgroundGradientTo: "#ffffff",
-                            decimalPlaces: 0,
-                            color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
-                            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                            style: {
-                                borderRadius: 16
-                            },
-                            propsForDots: {
-                                r: "3",
-                                strokeWidth: 1.5,
-                                stroke: "#ffffff"
-                            },
-                            strokeWidth: 2,
-                            propsForLabels: {
-                                fontSize: 9,
-                            }
-                        }}
-                        bezier
-                        style={{
-                            paddingRight: 35, // Adjust for Y labels
-                            marginTop: 8,
-                            marginLeft: -10,
-                        }}
-                    />
-                    {/* Legend */}
-                    <View style={styles.legendRow}>
-                        <View style={styles.legendItem}>
-                            <View style={[styles.legendDot, { backgroundColor: THEME.colors.secondary }]} />
-                            <Text style={styles.legendText}>Warranties</Text>
-                        </View>
-                        <View style={styles.legendItem}>
-                            <View style={[styles.legendDot, { backgroundColor: '#7C3AED' }]} />
-                            <Text style={styles.legendText}>Field Visits</Text>
-                        </View>
-                    </View>
-
-                </GlassPanel>
-
-                {/* Stats Grid */}
-                <View style={styles.statsGrid}>
-                    <GlassPanel style={styles.statCard}>
-                        <View style={styles.statIconWrapperVerify}>
-                            <MaterialIcons name="verified-user" size={20} color={THEME.colors.secondary} />
-                        </View>
-                        <View>
-                            <Text style={styles.statValue}>{warrantiesGenerated}</Text>
-                            <Text style={styles.statLabel}>ACTIVE WARRANTIES</Text>
-                        </View>
-                    </GlassPanel>
-                    <GlassPanel style={styles.statCard}>
-                        <View style={styles.statIconWrapperPending}>
-                            <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
-                        </View>
-                        <View>
-                            <Text style={styles.statValue}>{fieldVisitsCompleted}</Text>
-                            <Text style={styles.statLabel}>FIELD VISITS</Text>
-                        </View>
-                    </GlassPanel>
-                </View>
-
-                {/* Quick Actions */}
-                <View style={styles.sectionCmd}>
-                    <Text style={styles.sectionTitle}>Quick Actions</Text>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.actionBtn,
-                                { flex: 1 },
-                                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                            ]}
-                            onPress={() => navigation.navigate('CreateSaleStep1')}
-                        >
-                            <View style={styles.actionIcon}>
-                                <MaterialIcons name="add" size={20} color="white" />
+                            <LineChart
+                                data={chartData}
+                                width={width - 48} // More responsive width
+                                height={120}
+                                withInnerLines={false}
+                                withOuterLines={false}
+                                withVerticalLines={false}
+                                withHorizontalLines={false}
+                                withDots={true}
+                                withShadow={false}
+                                formatYLabel={(label) => Math.round(parseFloat(label)).toString()}
+                                chartConfig={{
+                                    backgroundColor: "#ffffff",
+                                    backgroundGradientFrom: "#ffffff",
+                                    backgroundGradientTo: "#ffffff",
+                                    decimalPlaces: 0,
+                                    color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
+                                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                                    style: {
+                                        borderRadius: 16
+                                    },
+                                    propsForDots: {
+                                        r: "3",
+                                        strokeWidth: 1.5,
+                                        stroke: "#ffffff"
+                                    },
+                                    strokeWidth: 2,
+                                    propsForLabels: {
+                                        fontSize: 9,
+                                    }
+                                }}
+                                bezier
+                                style={{
+                                    paddingRight: 35, // Adjust for Y labels
+                                    marginTop: 8,
+                                    marginLeft: -10,
+                                }}
+                            />
+                            {/* Legend */}
+                            <View style={styles.legendRow}>
+                                <View style={styles.legendItem}>
+                                    <View style={[styles.legendDot, { backgroundColor: THEME.colors.secondary }]} />
+                                    <Text style={styles.legendText}>Warranties</Text>
+                                </View>
+                                <View style={styles.legendItem}>
+                                    <View style={[styles.legendDot, { backgroundColor: '#7C3AED' }]} />
+                                    <Text style={styles.legendText}>Field Visits</Text>
+                                </View>
                             </View>
-                            <Text style={styles.actionText}>New Warranty</Text>
-                        </Pressable>
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.actionBtn,
-                                { flex: 1 },
-                                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                            ]}
-                            onPress={() => navigation.navigate('FieldVisitForm')}
-                        >
-                            <View style={[styles.actionIcon, { backgroundColor: THEME.colors.mintLight }]}>
-                                <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
-                            </View>
-                            <Text style={styles.actionText}>Field Visit</Text>
-                        </Pressable>
-                    </View>
-                </View>
 
-                {/* Recent Warranties Section */}
-                <View style={styles.recentHeader}>
-                    <Text style={styles.sectionTitle}>Recent Warranties</Text>
-                    <Pressable onPress={() => navigation.navigate('WarrantiesList')}>
-                        <Text style={styles.seeAllText}>View More</Text>
-                    </Pressable>
-                </View>
+                        </GlassPanel>
 
-                <GlassPanel style={styles.listContainer}>
-                    {sales.filter(s => s.warrantyId).length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <MaterialCommunityIcons name="inbox-outline" size={32} color={THEME.colors.textSecondary} />
-                            <Text style={styles.emptyText}>No warranties yet</Text>
+                        {/* Stats Grid */}
+                        <View style={styles.statsGrid}>
+                            <GlassPanel style={styles.statCard}>
+                                <View style={styles.statIconWrapperVerify}>
+                                    <MaterialIcons name="verified-user" size={20} color={THEME.colors.secondary} />
+                                </View>
+                                <View>
+                                    <Text style={styles.statValue}>{warrantiesGenerated}</Text>
+                                    <Text style={styles.statLabel}>ACTIVE WARRANTIES</Text>
+                                </View>
+                            </GlassPanel>
+                            <GlassPanel style={styles.statCard}>
+                                <View style={styles.statIconWrapperPending}>
+                                    <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
+                                </View>
+                                <View>
+                                    <Text style={styles.statValue}>{fieldVisitsCompleted}</Text>
+                                    <Text style={styles.statLabel}>FIELD VISITS</Text>
+                                </View>
+                            </GlassPanel>
                         </View>
-                    ) : (
-                        sales.filter(s => s.warrantyId).slice(0, 3).map(item => (
-                            <Pressable
-                                key={item.id}
-                                style={styles.listItem}
-                                onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
-                            >
-                                <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
-                                    <MaterialIcons name="verified-user" size={20} color={THEME.colors.success} />
-                                </View>
-                                <View style={styles.listInfo}>
-                                    <Text style={styles.listTitle}>{item.productModel}</Text>
-                                    <Text style={styles.listSub}>{item.customerName} • {item.city}</Text>
-                                </View>
-                                <View style={styles.listAmount}>
-                                    <Text style={styles.amountText}>{item.warrantyId}</Text>
-                                    <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                </View>
+
+                        {/* Quick Actions */}
+                        <View style={styles.sectionCmd}>
+                            <Text style={styles.sectionTitle}>Quick Actions</Text>
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.actionBtn,
+                                        { flex: 1 },
+                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                                    ]}
+                                    onPress={() => navigation.navigate('CreateSaleStep1')}
+                                >
+                                    <View style={styles.actionIcon}>
+                                        <MaterialIcons name="add" size={20} color="white" />
+                                    </View>
+                                    <Text style={styles.actionText}>New Warranty</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.actionBtn,
+                                        { flex: 1 },
+                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                                    ]}
+                                    onPress={() => navigation.navigate('FieldVisitForm')}
+                                >
+                                    <View style={[styles.actionIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                        <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
+                                    </View>
+                                    <Text style={styles.actionText}>Field Visit</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+
+                        {/* Recent Warranties Section */}
+                        <View style={styles.recentHeader}>
+                            <Text style={styles.sectionTitle}>Recent Warranties</Text>
+                            <Pressable onPress={() => navigation.navigate('WarrantiesList')}>
+                                <Text style={styles.seeAllText}>View More</Text>
                             </Pressable>
-                        ))
-                    )}
-                </GlassPanel>
+                        </View>
 
-                <View style={{ height: 100 }} />
+                        <GlassPanel style={styles.listContainer}>
+                            {sales.filter(s => s.warrantyId).length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <MaterialCommunityIcons name="inbox-outline" size={32} color={THEME.colors.textSecondary} />
+                                    <Text style={styles.emptyText}>No warranties yet</Text>
+                                </View>
+                            ) : (
+                                sales.filter(s => s.warrantyId).slice(0, 3).map(item => (
+                                    <Pressable
+                                        key={item.id}
+                                        style={styles.listItem}
+                                        onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
+                                    >
+                                        <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                            <MaterialIcons name="verified-user" size={20} color={THEME.colors.success} />
+                                        </View>
+                                        <View style={styles.listInfo}>
+                                            <Text style={styles.listTitle}>{item.productModel}</Text>
+                                            <Text style={styles.listSub}>{item.customerName} • {item.city}</Text>
+                                        </View>
+                                        <View style={styles.listAmount}>
+                                            <Text style={styles.amountText}>{item.warrantyId}</Text>
+                                            <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                        </View>
+                                    </Pressable>
+                                ))
+                            )}
+                        </GlassPanel>
+
+                        <View style={{ height: 100 }} />
+                    </>
+                )}
             </ScrollView>
 
             <FloatingTabBar activeTab="home" onTabPress={handleTabPress} />
@@ -789,4 +800,23 @@ const styles = StyleSheet.create({
     status: { fontSize: 10, fontFamily: THEME.fonts.bold },
     emptyState: { padding: 40, alignItems: 'center', gap: 12 },
     emptyText: { color: THEME.colors.textSecondary, fontSize: 14, fontFamily: THEME.fonts.semiBold },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: 400,
+        paddingVertical: 60,
+    },
+    loadingPanel: {
+        padding: 32,
+        borderRadius: 24,
+        alignItems: 'center',
+        gap: 16,
+    },
+    loadingText: {
+        fontSize: 15,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.textSecondary,
+        marginTop: 8,
+    },
 });

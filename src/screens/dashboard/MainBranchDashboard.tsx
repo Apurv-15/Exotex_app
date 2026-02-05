@@ -227,7 +227,14 @@ export default function MainBranchDashboard() {
                     </GlassPanel>
                 </View>
 
-                {activeTab === 'Dashboard' ? (
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <GlassPanel style={styles.loadingPanel}>
+                            <ActivityIndicator size="large" color={THEME.colors.secondary} />
+                            <Text style={styles.loadingText}>Loading dashboard data...</Text>
+                        </GlassPanel>
+                    </View>
+                ) : activeTab === 'Dashboard' ? (
                     <>
                         {/* Main Stats Bento Grid */}
                         <View style={styles.bentoGrid}>
@@ -729,5 +736,24 @@ const styles = StyleSheet.create({
     },
     tabButtonTextActive: {
         color: THEME.colors.text,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: 400,
+        paddingVertical: 60,
+    },
+    loadingPanel: {
+        padding: 32,
+        borderRadius: 24,
+        alignItems: 'center',
+        gap: 16,
+    },
+    loadingText: {
+        fontSize: 15,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.textSecondary,
+        marginTop: 8,
     },
 });
