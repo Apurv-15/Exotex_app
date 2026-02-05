@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import { SoundManager } from '../../utils/SoundManager';
 
 const IMAGE_CONFIG = [
     { label: 'Product Front (Required)', icon: 'image', color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.1)', required: true },
@@ -106,6 +107,7 @@ export default function CreateSaleStep2() {
             );
 
             setUploadStatus('Success!');
+            SoundManager.playSuccess();
             navigation.replace('WarrantyCard', { sale: newSale });
         } catch (error) {
             console.error('Submit error:', error);
@@ -254,7 +256,8 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 20,
-        paddingBottom: 20,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
+        paddingBottom: 40,
     },
     header: {
         alignItems: 'center',

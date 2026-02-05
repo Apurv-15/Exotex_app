@@ -5,8 +5,9 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import { SoundManager } from '../../utils/SoundManager';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.jpeg';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 
 const PRODUCT_MODELS = [
     'EKO-GREEN G3',
@@ -30,6 +31,7 @@ export default function CreateSaleStep1() {
         address: '',
         city: '',
         date: new Date().toISOString().split('T')[0],
+        invoiceNumber: '',
         waterTestingBefore: '',
         waterTestingAfter: '',
         executiveName: '',
@@ -49,6 +51,7 @@ export default function CreateSaleStep1() {
             address: '123 Test Street, Sample Area',
             city: 'Mumbai',
             date: new Date().toISOString().split('T')[0],
+            invoiceNumber: 'INV' + Math.floor(Math.random() * 100000).toString(),
             waterTestingBefore: '150',
             waterTestingAfter: '50',
             executiveName: 'Alex Smith',
@@ -67,6 +70,7 @@ export default function CreateSaleStep1() {
             formData.phone.trim() !== '' &&
             formData.address.trim() !== '' &&
             formData.city.trim() !== '' &&
+            formData.invoiceNumber.trim() !== '' &&
             formData.productModel.trim() !== '' &&
             formData.serialNumber.trim() !== '' &&
             formData.productDetailsConfirmed &&
@@ -88,6 +92,7 @@ export default function CreateSaleStep1() {
             return;
         }
 
+        SoundManager.playNext();
         navigation.navigate('CreateSaleStep2', { formData });
     };
 
@@ -102,7 +107,21 @@ export default function CreateSaleStep1() {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <View style={{ height: 10 }} />
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <View style={styles.headerTitleRow}>
+                            <Pressable
+                                onPress={() => navigation.goBack()}
+                                style={styles.backButton}
+                            >
+                                <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+                            </Pressable>
+                            <View>
+                                <Text style={styles.title}>New Sale</Text>
+                                <Text style={styles.subtitle}>Step 1: Customer Details</Text>
+                            </View>
+                        </View>
+                    </View>
 
                     {/* Customer Information */}
                     <View style={styles.section}>
@@ -190,6 +209,29 @@ export default function CreateSaleStep1() {
                                         autoCapitalize="none"
                                         value={formData.email}
                                         onChangeText={(text) => setFormData({ ...formData, email: text })}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.row}>
+                                <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                                    <Text style={styles.label}>Invoice Number *</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="INV12345"
+                                        placeholderTextColor="#9CA3AF"
+                                        value={formData.invoiceNumber}
+                                        onChangeText={(text) => setFormData({ ...formData, invoiceNumber: text })}
+                                    />
+                                </View>
+                                <View style={[styles.inputContainer, { flex: 1 }]}>
+                                    <Text style={styles.label}>Date</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="YYYY-MM-DD"
+                                        placeholderTextColor="#9CA3AF"
+                                        value={formData.date}
+                                        onChangeText={(text) => setFormData({ ...formData, date: text })}
                                     />
                                 </View>
                             </View>
@@ -442,13 +484,29 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 20,
-        paddingBottom: 20,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
+        paddingBottom: 100,
     },
     header: {
         marginBottom: 24,
         marginTop: 10,
     },
-    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
     logoWrapper: {
         width: 48,
         height: 48,
