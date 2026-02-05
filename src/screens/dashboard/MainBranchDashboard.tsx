@@ -10,8 +10,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { LineChart } from 'react-native-chart-kit';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import DetailedAnalyticsContent from '../../components/DetailedAnalyticsContent';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.jpeg';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -35,75 +36,68 @@ export default function MainBranchDashboard() {
     const [sales, setSales] = useState<Sale[]>([]);
     const [fieldVisits, setFieldVisits] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'All' | 'Today' | 'Month'>('All');
+    const [filter, setFilter] = useState<'All' | 'Today' | 'Month' | 'Year'>('All');
     const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-    const [salesStats, setSalesStats] = useState({ total: 0, pending: 0, approved: 0 });
-    const [visitStats, setVisitStats] = useState({ total: 0, completed: 0, pending: 0 });
-    const [regionStats, setRegionStats] = useState<Array<{ region: string; total: number; approved: number; pending: number }>>([]);
-    const [visitRegionStats, setVisitRegionStats] = useState<Array<{ region: string; total: number; completed: number; pending: number }>>([]);
+    const [allSales, setAllSales] = useState<Sale[]>([]);
+    const [allVisits, setAllVisits] = useState<any[]>([]);
     const [showAllSales, setShowAllSales] = useState(false);
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics'>('Dashboard');
 
     const fetchData = useCallback(async (isInitial: boolean = true) => {
-        // Only show full loader on initial mount or when we really have no data
         if (isInitial) setLoading(true);
 
         try {
-            const [visitsData, sStatsData, vsStatsData, rStatsData, vrStatsData] = await Promise.all([
-                FieldVisitService.getFieldVisits(5),
-                SalesService.getSalesStats(),
-                FieldVisitService.getFieldVisitStats(),
-                SalesService.getRegionStats(),
-                FieldVisitService.getFieldVisitRegionStats()
+            const [salesData, visitsData] = await Promise.all([
+                SalesService.getAllSales(),
+                FieldVisitService.getFieldVisits()
             ]);
 
-            setFieldVisits(visitsData);
-            setSalesStats(sStatsData);
-            setVisitStats(vsStatsData);
-            setRegionStats(rStatsData);
-            setVisitRegionStats(vrStatsData);
+            setAllSales(salesData);
+            setAllVisits(visitsData);
 
-            // Fetch initial 3 sales if it's the first load
-            if (isInitial && !showAllSales) {
-                const salesData = await SalesService.getSales(3);
-                setSales(salesData);
-            }
+            // Set initial display sales
+            setSales(salesData);
+            setFieldVisits(visitsData.slice(0, 5));
+
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
         }
-    }, [showAllSales]);
+    }, []);
 
     useFocusEffect(useCallback(() => {
         fetchData(true);
     }, [fetchData]));
 
-    const handleViewMoreToggle = async () => {
-        if (!showAllSales && sales.length <= 3) {
-            // Fetch everything only if we haven't already
-            setLoading(true);
-            try {
-                const allSales = await SalesService.getAllSales();
-                setSales(allSales);
-            } catch (error) {
-                console.error(error);
-            } finally {
-                setLoading(false);
-            }
-        }
+    const handleViewMoreToggle = () => {
         setShowAllSales(!showAllSales);
     };
 
     // Filter by time
     const filteredSales = useMemo(() => {
-        return sales.filter(s => {
+        const now = new Date();
+        return allSales.filter(s => {
             if (filter === 'All') return true;
             const date = new Date(s.saleDate);
-            const now = new Date();
             if (filter === 'Today') return date.toDateString() === now.toDateString();
-            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            if (filter === 'Month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            if (filter === 'Year') return date.getFullYear() === now.getFullYear();
+            return true;
         });
-    }, [sales, filter]);
+    }, [allSales, filter]);
+
+    const filteredVisits = useMemo(() => {
+        const now = new Date();
+        return allVisits.filter(v => {
+            const visitDate = new Date(v.visitDate);
+            if (filter === 'All') return true;
+            if (filter === 'Today') return visitDate.toDateString() === now.toDateString();
+            if (filter === 'Month') return visitDate.getMonth() === now.getMonth() && visitDate.getFullYear() === now.getFullYear();
+            if (filter === 'Year') return visitDate.getFullYear() === now.getFullYear();
+            return true;
+        });
+    }, [allVisits, filter]);
 
     // Display sales (filtered by region if selected)
     const displaySales = useMemo(() => {
@@ -114,9 +108,10 @@ export default function MainBranchDashboard() {
         return list;
     }, [filteredSales, selectedRegion]);
 
-    const totalSalesCount = salesStats.total;
-    const totalVisitsCount = visitStats.total;
-    const pendingVisitsCount = visitStats.pending;
+    const totalSalesCount = filteredSales.length;
+    const totalVisitsCount = filteredVisits.length;
+    const pendingVisitsCount = filteredVisits.filter(v => v.status === 'pending').length;
+    const approvedSalesCount = filteredSales.filter(s => s.status === 'approved').length;
 
     // Real data for visit analytics graph
     const visitGraphData = useMemo(() => {
@@ -143,16 +138,16 @@ export default function MainBranchDashboard() {
         return {
             labels,
             datasets: [{
-                data: counts.length > 0 && counts.some(c => c > 0) ? counts : [0, 0, 0, 0, 0, 0, 0],
+                data: counts,
                 color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
                 strokeWidth: 2
             }]
         };
-    }, [fieldVisits]);
+    }, [allVisits]); // Using allVisits for context of last 7 days
 
-    // Calculate top selling models from real sales data
+    // Calculate top selling models from filtered sales
     const topSellingModels = useMemo(() => {
-        const productStats = sales.reduce((acc: any, sale) => {
+        const productStats = filteredSales.reduce((acc: any, sale) => {
             acc[sale.productModel] = (acc[sale.productModel] || 0) + 1;
             return acc;
         }, {});
@@ -161,7 +156,36 @@ export default function MainBranchDashboard() {
             .map(([name, units]: [string, any]) => ({ name, units }))
             .sort((a, b) => b.units - a.units)
             .slice(0, 3);
-    }, [sales]);
+    }, [filteredSales]);
+
+    // Region stats from filtered data
+    const regionStats = useMemo(() => {
+        const grouped: Record<string, { region: string; total: number; approved: number; pending: number }> = {};
+        filteredSales.forEach(item => {
+            const region = item.city || 'Unknown';
+            if (!grouped[region]) {
+                grouped[region] = { region, total: 0, approved: 0, pending: 0 };
+            }
+            grouped[region].total++;
+            if (item.status === 'approved') grouped[region].approved++;
+            if (item.status === 'pending') grouped[region].pending++;
+        });
+        return Object.values(grouped).sort((a, b) => b.total - a.total);
+    }, [filteredSales]);
+
+    const visitRegionStats = useMemo(() => {
+        const grouped: Record<string, { region: string; total: number; completed: number; pending: number }> = {};
+        filteredVisits.forEach(item => {
+            const region = item.city || 'Unknown';
+            if (!grouped[region]) {
+                grouped[region] = { region, total: 0, completed: 0, pending: 0 };
+            }
+            grouped[region].total++;
+            if (item.status === 'completed') grouped[region].completed++;
+            if (item.status === 'pending') grouped[region].pending++;
+        });
+        return Object.values(grouped).sort((a, b) => b.total - a.total);
+    }, [filteredVisits]);
 
 
     return (
@@ -185,324 +209,348 @@ export default function MainBranchDashboard() {
                     </Pressable>
                 </View>
 
-                {/* Main Stats Bento Grid */}
-                <View style={styles.bentoGrid}>
-                    <LinearGradient
-                        colors={[THEME.colors.secondary, '#58A47D']}
-                        style={styles.mainStatCard}
-                    >
-                        <View style={styles.statTop}>
-                            <View style={styles.statIconWrapper}>
-                                <MaterialCommunityIcons name="chart-bar" size={24} color={THEME.colors.mintLight} />
-                            </View>
-                            <View style={styles.statBadge}>
-                                <Text style={styles.badgeText}>+12%</Text>
-                            </View>
-                        </View>
-                        <View>
-                            <Text style={styles.mainStatValue}>{totalSalesCount}</Text>
-                            <Text style={styles.mainStatLabel}>Total Units Sold</Text>
-                        </View>
-                    </LinearGradient>
-
-                    <View style={styles.bentoColumn}>
-                        <GlassPanel style={[styles.statBox, { backgroundColor: THEME.colors.mintLight + '80' }]}>
-                            <Text style={[styles.statBoxValue, { color: '#047857' }]}>{totalVisitsCount}</Text>
-                            <Text style={[styles.statBoxLabel, { color: '#065F46' }]}>Field Visits</Text>
-                        </GlassPanel>
-                        <GlassPanel style={[styles.statBox, { backgroundColor: '#FEF3C780' }]}>
-                            <Text style={[styles.statBoxValue, { color: '#D97706' }]}>{pendingVisitsCount}</Text>
-                            <Text style={[styles.statBoxLabel, { color: '#B45309' }]}>Pending Visits</Text>
-                        </GlassPanel>
-                    </View>
-                </View>
-
-                {/* Visit Analytics Graph */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Visit Analytics</Text>
-                </View>
-                <GlassPanel style={styles.graphCard}>
-                    <LineChart
-                        data={visitGraphData}
-                        width={screenWidth - 48}
-                        height={180}
-                        chartConfig={{
-                            backgroundColor: 'transparent',
-                            backgroundGradientFrom: '#ffffff',
-                            backgroundGradientTo: '#ffffff',
-                            decimalPlaces: 0,
-                            color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-                            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                            propsForDots: {
-                                r: '4',
-                                strokeWidth: '2',
-                                stroke: '#10B981'
-                            },
-                            style: {
-                                borderRadius: 16
-                            }
-                        }}
-                        bezier
-                        style={{
-                            marginVertical: 8,
-                            borderRadius: 16,
-                            paddingRight: 40
-                        }}
-                    />
-                </GlassPanel>
-
-                {/* Filter Chips */}
-                <View style={styles.filterRow}>
-                    {(['All', 'Today', 'Month'] as const).map(f => (
+                {/* Tab Switcher */}
+                <View style={styles.tabContainer}>
+                    <GlassPanel style={styles.tabSwitcher} intensity={30}>
                         <Pressable
-                            key={f}
-                            style={[styles.chip, filter === f && styles.chipActive]}
-                            onPress={() => setFilter(f)}
+                            onPress={() => setActiveTab('Dashboard')}
+                            style={[styles.tabButton, activeTab === 'Dashboard' && styles.tabButtonActive]}
                         >
-                            <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{f}</Text>
+                            <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
                         </Pressable>
-                    ))}
-                </View>
-
-                {/* Visit Region Performance */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Visit Hubs (Region Wise)</Text>
-                </View>
-                {loading ? (
-                    <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
-                ) : visitRegionStats.length === 0 ? (
-                    <GlassPanel style={styles.emptyState}>
-                        <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
-                        <Text style={styles.emptyText}>No visit data available</Text>
+                        <Pressable
+                            onPress={() => setActiveTab('Analytics')}
+                            style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
+                        </Pressable>
                     </GlassPanel>
-                ) : (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.regionScroll}
-                        contentContainerStyle={{ gap: 12, paddingRight: 20 }}
-                    >
-                        {visitRegionStats.map(({ region, total, completed, pending }) => {
-                            const colors = getRegionColor(region);
-                            return (
-                                <GlassPanel
-                                    key={region}
-                                    style={styles.regionCard}
-                                >
-                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
-                                        <MaterialCommunityIcons
-                                            name={colors.icon as any}
-                                            size={20}
-                                            color={colors.text}
-                                        />
-                                    </View>
-                                    <Text style={styles.regionName}>{region}</Text>
-                                    <Text style={styles.regionTotal}>{total} Visits</Text>
+                </View>
 
-                                    <View style={styles.progressBar}>
-                                        <View
-                                            style={[
-                                                styles.progressFill,
-                                                { width: `${(completed / (total || 1)) * 100}%` as any, backgroundColor: colors.text }
-                                            ]}
-                                        />
+                {activeTab === 'Dashboard' ? (
+                    <>
+                        {/* Main Stats Bento Grid */}
+                        <View style={styles.bentoGrid}>
+                            <LinearGradient
+                                colors={[THEME.colors.secondary, '#58A47D']}
+                                style={styles.mainStatCard}
+                            >
+                                <View style={styles.statTop}>
+                                    <View style={styles.statIconWrapper}>
+                                        <MaterialCommunityIcons name="chart-bar" size={24} color={THEME.colors.mintLight} />
                                     </View>
-                                    <Text style={{ fontSize: 10, color: THEME.colors.textSecondary, marginTop: 4 }}>
-                                        {completed} Done • {pending} Left
-                                    </Text>
+                                    <View style={styles.statBadge}>
+                                        <Text style={styles.badgeText}>+12%</Text>
+                                    </View>
+                                </View>
+                                <View>
+                                    <Text style={styles.mainStatValue}>{totalSalesCount}</Text>
+                                    <Text style={styles.mainStatLabel}>Total Units Sold</Text>
+                                </View>
+                            </LinearGradient>
+
+                            <View style={styles.bentoColumn}>
+                                <GlassPanel style={[styles.statBox, { backgroundColor: THEME.colors.mintLight + '80' }]}>
+                                    <Text style={[styles.statBoxValue, { color: '#047857' }]}>{totalVisitsCount}</Text>
+                                    <Text style={[styles.statBoxLabel, { color: '#065F46' }]}>Field Visits</Text>
                                 </GlassPanel>
-                            );
-                        })}
-                    </ScrollView>
-                )}
+                                <GlassPanel style={[styles.statBox, { backgroundColor: '#FEF3C780' }]}>
+                                    <Text style={[styles.statBoxValue, { color: '#D97706' }]}>{pendingVisitsCount}</Text>
+                                    <Text style={[styles.statBoxLabel, { color: '#B45309' }]}>Pending Visits</Text>
+                                </GlassPanel>
+                            </View>
+                        </View>
 
-                {/* Sales Region Performance */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Sales Region Performance</Text>
-                    {selectedRegion && (
-                        <Pressable onPress={() => setSelectedRegion(null)}>
-                            <Text style={styles.seeAllText}>Clear Filter</Text>
-                        </Pressable>
-                    )}
-                </View>
+                        {/* Visit Analytics Graph */}
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Visit Analytics</Text>
+                        </View>
+                        <GlassPanel style={styles.graphCard}>
+                            <LineChart
+                                data={visitGraphData}
+                                width={screenWidth - 48}
+                                height={180}
+                                chartConfig={{
+                                    backgroundColor: 'transparent',
+                                    backgroundGradientFrom: '#ffffff',
+                                    backgroundGradientTo: '#ffffff',
+                                    decimalPlaces: 0,
+                                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                                    propsForDots: {
+                                        r: '4',
+                                        strokeWidth: '2',
+                                        stroke: '#10B981'
+                                    },
+                                    style: {
+                                        borderRadius: 16
+                                    }
+                                }}
+                                bezier
+                                style={{
+                                    marginVertical: 8,
+                                    borderRadius: 16,
+                                    paddingRight: 40
+                                }}
+                            />
+                        </GlassPanel>
 
-                {loading ? (
-                    <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
-                ) : regionStats.length === 0 ? (
-                    <GlassPanel style={styles.emptyState}>
-                        <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
-                        <Text style={styles.emptyText}>No sales data available</Text>
-                    </GlassPanel>
-                ) : (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.regionScroll}
-                        contentContainerStyle={{ gap: 12, paddingRight: 20 }}
-                    >
-                        {regionStats.map(({ region, total, approved, pending }) => {
-                            const colors = getRegionColor(region);
-                            const isSelected = selectedRegion === region;
-                            return (
+                        {/* Filter Chips */}
+                        <View style={styles.filterRow}>
+                            {(['All', 'Today', 'Month', 'Year'] as const).map(f => (
                                 <Pressable
-                                    key={region}
-                                    onPress={() => setSelectedRegion(isSelected ? null : region)}
+                                    key={f}
+                                    style={[styles.chip, filter === f && styles.chipActive]}
+                                    onPress={() => setFilter(f)}
                                 >
-                                    <GlassPanel
-                                        style={[
-                                            styles.regionCard,
-                                            isSelected && styles.regionCardSelected
+                                    <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{f}</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+
+                        {/* Visit Region Performance */}
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Visit Hubs (Region Wise)</Text>
+                        </View>
+                        {loading ? (
+                            <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
+                        ) : visitRegionStats.length === 0 ? (
+                            <GlassPanel style={styles.emptyState}>
+                                <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
+                                <Text style={styles.emptyText}>No visit data available</Text>
+                            </GlassPanel>
+                        ) : (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.regionScroll}
+                                contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                            >
+                                {visitRegionStats.map(({ region, total, completed, pending }) => {
+                                    const colors = getRegionColor(region);
+                                    return (
+                                        <GlassPanel
+                                            key={region}
+                                            style={styles.regionCard}
+                                        >
+                                            <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                                <MaterialCommunityIcons
+                                                    name={colors.icon as any}
+                                                    size={20}
+                                                    color={colors.text}
+                                                />
+                                            </View>
+                                            <Text style={styles.regionName}>{region}</Text>
+                                            <Text style={styles.regionTotal}>{total} Visits</Text>
+
+                                            <View style={styles.progressBar}>
+                                                <View
+                                                    style={[
+                                                        styles.progressFill,
+                                                        { width: `${(completed / (total || 1)) * 100}%` as any, backgroundColor: colors.text }
+                                                    ]}
+                                                />
+                                            </View>
+                                            <Text style={{ fontSize: 10, color: THEME.colors.textSecondary, marginTop: 4 }}>
+                                                {completed} Done • {pending} Left
+                                            </Text>
+                                        </GlassPanel>
+                                    );
+                                })}
+                            </ScrollView>
+                        )}
+
+                        {/* Sales Region Performance */}
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Sales Region Performance</Text>
+                            {selectedRegion && (
+                                <Pressable onPress={() => setSelectedRegion(null)}>
+                                    <Text style={styles.seeAllText}>Clear Filter</Text>
+                                </Pressable>
+                            )}
+                        </View>
+
+                        {loading ? (
+                            <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
+                        ) : regionStats.length === 0 ? (
+                            <GlassPanel style={styles.emptyState}>
+                                <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
+                                <Text style={styles.emptyText}>No sales data available</Text>
+                            </GlassPanel>
+                        ) : (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.regionScroll}
+                                contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                            >
+                                {regionStats.map(({ region, total, approved, pending }) => {
+                                    const colors = getRegionColor(region);
+                                    const isSelected = selectedRegion === region;
+                                    return (
+                                        <Pressable
+                                            key={region}
+                                            onPress={() => setSelectedRegion(isSelected ? null : region)}
+                                        >
+                                            <GlassPanel
+                                                style={[
+                                                    styles.regionCard,
+                                                    isSelected && styles.regionCardSelected
+                                                ]}
+                                            >
+                                                <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                                    <MaterialCommunityIcons
+                                                        name={colors.icon as any}
+                                                        size={20}
+                                                        color={colors.text}
+                                                    />
+                                                </View>
+                                                <Text style={styles.regionName}>{region}</Text>
+                                                <Text style={styles.regionTotal}>{total} Sales</Text>
+
+                                                <View style={styles.progressBar}>
+                                                    <View
+                                                        style={[
+                                                            styles.progressFill,
+                                                            { width: `${(approved / (total || 1)) * 100}%` as any, backgroundColor: colors.text }
+                                                        ]}
+                                                    />
+                                                </View>
+                                            </GlassPanel>
+                                        </Pressable>
+                                    );
+                                })}
+                            </ScrollView>
+                        )}
+
+                        {/* Quick Actions */}
+                        <View style={styles.actionGrid}>
+                            <Pressable
+                                onPress={() => navigation.navigate('AnalyticsScreen')}
+                                style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
+                            >
+                                <GlassPanel style={styles.actionPanel}>
+                                    <View style={[styles.actionIconCircle, { backgroundColor: '#EEF2FF' }]}>
+                                        <MaterialCommunityIcons name="chart-timeline-variant" size={24} color="#4F46E5" />
+                                    </View>
+                                    <Text style={styles.actionBtnTitle}>Analytics</Text>
+                                </GlassPanel>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={() => navigation.navigate('TemplateManagement')}
+                                style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
+                            >
+                                <GlassPanel style={styles.actionPanel}>
+                                    <View style={[styles.actionIconCircle, { backgroundColor: '#FDF4FF' }]}>
+                                        <MaterialCommunityIcons name="file-document-edit-outline" size={24} color="#C026D3" />
+                                    </View>
+                                    <Text style={styles.actionBtnTitle}>Templates</Text>
+                                </GlassPanel>
+                            </Pressable>
+                        </View>
+
+                        {/* Top Selling Models */}
+                        <View style={styles.sectionHeader}>
+                            <MaterialCommunityIcons name="trophy" size={20} color="#F59E0B" />
+                            <Text style={styles.sectionTitle}>Top Selling Models</Text>
+                        </View>
+                        <GlassPanel style={styles.topModelsCard}>
+                            {topSellingModels.length === 0 ? (
+                                <Text style={styles.emptyText}>No sales data available</Text>
+                            ) : (
+                                topSellingModels.map((product, index) => (
+                                    <View key={index} style={styles.productRow}>
+                                        <View style={[styles.productRank, {
+                                            backgroundColor: index === 0 ? '#EDE9FE' : index === 1 ? '#D1FAE5' : '#FEF3C7'
+                                        }]}>
+                                            <Text style={[styles.rankText, {
+                                                color: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
+                                            }]}>{index + 1}</Text>
+                                        </View>
+                                        <View style={styles.productInfo}>
+                                            <Text style={styles.productName}>{product.name}</Text>
+                                            <View style={styles.productProgressBar}>
+                                                <View style={[styles.productProgressFill, {
+                                                    width: `${(product.units / (topSellingModels[0]?.units || 1)) * 100}%` as any,
+                                                    backgroundColor: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
+                                                }]} />
+                                            </View>
+                                        </View>
+                                        <Text style={styles.productUnits}>{product.units}</Text>
+                                    </View>
+                                ))
+                            )}
+                        </GlassPanel>
+
+                        {/* Recent Activity List */}
+                        <View style={styles.listHeader}>
+                            <Text style={styles.sectionTitle}>
+                                {selectedRegion ? `${selectedRegion} Sales` : 'Recent Warranty'}
+                            </Text>
+                        </View>
+
+                        {displaySales.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyText}>No sales found</Text>
+                            </View>
+                        ) : (
+                            <GlassPanel style={{ padding: 8 }}>
+                                {(showAllSales ? displaySales : displaySales.slice(0, 3)).map((s, index) => (
+                                    <Pressable
+                                        key={s.id}
+                                        style={({ pressed }) => [
+                                            styles.listItem,
+                                            pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
+                                            index === displaySales.length - 1 && { borderBottomWidth: 0 }
+                                        ]}
+                                        onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
+                                    >
+                                        <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? THEME.colors.mintLight : '#FFFBEB' }]}>
+                                            <View style={styles.statusIndicator}>
+                                                <MaterialCommunityIcons
+                                                    name={s.status === 'approved' ? 'check-circle' : 'clock-outline'}
+                                                    size={20}
+                                                    color={s.status === 'approved' ? THEME.colors.success : THEME.colors.warning}
+                                                />
+                                            </View>
+                                        </View>
+                                        <View style={styles.listContent}>
+                                            <Text style={styles.listTitle}>{s.customerName}</Text>
+                                            <Text style={styles.listSub}>{s.productModel}</Text>
+                                        </View>
+                                        <View style={styles.listRight}>
+                                            <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                            <Text style={styles.listCity}>{s.city}</Text>
+                                        </View>
+                                        <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
+                                    </Pressable>
+                                ))}
+
+                                {/* View More / Show Less Button */}
+                                {(totalSalesCount > 3 || showAllSales) && (
+                                    <Pressable
+                                        onPress={handleViewMoreToggle}
+                                        style={({ pressed }) => [
+                                            styles.viewMoreBtn,
+                                            pressed && { opacity: 0.7 }
                                         ]}
                                     >
-                                        <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
-                                            <MaterialCommunityIcons
-                                                name={colors.icon as any}
-                                                size={20}
-                                                color={colors.text}
-                                            />
-                                        </View>
-                                        <Text style={styles.regionName}>{region}</Text>
-                                        <Text style={styles.regionTotal}>{total} Sales</Text>
-
-                                        <View style={styles.progressBar}>
-                                            <View
-                                                style={[
-                                                    styles.progressFill,
-                                                    { width: `${(approved / (total || 1)) * 100}%` as any, backgroundColor: colors.text }
-                                                ]}
-                                            />
-                                        </View>
-                                    </GlassPanel>
-                                </Pressable>
-                            );
-                        })}
-                    </ScrollView>
-                )}
-
-                {/* Quick Actions */}
-                <View style={styles.actionGrid}>
-                    <Pressable
-                        onPress={() => navigation.navigate('AnalyticsScreen')}
-                        style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
-                    >
-                        <GlassPanel style={styles.actionPanel}>
-                            <View style={[styles.actionIconCircle, { backgroundColor: '#EEF2FF' }]}>
-                                <MaterialCommunityIcons name="chart-timeline-variant" size={24} color="#4F46E5" />
-                            </View>
-                            <Text style={styles.actionBtnTitle}>Analytics</Text>
-                        </GlassPanel>
-                    </Pressable>
-
-                    <Pressable
-                        onPress={() => navigation.navigate('TemplateManagement')}
-                        style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
-                    >
-                        <GlassPanel style={styles.actionPanel}>
-                            <View style={[styles.actionIconCircle, { backgroundColor: '#FDF4FF' }]}>
-                                <MaterialCommunityIcons name="file-document-edit-outline" size={24} color="#C026D3" />
-                            </View>
-                            <Text style={styles.actionBtnTitle}>Templates</Text>
-                        </GlassPanel>
-                    </Pressable>
-                </View>
-
-                {/* Top Selling Models */}
-                <View style={styles.sectionHeader}>
-                    <MaterialCommunityIcons name="trophy" size={20} color="#F59E0B" />
-                    <Text style={styles.sectionTitle}>Top Selling Models</Text>
-                </View>
-                <GlassPanel style={styles.topModelsCard}>
-                    {topSellingModels.length === 0 ? (
-                        <Text style={styles.emptyText}>No sales data available</Text>
-                    ) : (
-                        topSellingModels.map((product, index) => (
-                            <View key={index} style={styles.productRow}>
-                                <View style={[styles.productRank, {
-                                    backgroundColor: index === 0 ? '#EDE9FE' : index === 1 ? '#D1FAE5' : '#FEF3C7'
-                                }]}>
-                                    <Text style={[styles.rankText, {
-                                        color: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
-                                    }]}>{index + 1}</Text>
-                                </View>
-                                <View style={styles.productInfo}>
-                                    <Text style={styles.productName}>{product.name}</Text>
-                                    <View style={styles.productProgressBar}>
-                                        <View style={[styles.productProgressFill, {
-                                            width: `${(product.units / (topSellingModels[0]?.units || 1)) * 100}%` as any,
-                                            backgroundColor: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
-                                        }]} />
-                                    </View>
-                                </View>
-                                <Text style={styles.productUnits}>{product.units}</Text>
-                            </View>
-                        ))
-                    )}
-                </GlassPanel>
-
-                {/* Recent Activity List */}
-                <View style={styles.listHeader}>
-                    <Text style={styles.sectionTitle}>
-                        {selectedRegion ? `${selectedRegion} Sales` : 'Recent Warranty'}
-                    </Text>
-                </View>
-
-                {displaySales.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>No sales found</Text>
-                    </View>
-                ) : (
-                    <GlassPanel style={{ padding: 8 }}>
-                        {(showAllSales ? displaySales : displaySales.slice(0, 3)).map((s, index) => (
-                            <Pressable
-                                key={s.id}
-                                style={({ pressed }) => [
-                                    styles.listItem,
-                                    pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
-                                    index === displaySales.length - 1 && { borderBottomWidth: 0 }
-                                ]}
-                                onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
-                            >
-                                <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? THEME.colors.mintLight : '#FFFBEB' }]}>
-                                    <View style={styles.statusIndicator}>
+                                        <Text style={styles.viewMoreText}>
+                                            {showAllSales ? 'Show Less' : `View More Transactions (${totalSalesCount - 3} more)`}
+                                        </Text>
                                         <MaterialCommunityIcons
-                                            name={s.status === 'approved' ? 'check-circle' : 'clock-outline'}
+                                            name={showAllSales ? "chevron-up" : "chevron-down"}
                                             size={20}
-                                            color={s.status === 'approved' ? THEME.colors.success : THEME.colors.warning}
+                                            color={THEME.colors.primary}
                                         />
-                                    </View>
-                                </View>
-                                <View style={styles.listContent}>
-                                    <Text style={styles.listTitle}>{s.customerName}</Text>
-                                    <Text style={styles.listSub}>{s.productModel}</Text>
-                                </View>
-                                <View style={styles.listRight}>
-                                    <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                    <Text style={styles.listCity}>{s.city}</Text>
-                                </View>
-                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
-                            </Pressable>
-                        ))}
-
-                        {/* View More / Show Less Button */}
-                        {(salesStats.total > 3 || showAllSales) && (
-                            <Pressable
-                                onPress={handleViewMoreToggle}
-                                style={({ pressed }) => [
-                                    styles.viewMoreBtn,
-                                    pressed && { opacity: 0.7 }
-                                ]}
-                            >
-                                <Text style={styles.viewMoreText}>
-                                    {showAllSales ? 'Show Less' : `View More Transactions (${salesStats.total - 3} more)`}
-                                </Text>
-                                <MaterialCommunityIcons
-                                    name={showAllSales ? "chevron-up" : "chevron-down"}
-                                    size={20}
-                                    color={THEME.colors.primary}
-                                />
-                            </Pressable>
+                                    </Pressable>
+                                )}
+                            </GlassPanel>
                         )}
-                    </GlassPanel>
+                    </>
+                ) : (
+                    <DetailedAnalyticsContent sales={allSales} />
                 )}
             </ScrollView>
         </MeshBackground>
@@ -651,5 +699,35 @@ const styles = StyleSheet.create({
         fontFamily: THEME.fonts.black,
         marginLeft: 12,
         color: THEME.colors.text
+    },
+    tabContainer: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    tabSwitcher: {
+        flexDirection: 'row',
+        padding: 6,
+        borderRadius: 100,
+        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+        width: '100%',
+        maxWidth: 320,
+    },
+    tabButton: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 100,
+    },
+    tabButtonActive: {
+        backgroundColor: '#FFFFFF',
+        ...THEME.shadows.small,
+    },
+    tabButtonText: {
+        fontSize: 15,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+    },
+    tabButtonTextActive: {
+        color: THEME.colors.text,
     },
 });
