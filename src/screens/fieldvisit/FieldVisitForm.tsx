@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import { SoundManager } from '../../utils/SoundManager';
 
 const TOTAL_STEPS = 3;
 
@@ -248,6 +249,7 @@ export default function FieldVisitForm() {
             return;
         }
         if (currentStep < TOTAL_STEPS) {
+            SoundManager.playNext();
             setCurrentStep(currentStep + 1);
         }
     };
@@ -319,6 +321,7 @@ export default function FieldVisitForm() {
             );
 
             setUploadStatus('Success!');
+            SoundManager.playSuccess();
             showAlert('Success', 'Field visit recorded successfully!');
             navigation.goBack();
         } catch (error: any) {
@@ -1267,7 +1270,11 @@ const styles = StyleSheet.create({
     stepLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '500' },
     stepLabelActive: { color: '#7C3AED', fontWeight: '600' },
 
-    scrollContent: { padding: 20 },
+    scrollContent: {
+        padding: 20,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
+        paddingBottom: 100
+    },
     section: { marginBottom: 24 },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8, paddingLeft: 4 },
     sectionTitle: { fontSize: 15, fontWeight: '700', color: '#4B5563' },

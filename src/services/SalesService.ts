@@ -9,6 +9,7 @@ export interface Sale {
     address: string;
     city: string;
     date: string;
+    invoiceNumber: string;
     waterTestingBefore: string;
     waterTestingAfter: string;
     executiveName: string;
@@ -42,6 +43,7 @@ const dbToSale = (row: any): Sale => ({
     address: row.address,
     city: row.city,
     date: row.date,
+    invoiceNumber: row.invoice_number || row.warranty_id,
     waterTestingBefore: row.water_testing_before || '',
     waterTestingAfter: row.water_testing_after || '',
     executiveName: row.executive_name || '',
@@ -65,6 +67,7 @@ const saleToDb = (sale: Partial<Sale>) => ({
     address: sale.address,
     city: sale.city,
     date: sale.date,
+    invoice_number: sale.invoiceNumber,
     water_testing_before: sale.waterTestingBefore || null,
     water_testing_after: sale.waterTestingAfter || null,
     executive_name: sale.executiveName || null,
@@ -342,7 +345,8 @@ export const SalesService = {
         imageUris?: string[],
         onProgress?: (progress: number) => void
     ): Promise<Sale> => {
-        const warrantyId = `WAR-${Math.floor(100000 + Math.random() * 900000)}`;
+        // Use invoice number as warranty ID
+        const warrantyId = saleData.invoiceNumber;
 
         // Upload images sequentially with progress tracking
         let imageUrls: string[] = [];
