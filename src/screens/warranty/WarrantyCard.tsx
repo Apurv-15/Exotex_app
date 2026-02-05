@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated, ActivityIndicator, StatusBar } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Sale } from '../../services/SalesService';
@@ -470,6 +470,16 @@ export default function WarrantyCard() {
 
     return (
         <View style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+                <Pressable
+                    onPress={() => navigation.goBack()}
+                    style={styles.backButton}
+                >
+                    <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+                </Pressable>
+            </View>
+
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Success Animation */}
                 <View style={styles.successSection}>
@@ -629,9 +639,25 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#FAFAFA',
     },
+    header: {
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 50,
+        paddingBottom: 10,
+        zIndex: 10,
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(229, 231, 235, 0.5)',
+    },
     content: {
         padding: 20,
-        paddingTop: Platform.OS === 'android' ? 20 : 60,
+        paddingTop: 10,
         paddingBottom: 40,
     },
     successSection: {

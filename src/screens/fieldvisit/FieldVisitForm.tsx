@@ -1132,7 +1132,17 @@ export default function FieldVisitForm() {
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
                 <View style={styles.headerSubtitleCard}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <View style={styles.headerTitleRow}>
+                        <Pressable
+                            onPress={() => navigation.goBack()}
+                            style={styles.backButton}
+                        >
+                            <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+                        </Pressable>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.title}>Field Visit</Text>
+                            <Text style={styles.subtitle}>Site Inspection Report</Text>
+                        </View>
                         <Pressable
                             onPress={fillDummyData}
                             style={({ pressed }) => [
@@ -1221,8 +1231,14 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
     headerSubtitleCard: {
         paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 50,
+        paddingBottom: 12,
         backgroundColor: 'transparent',
+    },
+    headerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     dummyFillBtn: {
         flexDirection: 'row',
@@ -1272,7 +1288,7 @@ const styles = StyleSheet.create({
 
     scrollContent: {
         padding: 20,
-        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
+        paddingTop: 10,
         paddingBottom: 100
     },
     section: { marginBottom: 24 },

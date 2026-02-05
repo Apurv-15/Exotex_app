@@ -132,7 +132,21 @@ export default function CreateSaleStep2() {
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
             >
                 <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                    <View style={{ height: 16 }} />
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <View style={styles.headerTitleRow}>
+                            <Pressable
+                                onPress={() => navigation.goBack()}
+                                style={styles.backButton}
+                            >
+                                <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+                            </Pressable>
+                            <View>
+                                <Text style={styles.title}>New Sale</Text>
+                                <Text style={styles.subtitle}>Step 2: Upload Images</Text>
+                            </View>
+                        </View>
+                    </View>
 
                     {/* Network Status Warning */}
                     {!isOnline && (
@@ -260,24 +274,32 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     header: {
-        alignItems: 'center',
         marginBottom: 24,
-        marginTop: 10,
     },
-    headerIcon: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
-        backgroundColor: '#EDE9FE',
+    headerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(229, 231, 235, 0.5)',
     },
     title: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#1A1A1A',
-        textAlign: 'center',
+        color: '#111827',
+    },
+    subtitle: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginTop: 2,
     },
     description: {
         fontSize: 14,
