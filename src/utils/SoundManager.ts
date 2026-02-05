@@ -3,14 +3,6 @@ import { Platform, Vibration } from 'react-native';
 
 type SoundType = 'tap' | 'next' | 'success' | 'error' | 'whoosh';
 
-// Try to import Haptics - may not be available in all builds
-let Haptics: any = null;
-try {
-    Haptics = require('expo-haptics');
-} catch {
-    console.log('expo-haptics not available - using basic vibration');
-}
-
 class SoundManagerClass {
     private isInitialized = false;
     private isSoundEnabled = true;
@@ -28,7 +20,7 @@ class SoundManagerClass {
             });
             this.isInitialized = true;
 
-            // Try to pre-load sounds (optional - won't crash if files missing)
+            // Pre-load sounds (optional - app works without them)
             await this.preloadSounds();
         } catch (error) {
             console.warn('Sound init error:', error);
@@ -37,26 +29,22 @@ class SoundManagerClass {
     }
 
     private async preloadSounds() {
-        // Sound files are optional - app works with haptics only
+        // Sound files - app works with vibration only if files are missing
         const soundFiles: { [key: string]: any } = {};
 
-        // Sounds disabled until files are added to prevent crashes
-        // Uncomment when sound files are available:
-        /*
         try {
             // Try to load whoosh sound
             soundFiles.whoosh = require('../assets/sounds/whoosh.mp3');
         } catch {
-            console.log('Whoosh sound not found - using haptics only');
+            console.log('Whoosh sound not found - using vibration only');
         }
-        
+
         try {
             // Try to load success sound
             soundFiles.success = require('../assets/sounds/success.mp3');
         } catch {
-            console.log('Success sound not found - using haptics only');
+            console.log('Success sound not found - using vibration only');
         }
-        */
 
         for (const [key, source] of Object.entries(soundFiles)) {
             try {
@@ -78,68 +66,49 @@ class SoundManagerClass {
                 await sound.playAsync();
             }
         } catch (error) {
-            // Silent fail - haptics will still work
+            // Silent fail - vibration will still work
         }
     }
 
-    // Haptic feedback for taps on cards/buttons
+    // Light vibration for taps on cards/buttons
     async vibrateTap() {
         if (Platform.OS === 'web') return;
-
         try {
-            if (Haptics) {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            } else {
-                Vibration.vibrate(10);
-            }
-        } catch {
-            // Fallback to basic vibration
             Vibration.vibrate(10);
+        } catch (error) {
+            console.warn('Vibration error:', error);
         }
     }
 
-    // Medium haptic for next step / navigation
+    // Medium vibration for next step / navigation
     async vibrateNext() {
         if (Platform.OS === 'web') return;
-
         try {
-            if (Haptics) {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            } else {
-                Vibration.vibrate(20);
-            }
-        } catch {
             Vibration.vibrate(20);
+        } catch (error) {
+            console.warn('Vibration error:', error);
         }
     }
 
-    // Success haptic pattern
+    // Success vibration pattern
     async vibrateSuccess() {
         if (Platform.OS === 'web') return;
-
         try {
-            if (Haptics) {
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } else {
-                Vibration.vibrate([0, 50, 100, 50]);
-            }
-        } catch {
+            // Pattern: wait, vibrate, wait, vibrate (creates a nice success feel)
             Vibration.vibrate([0, 50, 100, 50]);
+        } catch (error) {
+            console.warn('Vibration error:', error);
         }
     }
 
-    // Error haptic pattern
+    // Error vibration pattern
     async vibrateError() {
         if (Platform.OS === 'web') return;
-
         try {
-            if (Haptics) {
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            } else {
-                Vibration.vibrate([0, 100, 50, 100]);
-            }
-        } catch {
+            // Pattern: longer vibrations for error (more intense feeling)
             Vibration.vibrate([0, 100, 50, 100]);
+        } catch (error) {
+            console.warn('Vibration error:', error);
         }
     }
 
