@@ -1,8 +1,15 @@
 import { Audio } from 'expo-av';
 import { Platform, Vibration } from 'react-native';
-import * as Haptics from 'expo-haptics';
 
 type SoundType = 'tap' | 'next' | 'success' | 'error' | 'whoosh';
+
+// Try to import Haptics - may not be available in all builds
+let Haptics: any = null;
+try {
+    Haptics = require('expo-haptics');
+} catch {
+    console.log('expo-haptics not available - using basic vibration');
+}
 
 class SoundManagerClass {
     private isInitialized = false;
@@ -80,7 +87,11 @@ class SoundManagerClass {
         if (Platform.OS === 'web') return;
 
         try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (Haptics) {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } else {
+                Vibration.vibrate(10);
+            }
         } catch {
             // Fallback to basic vibration
             Vibration.vibrate(10);
@@ -92,7 +103,11 @@ class SoundManagerClass {
         if (Platform.OS === 'web') return;
 
         try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            if (Haptics) {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            } else {
+                Vibration.vibrate(20);
+            }
         } catch {
             Vibration.vibrate(20);
         }
@@ -103,7 +118,11 @@ class SoundManagerClass {
         if (Platform.OS === 'web') return;
 
         try {
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (Haptics) {
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } else {
+                Vibration.vibrate([0, 50, 100, 50]);
+            }
         } catch {
             Vibration.vibrate([0, 50, 100, 50]);
         }
@@ -114,7 +133,11 @@ class SoundManagerClass {
         if (Platform.OS === 'web') return;
 
         try {
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            if (Haptics) {
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            } else {
+                Vibration.vibrate([0, 100, 50, 100]);
+            }
         } catch {
             Vibration.vibrate([0, 100, 50, 100]);
         }
