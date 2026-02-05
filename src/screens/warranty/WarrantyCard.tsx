@@ -478,6 +478,10 @@ export default function WarrantyCard() {
                 >
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
                 </Pressable>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerBrand}>EXOTEX</Text>
+                </View>
+                <View style={{ width: 44 }} />
             </View>
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -485,7 +489,7 @@ export default function WarrantyCard() {
                 <View style={styles.successSection}>
                     <Animated.View style={[styles.successIcon, { transform: [{ scale: scaleAnim }] }]}>
                         <LinearGradient
-                            colors={['#10B981', '#059669']}
+                            colors={['#52B788', '#40916C']}
                             style={styles.successGradient}
                         >
                             <MaterialCommunityIcons name="check" size={40} color="white" />
@@ -495,7 +499,7 @@ export default function WarrantyCard() {
                         Warranty Activated!
                     </Animated.Text>
                     <Animated.Text style={[styles.successSubtitle, { opacity: fadeAnim }]}>
-                        Your warranty has been successfully generated
+                        Your warranty has been successfully generated for your new device.
                     </Animated.Text>
                 </View>
 
@@ -508,8 +512,8 @@ export default function WarrantyCard() {
                     }
                 ]}>
                     <View style={styles.cardHeader}>
-                        <View style={styles.cardLogo}>
-                            <MaterialCommunityIcons name="shield-check" size={24} color="#7C3AED" />
+                        <View style={[styles.cardLogo, { backgroundColor: '#EEF2FF' }]}>
+                            <MaterialCommunityIcons name="shield-check" size={24} color="#6366F1" />
                         </View>
                         <Text style={styles.cardBrand}>WarrantyPro</Text>
                     </View>
@@ -519,52 +523,50 @@ export default function WarrantyCard() {
                         <Text style={styles.warrantyId}>{sale.warrantyId}</Text>
                     </View>
 
-                    <View style={styles.cardDivider} />
-
                     <View style={styles.detailsGrid}>
                         <View style={styles.detailItem}>
-                            <View style={[styles.detailIcon, { backgroundColor: '#EDE9FE' }]}>
-                                <MaterialCommunityIcons name="cube-outline" size={18} color="#7C3AED" />
+                            <View style={[styles.detailIcon, { backgroundColor: '#EEF2FF' }]}>
+                                <MaterialCommunityIcons name="archive-outline" size={18} color="#6366F1" />
                             </View>
                             <View>
-                                <Text style={styles.detailLabel}>Product</Text>
+                                <Text style={styles.detailLabel}>PRODUCT</Text>
                                 <Text style={styles.detailValue}>{sale.productModel}</Text>
                             </View>
                         </View>
 
                         <View style={styles.detailItem}>
-                            <View style={[styles.detailIcon, { backgroundColor: '#FEF3C7' }]}>
-                                <MaterialCommunityIcons name="barcode" size={18} color="#F59E0B" />
+                            <View style={[styles.detailIcon, { backgroundColor: '#FFF7ED' }]}>
+                                <MaterialCommunityIcons name="format-list-numbered" size={18} color="#F59E0B" />
                             </View>
                             <View>
-                                <Text style={styles.detailLabel}>Serial No.</Text>
+                                <Text style={styles.detailLabel}>SERIAL NO.</Text>
                                 <Text style={styles.detailValue}>{sale.serialNumber}</Text>
                             </View>
                         </View>
 
                         <View style={styles.detailItem}>
-                            <View style={[styles.detailIcon, { backgroundColor: '#D1FAE5' }]}>
-                                <MaterialCommunityIcons name="account" size={18} color="#10B981" />
+                            <View style={[styles.detailIcon, { backgroundColor: '#ECFDF5' }]}>
+                                <MaterialCommunityIcons name="account-outline" size={18} color="#10B981" />
                             </View>
                             <View>
-                                <Text style={styles.detailLabel}>Customer</Text>
+                                <Text style={styles.detailLabel}>CUSTOMER</Text>
                                 <Text style={styles.detailValue}>{sale.customerName}</Text>
                             </View>
                         </View>
 
                         <View style={styles.detailItem}>
-                            <View style={[styles.detailIcon, { backgroundColor: '#DBEAFE' }]}>
-                                <MaterialCommunityIcons name="calendar" size={18} color="#3B82F6" />
+                            <View style={[styles.detailIcon, { backgroundColor: '#EFF6FF' }]}>
+                                <MaterialCommunityIcons name="calendar-outline" size={18} color="#3B82F6" />
                             </View>
                             <View>
-                                <Text style={styles.detailLabel}>Purchase Date</Text>
+                                <Text style={styles.detailLabel}>PURCHASE DATE</Text>
                                 <Text style={styles.detailValue}>{sale.saleDate}</Text>
                             </View>
                         </View>
                     </View>
 
                     <View style={styles.validityBadge}>
-                        <MaterialCommunityIcons name="clock-check-outline" size={16} color="#5B21B6" />
+                        <MaterialCommunityIcons name="history" size={16} color="#40916C" />
                         <Text style={styles.validityText}>Valid for 1 year from purchase</Text>
                     </View>
                 </Animated.View>
@@ -583,7 +585,7 @@ export default function WarrantyCard() {
                         disabled={loading}
                     >
                         <LinearGradient
-                            colors={loading ? ['#9CA3AF', '#6B7280'] : ['#7C3AED', '#5B21B6']}
+                            colors={loading ? ['#9CA3AF', '#6B7280'] : ['#74C69D', '#52B788']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.gradientButton}
@@ -595,7 +597,7 @@ export default function WarrantyCard() {
                                 </>
                             ) : (
                                 <>
-                                    <MaterialCommunityIcons name="file-pdf-box" size={20} color="white" />
+                                    <MaterialCommunityIcons name="file-pdf-box" size={22} color="white" />
                                     <Text style={styles.downloadButtonText}>Download PDF</Text>
                                 </>
                             )}
@@ -637,163 +639,182 @@ export default function WarrantyCard() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
+        backgroundColor: '#F0FDF4', // Very light mint background
     },
     header: {
         paddingHorizontal: 20,
         paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 50,
         paddingBottom: 10,
         zIndex: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    headerTitleContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    headerBrand: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#94A3B8',
+        letterSpacing: 1.5,
     },
     backButton: {
         width: 44,
         height: 44,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        borderRadius: 100,
+        backgroundColor: 'white',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(229, 231, 235, 0.5)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
     },
     content: {
-        padding: 20,
+        padding: 24,
         paddingTop: 10,
-        paddingBottom: 40,
+        paddingBottom: 60,
     },
     successSection: {
         alignItems: 'center',
-        marginBottom: 32,
+        marginBottom: 40,
+        paddingTop: 10,
     },
     successIcon: {
-        marginBottom: 16,
+        marginBottom: 24,
     },
     successGradient: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#10B981',
-        shadowOffset: { width: 0, height: 8 },
+        shadowColor: '#52B788',
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowRadius: 20,
+        elevation: 10,
     },
     successTitle: {
-        fontSize: 26,
-        fontWeight: '700',
-        color: '#1A1A1A',
+        fontSize: 32,
+        fontWeight: '800',
+        color: '#111827',
+        textAlign: 'center',
+        marginBottom: 8,
     },
     successSubtitle: {
-        fontSize: 15,
-        color: '#6B7280',
-        marginTop: 8,
+        fontSize: 16,
+        color: '#64748B',
+        lineHeight: 24,
         textAlign: 'center',
+        paddingHorizontal: 20,
     },
     card: {
         backgroundColor: 'white',
-        borderRadius: 24,
+        borderRadius: 32,
         padding: 24,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 24,
-        elevation: 8,
-        marginBottom: 24,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.06,
+        shadowRadius: 32,
+        elevation: 10,
+        marginBottom: 32,
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 24,
     },
     cardLogo: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: '#EDE9FE',
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: '#EEF2FF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
     },
     cardBrand: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '700',
-        color: '#1A1A1A',
+        color: '#1F2937',
     },
     warrantyIdSection: {
         alignItems: 'center',
-        paddingVertical: 20,
-        backgroundColor: '#FAFAFA',
-        borderRadius: 16,
-        marginBottom: 20,
+        paddingVertical: 24,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 20,
+        marginBottom: 24,
     },
     warrantyIdLabel: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#9CA3AF',
-        letterSpacing: 1,
-        marginBottom: 4,
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#94A3B8',
+        letterSpacing: 2,
+        marginBottom: 10,
     },
     warrantyId: {
-        fontSize: 32,
+        fontSize: 36,
         fontWeight: '800',
-        color: '#7C3AED',
-        letterSpacing: 1,
-    },
-    cardDivider: {
-        height: 1,
-        backgroundColor: '#F3F4F6',
-        marginBottom: 20,
+        color: '#52B788', // Premium mint color
+        letterSpacing: 2,
     },
     detailsGrid: {
-        gap: 16,
+        gap: 20,
     },
     detailItem: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     detailIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
     },
     detailLabel: {
-        fontSize: 12,
-        color: '#9CA3AF',
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#94A3B8',
+        letterSpacing: 1,
+        marginBottom: 4,
     },
     detailValue: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1A1A1A',
-        marginTop: 2,
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
     },
     validityBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EDE9FE',
-        padding: 14,
-        borderRadius: 12,
-        marginTop: 20,
-        gap: 8,
+        backgroundColor: '#F0FDF4',
+        padding: 16,
+        borderRadius: 16,
+        marginTop: 32,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#DCFCE7',
     },
     validityText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#5B21B6',
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#166534',
     },
     actions: {
-        gap: 12,
+        gap: 16,
     },
     downloadButton: {
-        borderRadius: 16,
+        borderRadius: 24,
         overflow: 'hidden',
-        shadowColor: '#7C3AED',
+        shadowColor: '#52B788',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.4,
         shadowRadius: 16,
         elevation: 8,
     },
@@ -801,17 +822,17 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 18,
-        gap: 8,
+        paddingVertical: 20,
+        gap: 10,
     },
     downloadButtonText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '700',
     },
     docxButton: {
         backgroundColor: '#EFF6FF',
-        borderRadius: 16,
+        borderRadius: 24,
         borderWidth: 1,
         borderColor: '#DBEAFE',
         overflow: 'hidden',
@@ -820,25 +841,24 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 18,
-        gap: 8,
+        paddingVertical: 20,
+        gap: 10,
     },
     docxButtonText: {
         color: '#2B579A',
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '700',
     },
     homeButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 16,
+        paddingVertical: 20,
         gap: 8,
-        cursor: 'pointer',
-    } as any,
+    },
     homeButtonText: {
-        fontSize: 15,
-        color: '#6B7280',
+        fontSize: 16,
+        color: '#94A3B8',
         fontWeight: '600',
     },
 });
