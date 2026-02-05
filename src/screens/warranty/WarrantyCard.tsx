@@ -10,7 +10,9 @@ import { TemplateService } from '../../services/TemplateService';
 import { Storage } from '../../utils/storage';
 import { Asset } from 'expo-asset';
 // @ts-ignore
-import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo.jpeg';
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+// @ts-ignore
+import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 
 export default function WarrantyCard() {
     const route = useRoute<any>();
@@ -70,6 +72,10 @@ export default function WarrantyCard() {
         // For web, we can use the uri directly or a base64 string if needed.
         // For native, Asset.fromModule might give a local URI that works in WebView/Print
         const logoUri = logoAsset.uri;
+
+        // Resolve Sign & Stamp asset
+        const signStampAsset = Asset.fromModule(SignStampImage);
+        const signStampUri = signStampAsset.uri;
 
         return `
 <!DOCTYPE html>
@@ -211,6 +217,19 @@ export default function WarrantyCard() {
             font-size: 12px;
             color: #333;
             margin-bottom: 50px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .sign-stamp-img {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-height: 90px;
+            max-width: 90%;
+            z-index: 1;
+            object-fit: contain;
         }
         
         .signature-label {
@@ -319,6 +338,7 @@ export default function WarrantyCard() {
             
             <div class="dealer-box">
                 <div class="dealer-box-label">Name and Address of the dealer<br>with Stamp</div>
+                <img src="${signStampUri}" alt="Sign & Stamp" class="sign-stamp-img">
                 <div class="signature-label">Signature</div>
             </div>
         </div>
@@ -611,7 +631,8 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 20,
-        paddingTop: 32,
+        paddingTop: Platform.OS === 'android' ? 20 : 60,
+        paddingBottom: 40,
     },
     successSection: {
         alignItems: 'center',
