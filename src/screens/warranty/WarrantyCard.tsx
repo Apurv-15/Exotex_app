@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated, ActivityIndicator, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated, ActivityIndicator, StatusBar, BackHandler } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Sale } from '../../services/SalesService';
+import { useAuth } from '../../context/AuthContext';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +18,7 @@ import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_s
 export default function WarrantyCard() {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
+    const { user } = useAuth();
     const sale: Sale = route.params?.sale;
     const [loading, setLoading] = useState(false);
     const [docxLoading, setDocxLoading] = useState(false);
@@ -54,7 +56,28 @@ export default function WarrantyCard() {
                 }),
             ]),
         ]).start();
+
+        // Handle hardware back press on Android
+        const backAction = () => {
+            handleGoHome();
+            return true;
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            "hardwareBackPress",
+            backAction
+        );
+
+        return () => backHandler.remove();
     }, []);
+
+    const handleGoHome = () => {
+        if (user?.role === 'Admin') {
+            navigation.navigate('MainDashboard');
+        } else {
+            navigation.navigate('SubDashboard');
+        }
+    };
 
     if (!sale) return null;
 
@@ -473,7 +496,7 @@ export default function WarrantyCard() {
             {/* Header */}
             <View style={styles.header}>
                 <Pressable
-                    onPress={() => navigation.goBack()}
+                    onPress={handleGoHome}
                     style={styles.backButton}
                 >
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
@@ -625,7 +648,7 @@ export default function WarrantyCard() {
 
                     <Pressable
                         style={({ pressed }) => [styles.homeButton, pressed && { opacity: 0.7 }]}
-                        onPress={() => navigation.navigate('SubDashboard')}
+                        onPress={handleGoHome}
                     >
                         <MaterialCommunityIcons name="home-outline" size={20} color="#6B7280" />
                         <Text style={styles.homeButtonText}>Back to Dashboard</Text>
