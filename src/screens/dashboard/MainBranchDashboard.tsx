@@ -458,38 +458,7 @@ export default function MainBranchDashboard() {
                             </Pressable>
                         </View>
 
-                        {/* Top Selling Models */}
-                        <View style={styles.sectionHeader}>
-                            <MaterialCommunityIcons name="trophy" size={20} color="#F59E0B" />
-                            <Text style={styles.sectionTitle}>Top Selling Models</Text>
-                        </View>
-                        <GlassPanel style={styles.topModelsCard}>
-                            {topSellingModels.length === 0 ? (
-                                <Text style={styles.emptyText}>No sales data available</Text>
-                            ) : (
-                                topSellingModels.map((product, index) => (
-                                    <View key={index} style={styles.productRow}>
-                                        <View style={[styles.productRank, {
-                                            backgroundColor: index === 0 ? '#EDE9FE' : index === 1 ? '#D1FAE5' : '#FEF3C7'
-                                        }]}>
-                                            <Text style={[styles.rankText, {
-                                                color: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
-                                            }]}>{index + 1}</Text>
-                                        </View>
-                                        <View style={styles.productInfo}>
-                                            <Text style={styles.productName}>{product.name}</Text>
-                                            <View style={styles.productProgressBar}>
-                                                <View style={[styles.productProgressFill, {
-                                                    width: `${(product.units / (topSellingModels[0]?.units || 1)) * 100}%` as any,
-                                                    backgroundColor: index === 0 ? '#7C3AED' : index === 1 ? '#10B981' : '#F59E0B'
-                                                }]} />
-                                            </View>
-                                        </View>
-                                        <Text style={styles.productUnits}>{product.units}</Text>
-                                    </View>
-                                ))
-                            )}
-                        </GlassPanel>
+
 
                         {/* Recent Activity List */}
                         <View style={styles.listHeader}>

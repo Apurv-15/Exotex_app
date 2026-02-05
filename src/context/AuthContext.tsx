@@ -23,14 +23,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     async function loadStorageData() {
         try {
-            const storedUser = await AuthService.getUser();
-            const token = await AuthService.getToken();
+            // Add timeout to prevent hanging
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Storage load timeout')), 5000)
+            );
 
-            if (storedUser && token) {
-                setUser(storedUser);
-            }
+            const loadPromise = (async () => {
+                const storedUser = await AuthService.getUser();
+                const token = await AuthService.getToken();
+
+                if (storedUser && token) {
+                    setUser(storedUser);
+                }
+            })();
+
+            await Promise.race([loadPromise, timeoutPromise]);
         } catch (error) {
             console.log('Failed to load auth data', error);
+            // Continue anyway - user can log in
         } finally {
             setIsLoadingStorage(false);
         }
