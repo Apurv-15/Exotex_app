@@ -13,6 +13,7 @@ import GlassPanel from '../../components/GlassPanel';
 import DetailedAnalyticsContent from '../../components/DetailedAnalyticsContent';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+import { SoundManager } from '../../utils/SoundManager';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -433,7 +434,7 @@ export default function MainBranchDashboard() {
                         {/* Quick Actions */}
                         <View style={styles.actionGrid}>
                             <Pressable
-                                onPress={() => navigation.navigate('AnalyticsScreen')}
+                                onPress={() => { SoundManager.vibrateTap(); navigation.navigate('AnalyticsScreen'); }}
                                 style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
                             >
                                 <GlassPanel style={styles.actionPanel}>
@@ -445,7 +446,7 @@ export default function MainBranchDashboard() {
                             </Pressable>
 
                             <Pressable
-                                onPress={() => navigation.navigate('TemplateManagement')}
+                                onPress={() => { SoundManager.vibrateTap(); navigation.navigate('TemplateManagement'); }}
                                 style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
                             >
                                 <GlassPanel style={styles.actionPanel}>
@@ -511,7 +512,7 @@ export default function MainBranchDashboard() {
                                             pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
                                             index === displaySales.length - 1 && { borderBottomWidth: 0 }
                                         ]}
-                                        onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
+                                        onPress={() => { SoundManager.vibrateTap(); navigation.navigate('WarrantyCard', { sale: s }); }}
                                     >
                                         <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? THEME.colors.mintLight : '#FFFBEB' }]}>
                                             <View style={styles.statusIndicator}>

@@ -11,6 +11,7 @@ import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 // @ts-ignore
 import FloatingTabBar from '../../components/FloatingTabBar';
+import { SoundManager } from '../../utils/SoundManager';
 
 const { width } = Dimensions.get('window');
 
@@ -383,7 +384,7 @@ export default function SubBranchDashboard() {
                                         { flex: 1 },
                                         pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
                                     ]}
-                                    onPress={() => navigation.navigate('CreateSaleStep1')}
+                                    onPress={() => { SoundManager.vibrateTap(); navigation.navigate('CreateSaleStep1'); }}
                                 >
                                     <View style={styles.actionIcon}>
                                         <MaterialIcons name="add" size={20} color="white" />
@@ -396,7 +397,7 @@ export default function SubBranchDashboard() {
                                         { flex: 1 },
                                         pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
                                     ]}
-                                    onPress={() => navigation.navigate('FieldVisitForm')}
+                                    onPress={() => { SoundManager.vibrateTap(); navigation.navigate('FieldVisitForm'); }}
                                 >
                                     <View style={[styles.actionIcon, { backgroundColor: THEME.colors.mintLight }]}>
                                         <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
@@ -409,7 +410,7 @@ export default function SubBranchDashboard() {
                         {/* Recent Warranties Section */}
                         <View style={styles.recentHeader}>
                             <Text style={styles.sectionTitle}>Recent Warranties</Text>
-                            <Pressable onPress={() => navigation.navigate('WarrantiesList')}>
+                            <Pressable onPress={() => { SoundManager.vibrateTap(); navigation.navigate('WarrantiesList'); }}>
                                 <Text style={styles.seeAllText}>View More</Text>
                             </Pressable>
                         </View>
@@ -425,7 +426,7 @@ export default function SubBranchDashboard() {
                                     <Pressable
                                         key={item.id}
                                         style={styles.listItem}
-                                        onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
+                                        onPress={() => { SoundManager.vibrateTap(); navigation.navigate('WarrantyCard', { sale: item }); }}
                                     >
                                         <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
                                             <MaterialIcons name="verified-user" size={20} color={THEME.colors.success} />

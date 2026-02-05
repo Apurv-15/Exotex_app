@@ -1,11 +1,13 @@
 import { Audio } from 'expo-av';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
-type SoundType = 'tap' | 'next' | 'success' | 'error';
+type SoundType = 'tap' | 'next' | 'success' | 'error' | 'whoosh';
 
 class SoundManagerClass {
     private isInitialized = false;
     private isSoundEnabled = true;
+    private loadedSounds: { [key: string]: Audio.Sound } = {};
 
     async init() {
         if (this.isInitialized || Platform.OS === 'web') return;
@@ -18,32 +20,129 @@ class SoundManagerClass {
                 shouldDuckAndroid: true,
             });
             this.isInitialized = true;
+
+            // Try to pre-load sounds (optional - won't crash if files missing)
+            await this.preloadSounds();
         } catch (error) {
             console.warn('Sound init error:', error);
             this.isSoundEnabled = false;
         }
     }
 
-    async play(type: SoundType) {
-        // Sounds are disabled for now to avoid network errors
-        // Can be re-enabled with local sound files
-        return;
+    private async preloadSounds() {
+        // Sound files are optional - app works with haptics only
+        const soundFiles: { [key: string]: any } = {};
+
+        // Sounds disabled until files are added to prevent crashes
+        // Uncomment when sound files are available:
+        /*
+        try {
+            // Try to load whoosh sound
+            soundFiles.whoosh = require('../assets/sounds/whoosh.mp3');
+        } catch {
+            console.log('Whoosh sound not found - using haptics only');
+        }
+        
+        try {
+            // Try to load success sound
+            soundFiles.success = require('../assets/sounds/success.mp3');
+        } catch {
+            console.log('Success sound not found - using haptics only');
+        }
+        */
+
+        for (const [key, source] of Object.entries(soundFiles)) {
+            try {
+                const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: false });
+                this.loadedSounds[key] = sound;
+            } catch (error) {
+                console.warn(`Failed to load ${key} sound:`, error);
+            }
+        }
     }
 
+    private async playSound(soundKey: string) {
+        if (!this.isSoundEnabled || Platform.OS === 'web') return;
+
+        try {
+            const sound = this.loadedSounds[soundKey];
+            if (sound) {
+                await sound.setPositionAsync(0);
+                await sound.playAsync();
+            }
+        } catch (error) {
+            // Silent fail - haptics will still work
+        }
+    }
+
+    // Haptic feedback for taps on cards/buttons
+    async vibrateTap() {
+        if (Platform.OS === 'web') return;
+
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch {
+            // Fallback to basic vibration
+            Vibration.vibrate(10);
+        }
+    }
+
+    // Medium haptic for next step / navigation
+    async vibrateNext() {
+        if (Platform.OS === 'web') return;
+
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } catch {
+            Vibration.vibrate(20);
+        }
+    }
+
+    // Success haptic pattern
+    async vibrateSuccess() {
+        if (Platform.OS === 'web') return;
+
+        try {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {
+            Vibration.vibrate([0, 50, 100, 50]);
+        }
+    }
+
+    // Error haptic pattern
+    async vibrateError() {
+        if (Platform.OS === 'web') return;
+
+        try {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        } catch {
+            Vibration.vibrate([0, 100, 50, 100]);
+        }
+    }
+
+    // Combined methods for backward compatibility
     async playTap() {
-        return;
+        await this.vibrateTap();
     }
 
     async playNext() {
-        return;
+        await this.vibrateNext();
+        await this.playSound('whoosh');
     }
 
     async playSuccess() {
-        return;
+        await this.vibrateSuccess();
+        await this.playSound('success');
     }
 
     async playError() {
-        return;
+        await this.vibrateError();
+    }
+
+    // Whoosh effect for form submissions
+    async playWhoosh() {
+        await this.vibrateNext();
+        await this.playSound('whoosh');
     }
 }
 
