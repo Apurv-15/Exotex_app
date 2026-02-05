@@ -53,36 +53,32 @@ function AdminStack() {
 
 function UserStack() {
     return (
-        <Stack.Navigator>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen
                 name="SubDashboard"
                 component={SubBranchDashboard}
-                options={{ title: 'Overview', headerLargeTitle: true }}
             />
             <Stack.Screen
                 name="CreateSaleStep1"
                 component={CreateSaleStep1}
-                options={{ title: 'New Sale', headerBackTitle: 'Back' }}
             />
             <Stack.Screen
                 name="CreateSaleStep2"
                 component={CreateSaleStep2}
-                options={{ title: 'Upload Proof', headerBackTitle: 'Back' }}
             />
             <Stack.Screen
                 name="WarrantyCard"
                 component={WarrantyCard}
-                options={{ title: 'Warranty Generated', gestureEnabled: false, headerLeft: () => null }}
+                options={{ gestureEnabled: false }}
             />
             <Stack.Screen
                 name="FieldVisitForm"
                 component={FieldVisitForm}
-                options={{ title: 'Field Visit Report', headerBackTitle: 'Back' }}
             />
             <Stack.Screen
                 name="AnalyticsScreen"
                 component={AnalyticsScreen}
-                options={{ title: 'My Analytics' }}
+                options={{ headerShown: true, title: 'My Analytics' }}
             />
         </Stack.Navigator>
     );
