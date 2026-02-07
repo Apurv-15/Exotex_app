@@ -1,35 +1,18 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Pressable, StyleSheet, Animated, Platform } from 'react-native';
+import { View, Pressable, StyleSheet, Animated, Platform, Dimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
+import { THEME } from '../constants/theme';
 
 interface FloatingTabBarProps {
     activeTab: 'home' | 'create' | 'fieldvisit';
     onTabPress: (tab: 'home' | 'create' | 'fieldvisit') => void;
 }
 
+const { width } = Dimensions.get('window');
+
 export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBarProps) {
     const scaleAnim = useRef(new Animated.Value(1)).current;
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-
-    useEffect(() => {
-        // Subtle pulse animation for center button
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1.05,
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-            ])
-        ).start();
-    }, []);
 
     const handleCenterPress = () => {
         Animated.sequence([
@@ -50,75 +33,67 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
     const TabButton = ({
         tab,
         icon,
-        activeIcon
+        activeIcon,
+        isPlaceholder = false
     }: {
-        tab: 'home' | 'fieldvisit';
+        tab?: 'home' | 'fieldvisit' | 'create';
         icon: keyof typeof MaterialCommunityIcons.glyphMap;
         activeIcon: keyof typeof MaterialCommunityIcons.glyphMap;
+        isPlaceholder?: boolean;
     }) => {
-        const isActive = activeTab === tab;
+        const isActive = !isPlaceholder && activeTab === tab;
         return (
             <Pressable
-                onPress={() => onTabPress(tab)}
+                onPress={() => !isPlaceholder && tab && onTabPress(tab as any)}
                 style={({ pressed }) => [
                     styles.tabButton,
-                    pressed && { transform: [{ scale: 0.95 }] }
+                    pressed && !isPlaceholder && { transform: [{ scale: 0.95 }] },
+                    isPlaceholder && { opacity: 0.6 }
                 ]}
             >
-                <View style={[styles.tabIconContainer, isActive && styles.tabIconActive]}>
-                    <MaterialCommunityIcons
-                        name={isActive ? activeIcon : icon}
-                        size={24}
-                        color={isActive ? '#7C3AED' : '#9CA3AF'}
-                    />
-                </View>
-                {isActive && <View style={styles.activeIndicator} />}
+                <MaterialCommunityIcons
+                    name={isActive ? activeIcon : icon}
+                    size={26}
+                    color={isActive ? '#059669' : '#94A3B8'}
+                />
             </Pressable>
         );
     };
 
     const TabBarContent = () => (
         <View style={styles.tabBarInner}>
-            {/* Home Tab */}
-            <TabButton tab="home" icon="home-outline" activeIcon="home" />
-
-            {/* Center Create Button */}
-            <View style={styles.centerButtonContainer}>
-                <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <Pressable onPress={handleCenterPress}>
-                        <Animated.View style={[styles.centerButton, { transform: [{ scale: scaleAnim }] }]}>
-                            <LinearGradient
-                                colors={['#7C3AED', '#5B21B6']}
-                                style={styles.centerGradient}
-                            >
-                                <MaterialCommunityIcons name="plus" size={28} color="white" />
-                            </LinearGradient>
-                        </Animated.View>
-                    </Pressable>
-                </Animated.View>
+            {/* Left side: Home */}
+            <View style={styles.sideGroup}>
+                <TabButton tab="home" icon="view-grid-outline" activeIcon="view-grid" />
             </View>
 
-            {/* Field Visit Tab */}
-            <TabButton tab="fieldvisit" icon="clipboard-text-outline" activeIcon="clipboard-text" />
+            {/* Center: Create */}
+            <View style={styles.centerButtonOuter}>
+                <Pressable onPress={handleCenterPress}>
+                    <Animated.View style={[styles.centerButton, { transform: [{ scale: scaleAnim }] }]}>
+                        <MaterialCommunityIcons name="plus" size={32} color="#065F46" />
+                    </Animated.View>
+                </Pressable>
+            </View>
+
+            {/* Right side: Field Visit */}
+            <View style={styles.sideGroup}>
+                <TabButton tab="fieldvisit" icon="chart-box-outline" activeIcon="chart-bar" />
+            </View>
         </View>
     );
 
-    if (Platform.OS === 'ios') {
-        return (
-            <View style={styles.container}>
-                <BlurView intensity={80} tint="light" style={styles.blurContainer}>
-                    <TabBarContent />
-                </BlurView>
-            </View>
-        );
-    }
-
-    // For Android and Web - use semi-transparent background
     return (
         <View style={styles.container}>
-            <View style={styles.androidContainer}>
-                <TabBarContent />
-            </View>
+            {Platform.OS === 'ios' ? (
+                <BlurView intensity={90} tint="light" style={styles.blurContainer}>
+                    <TabBarContent />
+                </BlurView>
+            ) : (
+                <View style={styles.androidContainer}>
+                    <TabBarContent />
+                </View>
+            )}
         </View>
     );
 }
@@ -126,77 +101,76 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        bottom: Platform.OS === 'web' ? 20 : 30,
-        left: 20,
-        right: 20,
+        bottom: Platform.OS === 'ios' ? 30 : 20,
+        left: 0,
+        right: 0,
         alignItems: 'center',
+        paddingHorizontal: 20,
     },
     blurContainer: {
-        borderRadius: 28,
-        overflow: 'hidden',
+        borderRadius: 45,
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 360,
+        height: 80,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
+        ...THEME.shadows.small,
     },
     androidContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: 28,
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        borderRadius: 45,
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 360,
+        height: 75,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
-        elevation: 12,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.8)',
     },
     tabBarInner: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        height: '100%',
+        paddingHorizontal: 20,
+    },
+    sideGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
         justifyContent: 'space-around',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
     },
     tabButton: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 4,
+        padding: 5,
     },
-    tabIconContainer: {
-        padding: 6,
-        borderRadius: 14,
-    },
-    tabIconActive: {
-        backgroundColor: 'rgba(124, 58, 237, 0.1)',
-    },
-    activeIndicator: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: '#7C3AED',
-        marginTop: 2,
-    },
-    centerButtonContainer: {
-        marginTop: -25,
+    centerButtonOuter: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#F7FCF8',
+        marginTop: -40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 6,
+        borderColor: '#F7FCF8',
+        ...THEME.shadows.small,
+        shadowRadius: 10,
+        shadowOpacity: 0.15,
     },
     centerButton: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-        shadowColor: '#7C3AED',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    centerGradient: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#98D8B1',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 3,
         borderColor: 'white',
     },
 });
+
