@@ -427,4 +427,27 @@ export const SalesService = {
         const updatedSales = sales.map(s => s.id === saleId ? { ...s, status } : s);
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
     },
+
+    deleteSale: async (id: string) => {
+        try {
+            if (isSupabaseConfigured()) {
+                const { error } = await supabase
+                    .from('sales')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+            }
+
+            // Also delete from local storage
+            const sales = await SalesService.getSales();
+            const updatedSales = sales.filter(s => s.id !== id);
+            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
+
+            return true;
+        } catch (error) {
+            console.error('Error deleting sale:', error);
+            throw error;
+        }
+    },
 };

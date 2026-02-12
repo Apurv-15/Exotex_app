@@ -12,10 +12,10 @@ export default function AnalyticsScreen() {
 
     React.useEffect(() => {
         SalesService.getAllSales().then(allSales => {
-            if (user?.role !== 'Admin') {
-                setSales(allSales.filter(s => s.branchId === user?.branchId));
-            } else {
+            if (user?.role === 'Super Admin' || !user?.branchId) {
                 setSales(allSales);
+            } else {
+                setSales(allSales.filter(s => s.branchId === user?.branchId));
             }
         });
     }, [user]);

@@ -108,6 +108,18 @@ export interface FieldVisit {
     followUpDate?: string;
     followUpNotes?: string;
 
+    // Residential Specific Fields
+    propertyType?: string;
+    tankCapacity?: string;
+    waterTDS?: string;
+    waterQualityIssues?: string[];
+    cleaningConcerns?: string[];
+    applianceIssues?: string[];
+    healthConcerns?: string[];
+    hasWaterPurifier?: boolean;
+    waterPurifierBrand?: string;
+    hasUsedSoftener?: boolean;
+
     // Metadata
     branchId: string;
     createdBy: string;
@@ -160,6 +172,16 @@ const dbToFieldVisit = (row: any): FieldVisit => ({
     createdBy: row.created_by,
     status: row.status,
     imageUrls: row.image_urls || [],
+    propertyType: row.property_type || '',
+    tankCapacity: row.tank_capacity || '',
+    waterTDS: row.water_tds || '',
+    waterQualityIssues: row.water_quality_issues || [],
+    cleaningConcerns: row.cleaning_concerns || [],
+    applianceIssues: row.appliance_issues || [],
+    healthConcerns: row.health_concerns || [],
+    hasWaterPurifier: row.has_water_purifier || false,
+    waterPurifierBrand: row.water_purifier_brand || '',
+    hasUsedSoftener: row.has_used_softener || false,
 });
 
 // Helper to convert FieldVisit object to DB row
@@ -197,6 +219,16 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
     created_by: visit.createdBy,
     status: visit.status,
     image_urls: visit.imageUrls || [],
+    property_type: visit.propertyType || null,
+    tank_capacity: visit.tankCapacity || null,
+    water_tds: visit.waterTDS || null,
+    water_quality_issues: visit.waterQualityIssues || [],
+    cleaning_concerns: visit.cleaningConcerns || [],
+    appliance_issues: visit.applianceIssues || [],
+    health_concerns: visit.healthConcerns || [],
+    has_water_purifier: visit.hasWaterPurifier || false,
+    water_purifier_brand: visit.waterPurifierBrand || null,
+    has_used_softener: visit.hasUsedSoftener || false,
 });
 
 export const FieldVisitService = {
@@ -525,5 +557,28 @@ export const FieldVisitService = {
         const visits = await FieldVisitService.getFieldVisits();
         const updatedVisits = visits.map(v => v.id === visitId ? { ...v, status } : v);
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
+    },
+
+    deleteFieldVisit: async (id: string) => {
+        try {
+            if (isSupabaseConfigured()) {
+                const { error } = await supabase
+                    .from('field_visits')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+            }
+
+            // Also delete from local storage
+            const visits = await FieldVisitService.getFieldVisits();
+            const updatedVisits = visits.filter(v => v.id !== id);
+            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
+
+            return true;
+        } catch (error) {
+            console.error('Error deleting field visit:', error);
+            throw error;
+        }
     },
 };

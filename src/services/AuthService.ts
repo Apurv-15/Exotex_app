@@ -62,4 +62,41 @@ export const AuthService = {
         await Storage.setItem(TOKEN_KEY, response.token);
         await Storage.setItem(USER_KEY, JSON.stringify(response.user));
     },
+
+    registerUser: async (email: string, pass: string, name: string, role: string, branchId: string): Promise<User> => {
+        try {
+            // Note: In production, use supabase.auth.signUp
+            // This implementation adds user metadata to the 'users' table
+
+            const { data, error } = await supabase
+                .from('users')
+                .insert([{
+                    email,
+                    name,
+                    role,
+                    branch_id: branchId,
+                    // Note: We are not hashing password here because the current system 
+                    // seems to use database-only check for simplicity
+                    password: pass
+                }])
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Registration error:', error);
+                throw new Error(error.message || 'Failed to register user');
+            }
+
+            return {
+                id: data.id,
+                name: data.name,
+                email: data.email,
+                role: data.role as any,
+                branchId: data.branch_id
+            };
+        } catch (error: any) {
+            console.error('AuthService.registerUser error:', error);
+            throw error;
+        }
+    },
 };

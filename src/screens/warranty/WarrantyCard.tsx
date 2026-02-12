@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Platform, Animated, ActivityIndicator, StatusBar, BackHandler } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Sale } from '../../services/SalesService';
+import { Sale, SalesService } from '../../services/SalesService';
 import { useAuth } from '../../context/AuthContext';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -72,7 +72,7 @@ export default function WarrantyCard() {
     }, []);
 
     const handleGoHome = () => {
-        if (user?.role === 'Admin') {
+        if (user?.role === 'Admin' || user?.role === 'Super Admin') {
             navigation.navigate('MainDashboard');
         } else {
             navigation.navigate('SubDashboard');
@@ -491,6 +491,33 @@ export default function WarrantyCard() {
         }
     };
 
+    const handleDelete = async () => {
+        Alert.alert(
+            'Delete Warranty',
+            'Are you sure you want to delete this warranty? This action cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await SalesService.deleteSale(sale.id);
+                            Alert.alert('Success', 'Warranty deleted successfully');
+                            handleGoHome();
+                        } catch (error) {
+                            console.error('Delete error:', error);
+                            Alert.alert('Error', 'Could not delete warranty');
+                        } finally {
+                            setLoading(true);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -590,7 +617,7 @@ export default function WarrantyCard() {
 
                     <View style={styles.validityBadge}>
                         <MaterialCommunityIcons name="history" size={16} color="#40916C" />
-                        <Text style={styles.validityText}>Valid for 1 year from purchase</Text>
+
                     </View>
                 </Animated.View>
 
@@ -643,6 +670,17 @@ export default function WarrantyCard() {
                                     {docxLoading ? 'Generating Word...' : 'Download Word (.docx)'}
                                 </Text>
                             </View>
+                        </Pressable>
+                    )}
+
+                    {user?.role === 'Super Admin' && (
+                        <Pressable
+                            style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.7 }]}
+                            onPress={handleDelete}
+                            disabled={loading}
+                        >
+                            <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
+                            <Text style={styles.deleteButtonText}>Delete Warranty</Text>
                         </Pressable>
                     )}
 
@@ -883,5 +921,20 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#94A3B8',
         fontWeight: '600',
+    },
+    deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        gap: 8,
+        marginTop: 8,
+        borderRadius: 12,
+        backgroundColor: '#FEF2F2',
+    },
+    deleteButtonText: {
+        fontSize: 14,
+        color: '#EF4444',
+        fontWeight: '700',
     },
 });

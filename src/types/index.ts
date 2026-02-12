@@ -1,4 +1,12 @@
-export type UserRole = 'Admin' | 'User';
+export type UserRole = 'Super Admin' | 'Admin' | 'User';
+
+export interface Stock {
+  id: string;
+  region: string;
+  modelName: string;
+  quantity: number;
+  updatedAt: string;
+}
 
 export interface User {
   id: string;
@@ -6,6 +14,7 @@ export interface User {
   email: string;
   role: UserRole;
   branchId?: string;
+  region?: string;
 }
 
 export interface AuthResponse {

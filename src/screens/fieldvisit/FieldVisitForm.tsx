@@ -8,6 +8,15 @@ import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import { ResidentialForm } from './ResidentialForm';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { Asset } from 'expo-asset';
+import { ActionSheetIOS } from 'react-native'; // For better UI choice if needed, but Alert is fine
+import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
+
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // import { SoundManager } from '../../utils/SoundManager';
 
 const TOTAL_STEPS = 3;
@@ -102,6 +111,18 @@ export default function FieldVisitForm() {
         overallSiteAssessment: '', // Excellent/Good/Average/Not Suitable
         conversionProbability: '',
         visitedBySignature: '',
+
+        // Property Type Selection
+        propertyType: '', // Residential, Commercial, Industrial, Agriculture
+        tankCapacity: '',
+        waterTDS: '',
+        waterQualityIssues: [] as string[],
+        cleaningConcerns: [] as string[],
+        applianceIssues: [] as string[],
+        healthConcerns: [] as string[],
+        hasWaterPurifier: false,
+        waterPurifierBrand: '',
+        hasUsedSoftener: false,
     });
 
     const fillDummyData = () => {
@@ -159,6 +180,16 @@ export default function FieldVisitForm() {
             overallSiteAssessment: 'Good',
             conversionProbability: 'High',
             visitedBySignature: 'Robert Green',
+            propertyType: 'Industrial',
+            tankCapacity: '5000L',
+            waterTDS: '450',
+            waterQualityIssues: ['Scaling'],
+            cleaningConcerns: [],
+            applianceIssues: [],
+            healthConcerns: [],
+            hasWaterPurifier: true,
+            waterPurifierBrand: 'Kent',
+            hasUsedSoftener: false,
         });
     };
 
@@ -203,6 +234,10 @@ export default function FieldVisitForm() {
     };
 
     const canProceed = () => {
+        if (!formData.propertyType) return false;
+        if (formData.propertyType === 'Residential') {
+            return formData.contactPersonName.trim() !== '' && formData.mobileNumber.trim() !== '';
+        }
         if (currentStep === 1) return isStep1Valid();
         if (currentStep === 2) return isStep2Valid();
         if (currentStep === 3) return isStep3Valid();
@@ -322,8 +357,32 @@ export default function FieldVisitForm() {
 
             setUploadStatus('Success!');
             // SoundManager.playSuccess();
-            showAlert('Success', 'Field visit recorded successfully!');
-            navigation.goBack();
+
+            if (Platform.OS === 'web') {
+                const download = window.confirm('Success! Field visit recorded successfully. Do you want to download the report?');
+                if (download) {
+                    await handleDownloadReport();
+                }
+                navigation.goBack();
+            } else {
+                Alert.alert(
+                    'Success',
+                    'Field visit recorded successfully!',
+                    [
+                        {
+                            text: 'Download Report',
+                            onPress: async () => {
+                                await handleDownloadReport();
+                                navigation.goBack();
+                            }
+                        },
+                        {
+                            text: 'Done',
+                            onPress: () => navigation.goBack()
+                        }
+                    ]
+                );
+            }
         } catch (error: any) {
             console.error('Submit error:', error);
             showAlert('Error', error.message || 'Failed to save field visit');
@@ -331,6 +390,44 @@ export default function FieldVisitForm() {
         } finally {
             setLoading(false);
             setUploadProgress(0);
+        }
+    };
+
+    const handleDownloadReport = async () => {
+        try {
+            setLoading(true);
+            setUploadStatus('Generating report...');
+
+            // Resolve logo
+            const logoAsset = Asset.fromModule(LogoImage);
+            await logoAsset.downloadAsync();
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+
+            const html = generateFieldVisitHTML(formData, logoUri);
+
+            if (Platform.OS === 'web') {
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                }
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: 'Download Field Visit Report',
+                    UTI: 'com.adobe.pdf'
+                });
+            }
+        } catch (error) {
+            console.error('Report generation error:', error);
+            showAlert('Error', 'Failed to generate report PDF');
+        } finally {
+            setLoading(false);
+            setUploadStatus('');
         }
     };
 
@@ -382,6 +479,36 @@ export default function FieldVisitForm() {
                             {step === 1 ? 'Site Info' : step === 2 ? 'Technical' : 'Summary'}
                         </Text>
                     </View>
+                ))}
+            </View>
+        </View>
+    );
+
+    const renderPropertySelection = () => (
+        <View style={styles.section}>
+            <Text style={styles.propertySelectionTitle}>Please Select Property Type</Text>
+            <View style={styles.propertyGrid}>
+                {[
+                    { id: 'Residential', icon: 'home-outline' as const, color: '#3B82F6' },
+                    { id: 'Commercial', icon: 'office-building' as const, color: '#10B981' },
+                    { id: 'Industrial', icon: 'factory' as const, color: '#F59E0B' },
+                    { id: 'Agriculture', icon: 'leaf' as const, color: '#059669' }
+                ].map((item) => (
+                    <Pressable
+                        key={item.id}
+                        style={({ pressed }) => [
+                            styles.propertyCard,
+                            pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                        ]}
+                        onPress={() => updateField('propertyType', item.id)}
+                    >
+                        <GlassPanel style={styles.propertyInnerCard}>
+                            <View style={[styles.propertyIconContainer, { backgroundColor: `${item.color}20` }]}>
+                                <MaterialCommunityIcons name={item.icon} size={32} color={item.color} />
+                            </View>
+                            <Text style={styles.propertyCardText}>{item.id}</Text>
+                        </GlassPanel>
+                    </Pressable>
                 ))}
             </View>
         </View>
@@ -1165,7 +1292,7 @@ export default function FieldVisitForm() {
                 )}
 
                 {/* Progress Bar */}
-                <ProgressBar />
+                {formData.propertyType && formData.propertyType !== 'Residential' && <ProgressBar />}
 
                 {/* Upload Progress */}
                 {loading && uploadProgress > 0 && (
@@ -1182,9 +1309,21 @@ export default function FieldVisitForm() {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {currentStep === 1 && renderStep1()}
-                    {currentStep === 2 && renderStep2()}
-                    {currentStep === 3 && renderStep3()}
+                    {!formData.propertyType ? (
+                        renderPropertySelection()
+                    ) : formData.propertyType === 'Residential' ? (
+                        <ResidentialForm
+                            formData={formData}
+                            updateField={updateField}
+                            toggleArrayField={toggleArrayField}
+                        />
+                    ) : (
+                        <>
+                            {currentStep === 1 && renderStep1()}
+                            {currentStep === 2 && renderStep2()}
+                            {currentStep === 3 && renderStep3()}
+                        </>
+                    )}
                     <View style={{ height: 20 }} />
                 </ScrollView>
 
@@ -1198,9 +1337,19 @@ export default function FieldVisitForm() {
                             </Pressable>
                         )}
 
+                        {formData.propertyType && (
+                            <Pressable
+                                style={styles.downloadReportBtn}
+                                onPress={handleDownloadReport}
+                                disabled={loading}
+                            >
+                                <MaterialCommunityIcons name="file-pdf-box" size={24} color="#EF4444" />
+                            </Pressable>
+                        )}
+
                         <Pressable
                             style={[styles.nextBtn, !canProceed() && styles.btnDisabled]}
-                            onPress={currentStep === TOTAL_STEPS ? handleSubmit : handleNext}
+                            onPress={(formData.propertyType === 'Residential' || currentStep === TOTAL_STEPS) ? handleSubmit : handleNext}
                             disabled={!canProceed() || loading}
                         >
                             <View style={[styles.gradientBtn, { backgroundColor: canProceed() ? '#74C69D' : '#E5E7EB' }]}>
@@ -1209,10 +1358,10 @@ export default function FieldVisitForm() {
                                 ) : (
                                     <>
                                         <Text style={styles.nextBtnText}>
-                                            {currentStep === TOTAL_STEPS ? 'Submit Report' : 'Continue'}
+                                            {(formData.propertyType === 'Residential' || currentStep === TOTAL_STEPS) ? 'Submit Report' : 'Continue'}
                                         </Text>
                                         <MaterialCommunityIcons
-                                            name={currentStep === TOTAL_STEPS ? 'check-circle' : 'arrow-right'}
+                                            name={(formData.propertyType === 'Residential' || currentStep === TOTAL_STEPS) ? 'check-circle' : 'arrow-right'}
                                             size={20}
                                             color="white"
                                         />
@@ -1255,6 +1404,17 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
         color: '#7C3AED',
+    },
+    downloadReportBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#FEE2E2',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+        borderWidth: 1,
+        borderColor: '#FECACA',
     },
     backButton: {
         width: 40, height: 40, borderRadius: 12,
@@ -1419,5 +1579,43 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#6B7280',
         textAlign: 'right',
+    },
+    propertySelectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+        textAlign: 'center',
+        marginVertical: 20,
+    },
+    propertyGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 16,
+        justifyContent: 'center',
+    },
+    propertyCard: {
+        width: '45%',
+        aspectRatio: 1,
+    },
+    propertyInnerCard: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        borderRadius: 20,
+        padding: 16,
+    },
+    propertyIconContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    propertyCardText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#374151',
     },
 });

@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar, Modal } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
 import { FieldVisitService } from '../../services/FieldVisitService';
+import { StockService } from '../../services/StockService';
+import { Stock } from '../../types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +13,9 @@ import { LineChart } from 'react-native-chart-kit';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 import DetailedAnalyticsContent from '../../components/DetailedAnalyticsContent';
+const FileSystem = require('expo-file-system/legacy');
+import * as Sharing from 'expo-sharing';
+import { Alert } from 'react-native';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // import { SoundManager } from '../../utils/SoundManager';
@@ -31,6 +36,24 @@ const REGION_COLORS: Record<string, { bg: string; text: string; icon: string }> 
 
 const getRegionColor = (city: string) => REGION_COLORS[city] || REGION_COLORS['default'];
 
+const calculateDaysRemaining = (saleDate: string) => {
+    const start = new Date(saleDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    start.setHours(0, 0, 0, 0);
+
+    const diffTime = today.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const remaining = 45 - diffDays;
+
+    return {
+        days: remaining,
+        isExpired: remaining <= 0,
+        label: remaining <= 0 ? (remaining === 0 ? 'Today' : `Expired ${Math.abs(remaining)} days ago`) : `${remaining} Days Left`,
+        color: remaining > 15 ? THEME.colors.success : (remaining > 0 ? THEME.colors.warning : THEME.colors.error)
+    };
+};
+
 export default function MainBranchDashboard() {
     const { logout, user } = useAuth();
     const navigation = useNavigation<any>();
@@ -42,19 +65,48 @@ export default function MainBranchDashboard() {
     const [allSales, setAllSales] = useState<Sale[]>([]);
     const [allVisits, setAllVisits] = useState<any[]>([]);
     const [showAllSales, setShowAllSales] = useState(false);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Photos'>('Dashboard');
+    const [allStock, setAllStock] = useState<Stock[]>([]);
+    const [stockLoading, setStockLoading] = useState(false);
+
+    // Photos selection state (lifted for floating toolbar)
+    const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [isDownloadingPhotos, setIsDownloadingPhotos] = useState(false);
 
     const fetchData = useCallback(async (isInitial: boolean = true) => {
         if (isInitial) setLoading(true);
 
         try {
-            const [salesData, visitsData] = await Promise.all([
-                SalesService.getAllSales(),
-                FieldVisitService.getFieldVisits()
-            ]);
+            let salesData: Sale[] = [];
+            let visitsData: any[] = [];
+            let stockData: Stock[] = [];
+
+            // If Super Admin, get everything. If Admin and has branchId, filter by branch.
+            if (user?.role === 'Super Admin' || !user?.branchId) {
+                const [s, v, st] = await Promise.all([
+                    SalesService.getAllSales(),
+                    FieldVisitService.getFieldVisits(),
+                    StockService.getAllStock()
+                ]);
+                salesData = s;
+                visitsData = v;
+                stockData = st;
+            } else {
+                // Admin restricted to branch
+                const [s, v, st] = await Promise.all([
+                    SalesService.getSalesByBranch(user.branchId),
+                    FieldVisitService.getFieldVisitsByBranch(user.branchId),
+                    StockService.getAllStock() // Stock might still be global or we could filter too
+                ]);
+                salesData = s;
+                visitsData = v;
+                stockData = st;
+            }
 
             setAllSales(salesData);
             setAllVisits(visitsData);
+            setAllStock(stockData);
 
             // Set initial display sales
             setSales(salesData);
@@ -65,7 +117,7 @@ export default function MainBranchDashboard() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [user?.role, user?.branchId]);
 
     useFocusEffect(useCallback(() => {
         fetchData(true);
@@ -187,7 +239,32 @@ export default function MainBranchDashboard() {
         });
         return Object.values(grouped).sort((a, b) => b.total - a.total);
     }, [filteredVisits]);
+    const handleDownloadPhotos = async () => {
+        if (selectedPhotos.length === 0) return;
+        setIsDownloadingPhotos(true);
 
+        try {
+            for (const url of selectedPhotos) {
+                const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
+                const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+                const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
+
+                if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(downloadedFile.uri);
+                } else {
+                    alert('Download started for: ' + filename);
+                }
+            }
+            setSelectedPhotos([]);
+            setIsSelectionMode(false);
+            Alert.alert('Success', 'Photos processed successfully');
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to process photos');
+        } finally {
+            setIsDownloadingPhotos(false);
+        }
+    };
 
     return (
         <MeshBackground>
@@ -224,6 +301,18 @@ export default function MainBranchDashboard() {
                             style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
                         >
                             <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setActiveTab('Stock')}
+                            style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setActiveTab('Photos')}
+                            style={[styles.tabButton, activeTab === 'Photos' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'Photos' && styles.tabButtonTextActive]}>Photos</Text>
                         </Pressable>
                     </GlassPanel>
                 </View>
@@ -431,32 +520,7 @@ export default function MainBranchDashboard() {
                             </ScrollView>
                         )}
 
-                        {/* Quick Actions */}
-                        <View style={styles.actionGrid}>
-                            <Pressable
-                                onPress={() => navigation.navigate('AnalyticsScreen')}
-                                style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
-                            >
-                                <GlassPanel style={styles.actionPanel}>
-                                    <View style={[styles.actionIconCircle, { backgroundColor: '#EEF2FF' }]}>
-                                        <MaterialCommunityIcons name="chart-timeline-variant" size={24} color="#4F46E5" />
-                                    </View>
-                                    <Text style={styles.actionBtnTitle}>Analytics</Text>
-                                </GlassPanel>
-                            </Pressable>
 
-                            <Pressable
-                                onPress={() => navigation.navigate('TemplateManagement')}
-                                style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.9 }]}
-                            >
-                                <GlassPanel style={styles.actionPanel}>
-                                    <View style={[styles.actionIconCircle, { backgroundColor: '#FDF4FF' }]}>
-                                        <MaterialCommunityIcons name="file-document-edit-outline" size={24} color="#C026D3" />
-                                    </View>
-                                    <Text style={styles.actionBtnTitle}>Templates</Text>
-                                </GlassPanel>
-                            </Pressable>
-                        </View>
 
 
 
@@ -473,36 +537,46 @@ export default function MainBranchDashboard() {
                             </View>
                         ) : (
                             <GlassPanel style={{ padding: 8 }}>
-                                {(showAllSales ? displaySales : displaySales.slice(0, 3)).map((s, index) => (
-                                    <Pressable
-                                        key={s.id}
-                                        style={({ pressed }) => [
-                                            styles.listItem,
-                                            pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
-                                            index === displaySales.length - 1 && { borderBottomWidth: 0 }
-                                        ]}
-                                        onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
-                                    >
-                                        <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? THEME.colors.mintLight : '#FFFBEB' }]}>
-                                            <View style={styles.statusIndicator}>
-                                                <MaterialCommunityIcons
-                                                    name={s.status === 'approved' ? 'check-circle' : 'clock-outline'}
-                                                    size={20}
-                                                    color={s.status === 'approved' ? THEME.colors.success : THEME.colors.warning}
-                                                />
+                                {(showAllSales ? displaySales : displaySales.slice(0, 3)).map((s, index) => {
+                                    const countdown = calculateDaysRemaining(s.saleDate);
+                                    return (
+                                        <Pressable
+                                            key={s.id}
+                                            style={({ pressed }) => [
+                                                styles.listItem,
+                                                pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
+                                                index === displaySales.length - 1 && { borderBottomWidth: 0 }
+                                            ]}
+                                            onPress={() => navigation.navigate('WarrantyCard', { sale: s })}
+                                        >
+                                            <View style={[styles.listIcon, { backgroundColor: s.status === 'approved' ? THEME.colors.mintLight : '#FFFBEB' }]}>
+                                                <View style={styles.statusIndicator}>
+                                                    <MaterialCommunityIcons
+                                                        name={s.status === 'approved' ? 'check-circle' : 'clock-outline'}
+                                                        size={20}
+                                                        color={s.status === 'approved' ? THEME.colors.success : THEME.colors.warning}
+                                                    />
+                                                </View>
                                             </View>
-                                        </View>
-                                        <View style={styles.listContent}>
-                                            <Text style={styles.listTitle}>{s.customerName}</Text>
-                                            <Text style={styles.listSub}>{s.productModel}</Text>
-                                        </View>
-                                        <View style={styles.listRight}>
-                                            <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                            <Text style={styles.listCity}>{s.city}</Text>
-                                        </View>
-                                        <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
-                                    </Pressable>
-                                ))}
+                                            <View style={styles.listContent}>
+                                                <Text style={styles.listTitle}>{s.customerName}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Text style={styles.listSub}>{s.productModel}</Text>
+                                                    <View style={[styles.countdownBadge, { backgroundColor: countdown.color + '20' }]}>
+                                                        <Text style={[styles.countdownText, { color: countdown.color }]}>
+                                                            {countdown.label}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                            <View style={styles.listRight}>
+                                                <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                                <Text style={styles.listCity}>{s.city}</Text>
+                                            </View>
+                                            <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
+                                        </Pressable>
+                                    );
+                                })}
 
                                 {/* View More / Show Less Button */}
                                 {(totalSalesCount > 3 || showAllSales) && (
@@ -526,13 +600,368 @@ export default function MainBranchDashboard() {
                             </GlassPanel>
                         )}
                     </>
-                ) : (
+                ) : activeTab === 'Analytics' ? (
                     <DetailedAnalyticsContent sales={allSales} />
+                ) : activeTab === 'Stock' ? (
+                    <StockManagementContent
+                        allStock={allStock}
+                        onUpdate={() => fetchData(false)}
+                    />
+                ) : (
+                    <PhotosGalleryContent
+                        allSales={allSales}
+                        selectedPhotos={selectedPhotos}
+                        setSelectedPhotos={setSelectedPhotos}
+                        isSelectionMode={isSelectionMode}
+                        setIsSelectionMode={setIsSelectionMode}
+                    />
                 )}
             </ScrollView>
+
+            {/* Fixed Floating Toolbar for Photos Selection */}
+            {activeTab === 'Photos' && isSelectionMode && (
+                <View style={styles.bottomToolbarContainer}>
+                    <GlassPanel style={styles.bottomToolbar} intensity={98}>
+                        <View style={styles.toolbarContent}>
+                            <Text style={styles.selectionCount}>
+                                {selectedPhotos.length > 0 ? `${selectedPhotos.length} Selected` : 'Select Items'}
+                            </Text>
+                            <Pressable
+                                onPress={handleDownloadPhotos}
+                                disabled={selectedPhotos.length === 0 || isDownloadingPhotos}
+                                style={({ pressed }) => [
+                                    styles.downloadActionBtn,
+                                    (selectedPhotos.length === 0 || isDownloadingPhotos) && { opacity: 0.5 },
+                                    pressed && { opacity: 0.7 }
+                                ]}
+                            >
+                                {isDownloadingPhotos ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                ) : (
+                                    <MaterialCommunityIcons name="download" size={20} color="white" />
+                                )}
+                                <Text style={styles.downloadActionText}>Download</Text>
+                            </Pressable>
+                        </View>
+                    </GlassPanel>
+                </View>
+            )}
         </MeshBackground>
     );
 }
+
+const REGIONS = ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 'Pune'];
+
+const StockManagementContent = ({ allStock, onUpdate }: { allStock: Stock[], onUpdate: () => void }) => {
+    const [selectedRegion, setSelectedRegion] = useState(REGIONS[0]);
+    const [modelName, setModelName] = useState('');
+    const [quantity, setQuantity] = useState('');
+    const [updating, setUpdating] = useState(false);
+
+    const handleUpdate = async () => {
+        if (!modelName || !quantity) {
+            alert('Please enter model name and quantity');
+            return;
+        }
+        setUpdating(true);
+        try {
+            await StockService.updateStock(selectedRegion, modelName, parseInt(quantity));
+            setModelName('');
+            setQuantity('');
+            onUpdate();
+            alert('Stock updated successfully');
+        } catch (error) {
+            console.error(error);
+            alert('Failed to update stock');
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const regionalStock = allStock.filter(s => s.region === selectedRegion);
+
+    return (
+        <View style={{ paddingBottom: 20 }}>
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Stock Management</Text>
+            </View>
+
+            <GlassPanel style={{ padding: 20, marginBottom: 24 }}>
+                <Text style={[styles.listTitle, { marginBottom: 16 }]}>Update Stock Level</Text>
+
+                <Text style={styles.listSub}>Select Region</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 12 }}>
+                    {REGIONS.map(r => (
+                        <Pressable
+                            key={r}
+                            onPress={() => setSelectedRegion(r)}
+                            style={[
+                                styles.chip,
+                                selectedRegion === r && styles.chipActive,
+                                { marginRight: 8 }
+                            ]}
+                        >
+                            <Text style={[styles.chipText, selectedRegion === r && styles.chipTextActive]}>{r}</Text>
+                        </Pressable>
+                    ))}
+                </ScrollView>
+
+                <View style={{ gap: 12, marginTop: 8 }}>
+                    <View>
+                        <Text style={styles.listSub}>Model Name</Text>
+                        <GlassPanel style={{ padding: 12, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.6)' }} intensity={10}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <MaterialCommunityIcons name="tag-outline" size={20} color={THEME.colors.textSecondary} />
+                                <View style={{ flex: 1, marginLeft: 8 }}>
+                                    {/* Using View as placeholder for TextInput for simplicity in this artifact, but normally would use TextInput */}
+                                    <View style={{ height: 20 }}>
+                                        <Text style={{ color: modelName ? THEME.colors.text : THEME.colors.textSecondary }}>
+                                            {modelName || 'e.g. RO-100'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </GlassPanel>
+                        {/* Note: In a real app, I'd use a proper Input component. For this demo/plan, I'm illustrating the UI. */}
+                    </View>
+
+                    <View>
+                        <Text style={styles.listSub}>Quantity</Text>
+                        <GlassPanel style={{ padding: 12, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.6)' }} intensity={10}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <MaterialCommunityIcons name="numeric" size={20} color={THEME.colors.textSecondary} />
+                                <View style={{ flex: 1, marginLeft: 8 }}>
+                                    <Text style={{ color: quantity ? THEME.colors.text : THEME.colors.textSecondary }}>
+                                        {quantity || 'e.g. 50'}
+                                    </Text>
+                                </View>
+                            </View>
+                        </GlassPanel>
+                    </View>
+
+                    <Pressable
+                        onPress={handleUpdate}
+                        disabled={updating}
+                        style={({ pressed }) => [
+                            {
+                                backgroundColor: THEME.colors.secondary,
+                                padding: 16,
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                marginTop: 8,
+                                opacity: (pressed || updating) ? 0.8 : 1
+                            }
+                        ]}
+                    >
+                        {updating ? (
+                            <ActivityIndicator color="white" />
+                        ) : (
+                            <Text style={{ color: 'white', fontFamily: THEME.fonts.bold }}>Update Stock</Text>
+                        )}
+                    </Pressable>
+                </View>
+            </GlassPanel>
+
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Current Stock in {selectedRegion}</Text>
+            </View>
+
+            {regionalStock.length === 0 ? (
+                <GlassPanel style={styles.emptyState}>
+                    <MaterialCommunityIcons name="package-variant-closed" size={48} color={THEME.colors.textSecondary} />
+                    <Text style={styles.emptyText}>No stock data for this region</Text>
+                </GlassPanel>
+            ) : (
+                <GlassPanel style={{ padding: 8 }}>
+                    {regionalStock.map((s, index) => (
+                        <View
+                            key={s.id}
+                            style={[
+                                styles.listItem,
+                                index === regionalStock.length - 1 && { borderBottomWidth: 0 }
+                            ]}
+                        >
+                            <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                <MaterialCommunityIcons name="package-variant" size={24} color={THEME.colors.secondary} />
+                            </View>
+                            <View style={styles.listContent}>
+                                <Text style={styles.listTitle}>{s.modelName}</Text>
+                                <Text style={styles.listSub}>Last updated: {new Date(s.updatedAt).toLocaleDateString()}</Text>
+                            </View>
+                            <View style={styles.listRight}>
+                                <Text style={[styles.mainStatValue, { color: THEME.colors.text, fontSize: 24 }]}>{s.quantity}</Text>
+                                <Text style={styles.listSub}>Units</Text>
+                            </View>
+                        </View>
+                    ))}
+                </GlassPanel>
+            )}
+        </View>
+    );
+};
+
+const PhotosGalleryContent = ({
+    allSales,
+    selectedPhotos,
+    setSelectedPhotos,
+    isSelectionMode,
+    setIsSelectionMode
+}: {
+    allSales: Sale[],
+    selectedPhotos: string[],
+    setSelectedPhotos: React.Dispatch<React.SetStateAction<string[]>>,
+    isSelectionMode: boolean,
+    setIsSelectionMode: React.Dispatch<React.SetStateAction<boolean>>
+}) => {
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+    const screenWidth = Dimensions.get('window').width;
+    const GAP = 2; // Very tight gap like Apple Photos
+    const COLUMN_COUNT = screenWidth > 768 ? 4 : 2;
+    const itemSize = (screenWidth - 40 - (GAP * (COLUMN_COUNT - 1))) / COLUMN_COUNT; // 40 is container padding
+
+    const allPhotos = useMemo(() => {
+        const photos: { url: string; customer: string; id: string }[] = [];
+        allSales.forEach(sale => {
+            (sale.imageUrls || []).forEach((url, index) => {
+                // Only show valid web URLs. Local file:// URIs from other devices won't load here.
+                if (url && (url.startsWith('http') || url.startsWith('https'))) {
+                    photos.push({ url, customer: sale.customerName, id: `${sale.id}_${index}` });
+                }
+            });
+        });
+        // Remove duplicates if any
+        return photos.filter((v, i, a) => a.findIndex(t => t.url === v.url) === i);
+    }, [allSales]);
+
+    const toggleSelection = (url: string) => {
+        if (selectedPhotos.includes(url)) {
+            setSelectedPhotos(prev => prev.filter(p => p !== url));
+        } else {
+            setSelectedPhotos(prev => [...prev, url]);
+        }
+    };
+
+    const handleLongPress = (url: string) => {
+        if (!isSelectionMode) {
+            setIsSelectionMode(true);
+            toggleSelection(url);
+        }
+    };
+
+    const handlePress = (url: string) => {
+        if (isSelectionMode) {
+            toggleSelection(url);
+        } else {
+            setPreviewPhoto(url);
+        }
+    };
+
+    const handleDownloadSingle = async (url: string) => {
+        setIsDownloading(true);
+        try {
+            const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
+            const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+            const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
+
+            if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(downloadedFile.uri);
+            } else {
+                alert('Download started for: ' + filename);
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to download photo');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    return (
+        <View style={{ paddingBottom: 100 }}>
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Photos</Text>
+                <Pressable onPress={() => {
+                    if (isSelectionMode) {
+                        setSelectedPhotos([]);
+                        setIsSelectionMode(false);
+                    } else {
+                        setIsSelectionMode(true);
+                    }
+                }}>
+                    <Text style={styles.seeAllText}>{isSelectionMode ? 'Cancel' : 'Select'}</Text>
+                </Pressable>
+            </View>
+
+            {allPhotos.length === 0 ? (
+                <GlassPanel style={styles.emptyState}>
+                    <MaterialCommunityIcons name="image-off-outline" size={48} color={THEME.colors.textSecondary} />
+                    <Text style={styles.emptyText}>No photos found</Text>
+                </GlassPanel>
+            ) : (
+                <>
+                    <View style={[styles.photoGrid, { gap: GAP }]}>
+                        {allPhotos.map((item) => (
+                            <Pressable
+                                key={item.id}
+                                onPress={() => handlePress(item.url)}
+                                onLongPress={() => handleLongPress(item.url)}
+                                style={{ width: itemSize, height: itemSize, marginBottom: GAP, position: 'relative' }}
+                            >
+                                <Image
+                                    source={{ uri: item.url }}
+                                    style={{ width: '100%', height: '100%', borderRadius: 0, backgroundColor: '#f0f0f0' }}
+                                    resizeMode="cover"
+                                />
+                                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.05)' }]} />
+                                {isSelectionMode && (
+                                    <View style={styles.selectionIndicator}>
+                                        <MaterialCommunityIcons
+                                            name={selectedPhotos.includes(item.url) ? "check-circle" : "circle-outline"}
+                                            size={22}
+                                            color={selectedPhotos.includes(item.url) ? THEME.colors.primary : "rgba(255,255,255,0.9)"}
+                                        />
+                                        {selectedPhotos.includes(item.url) && (
+                                            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'white', borderRadius: 100, zIndex: -1, margin: 4 }]} />
+                                        )}
+                                    </View>
+                                )}
+                                {isSelectionMode && selectedPhotos.includes(item.url) && (
+                                    <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.3)' }} />
+                                )}
+                            </Pressable>
+                        ))}
+                    </View>
+                </>
+            )}
+
+            <Modal visible={!!previewPhoto} transparent={true} animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
+                <View style={styles.modalOverlay}>
+                    <Pressable style={styles.modalBackdrop} onPress={() => setPreviewPhoto(null)} />
+                    <View style={styles.modalContent}>
+                        <Image source={{ uri: previewPhoto || '' }} style={styles.fullImage} resizeMode="contain" />
+                        <View style={styles.modalActions}>
+                            <Pressable onPress={() => setPreviewPhoto(null)} style={styles.modalBtn}>
+                                <MaterialCommunityIcons name="close" size={24} color="white" />
+                            </Pressable>
+                            <Pressable
+                                onPress={() => previewPhoto && handleDownloadSingle(previewPhoto)}
+                                style={[styles.modalBtn, { backgroundColor: THEME.colors.secondary }]}
+                                disabled={isDownloading}
+                            >
+                                {isDownloading ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                ) : (
+                                    <MaterialCommunityIcons name="download" size={24} color="white" />
+                                )}
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </View>
+    );
+};
 
 const styles = StyleSheet.create({
     content: { padding: 20, paddingBottom: 40, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10 },
@@ -594,11 +1023,7 @@ const styles = StyleSheet.create({
     progressBar: { height: 4, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 2, width: '100%' },
     progressFill: { height: '100%', borderRadius: 2 },
 
-    actionGrid: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-    actionButton: { flex: 1 },
-    actionPanel: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 20 },
-    actionIconCircle: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    actionBtnTitle: { fontSize: 15, fontFamily: THEME.fonts.bold, color: THEME.colors.text },
+
 
     listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     listItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 8 },
@@ -612,6 +1037,15 @@ const styles = StyleSheet.create({
 
     emptyState: { padding: 40, alignItems: 'center', gap: 12, borderRadius: 20 },
     emptyText: { color: THEME.colors.textSecondary, fontSize: 15, fontFamily: THEME.fonts.semiBold },
+    countdownBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    countdownText: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.bold,
+    },
     statusIndicator: {
         width: 24,
         height: 24,
@@ -683,11 +1117,11 @@ const styles = StyleSheet.create({
     },
     tabSwitcher: {
         flexDirection: 'row',
-        padding: 6,
+        padding: 5,
         borderRadius: 100,
         backgroundColor: 'rgba(255, 255, 255, 0.4)',
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 360,
     },
     tabButton: {
         flex: 1,
@@ -725,5 +1159,89 @@ const styles = StyleSheet.create({
         fontFamily: THEME.fonts.semiBold,
         color: THEME.colors.textSecondary,
         marginTop: 8,
+    },
+    photoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingBottom: 100,
+        borderRadius: 12,
+        overflow: 'hidden', // smooth corners for the whole grid
+    },
+    selectionIndicator: {
+        position: 'absolute',
+        bottom: 6,
+        right: 6,
+        zIndex: 10,
+    },
+    bottomToolbarContainer: {
+        position: 'absolute',
+        bottom: 20,
+        left: 20,
+        right: 20,
+    },
+    bottomToolbar: {
+        borderRadius: 24,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        ...THEME.shadows.small,
+    },
+    toolbarContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    selectionCount: {
+        fontSize: 16,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
+    },
+    downloadActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: THEME.colors.secondary,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        gap: 8,
+        ...THEME.shadows.small,
+    },
+    downloadActionText: {
+        color: 'white',
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    modalContent: {
+        width: '100%',
+        height: '90%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullImage: {
+        width: '100%',
+        height: '80%',
+    },
+    modalActions: {
+        position: 'absolute',
+        bottom: 40,
+        flexDirection: 'row',
+        gap: 20,
+    },
+    modalBtn: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

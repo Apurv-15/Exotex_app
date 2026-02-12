@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -13,8 +13,10 @@ import {
     Dimensions,
     Image,
     StatusBar,
+    Modal,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { AuthService } from '../../services/AuthService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../../components/GlassPanel';
@@ -28,6 +30,65 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const { login, loading } = useAuth();
+
+    // Registration Modal State
+    const [showRegister, setShowRegister] = useState(false);
+    const [registerEmail, setRegisterEmail] = useState('');
+    const [registerPassword, setRegisterPassword] = useState('');
+    const [registerName, setRegisterName] = useState('');
+    const [registerRole, setRegisterRole] = useState<'Super Admin' | 'Admin' | 'User'>('User');
+    const [registerBranch, setRegisterBranch] = useState('');
+    const [registerLoading, setRegisterLoading] = useState(false);
+
+    // Tap Secret Access
+    const tapCount = useRef(0);
+    const lastTap = useRef(0);
+
+    const handleSecretTap = () => {
+        const now = Date.now();
+        if (now - lastTap.current < 500) {
+            tapCount.current += 1;
+        } else {
+            tapCount.current = 1;
+        }
+        lastTap.current = now;
+
+        if (tapCount.current >= 6) {
+            setShowRegister(true);
+            tapCount.current = 0;
+        }
+    };
+
+    const handleRegister = async () => {
+        if (!registerEmail || !registerPassword || !registerName || !registerBranch) {
+            Alert.alert('Error', 'Please fill all fields for registration');
+            return;
+        }
+
+        setRegisterLoading(true);
+        try {
+            await AuthService.registerUser(
+                registerEmail,
+                registerPassword,
+                registerName,
+                registerRole,
+                registerBranch
+            );
+            Alert.alert('Success', 'Access created successfully. You can now login.');
+            setShowRegister(false);
+            // Preset the login email
+            setEmail(registerEmail);
+            // Clear fields
+            setRegisterEmail('');
+            setRegisterPassword('');
+            setRegisterName('');
+            setRegisterBranch('');
+        } catch (error: any) {
+            Alert.alert('Registration Failed', error.message || 'Error creating access');
+        } finally {
+            setRegisterLoading(false);
+        }
+    };
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -67,9 +128,6 @@ export default function LoginScreen() {
                 >
                     {/* Header Info (Mocking the design's top bar) */}
                     <View style={styles.topBar}>
-                        {/* We don't implement the status bar icons as they are system natively, 
-                            but we leave space or could implement if this was a non-native web mock.
-                            For React Native, we just let the content sit nicely. */}
                     </View>
 
                     {/* Branding */}
@@ -81,7 +139,9 @@ export default function LoginScreen() {
                                 resizeMode="contain"
                             />
                         </View>
-                        <Text style={styles.brandTitle}>EXOTEX SYSTEM</Text>
+                        <Pressable onPress={handleSecretTap}>
+                            <Text style={styles.brandTitle}>EXOTEX SYSTEM</Text>
+                        </Pressable>
                     </View>
 
                     {/* Login Card */}
@@ -90,7 +150,7 @@ export default function LoginScreen() {
                         <View style={styles.cardDecoration} />
 
                         <Text style={styles.cardTitle}>Sign In</Text>
-                        <Text style={styles.cardSubtitle}>Access your professional warranty dashboard</Text>
+
 
                         <View style={styles.form}>
                             {/* Email */}
@@ -192,6 +252,107 @@ export default function LoginScreen() {
 
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Secret Registration Modal */}
+            <Modal
+                visible={showRegister}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowRegister(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <GlassPanel style={styles.modalContent} intensity={80}>
+                        <Text style={styles.modalTitle}>Create Access</Text>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={styles.modalForm}>
+                                <View style={styles.modalInputGroup}>
+                                    <Text style={styles.modalLabel}>FULL NAME</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        value={registerName}
+                                        onChangeText={setRegisterName}
+                                        placeholder="Apurv Deshmukh"
+                                    />
+                                </View>
+
+                                <View style={styles.modalInputGroup}>
+                                    <Text style={styles.modalLabel}>GMAIL ADDRESS</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        value={registerEmail}
+                                        onChangeText={setRegisterEmail}
+                                        placeholder="user@gmail.com"
+                                        autoCapitalize="none"
+                                        keyboardType="email-address"
+                                    />
+                                </View>
+
+                                <View style={styles.modalInputGroup}>
+                                    <Text style={styles.modalLabel}>PASSWORD</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        value={registerPassword}
+                                        onChangeText={setRegisterPassword}
+                                        placeholder="••••••••"
+                                        secureTextEntry
+                                    />
+                                </View>
+
+                                <View style={styles.modalInputGroup}>
+                                    <Text style={styles.modalLabel}>BRANCH ID / NAME</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        value={registerBranch}
+                                        onChangeText={setRegisterBranch}
+                                        placeholder="Main Branch / Nashik"
+                                    />
+                                </View>
+
+                                <View style={styles.modalInputGroup}>
+                                    <Text style={styles.modalLabel}>SELECT ROLE</Text>
+                                    <View style={styles.roleSelector}>
+                                        {(['Super Admin', 'Admin', 'User'] as const).map(role => (
+                                            <Pressable
+                                                key={role}
+                                                style={[
+                                                    styles.roleChip,
+                                                    registerRole === role && styles.roleChipActive
+                                                ]}
+                                                onPress={() => setRegisterRole(role)}
+                                            >
+                                                <Text style={[
+                                                    styles.roleChipText,
+                                                    registerRole === role && styles.roleChipTextActive
+                                                ]}>{role}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                </View>
+
+                                <Pressable
+                                    style={styles.registerButton}
+                                    onPress={handleRegister}
+                                    disabled={registerLoading}
+                                >
+                                    {registerLoading ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <Text style={styles.registerButtonText}>Create Access</Text>
+                                    )}
+                                </Pressable>
+
+                                <Pressable
+                                    style={styles.closeButton}
+                                    onPress={() => setShowRegister(false)}
+                                >
+                                    <Text style={styles.closeButtonText}>Cancel</Text>
+                                </Pressable>
+                            </View>
+                        </ScrollView>
+                    </GlassPanel>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -438,5 +599,91 @@ const styles = StyleSheet.create({
         fontFamily: THEME.fonts.black,
         color: '#64748B',
         letterSpacing: 2,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    modalContent: {
+        borderRadius: 32,
+        padding: 24,
+        maxHeight: '80%',
+    },
+    modalTitle: {
+        fontSize: 24,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.text,
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    modalForm: {
+        gap: 16,
+    },
+    modalInputGroup: {
+        gap: 8,
+    },
+    modalLabel: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.textSecondary,
+        letterSpacing: 1.5,
+    },
+    modalInput: {
+        backgroundColor: 'rgba(255,255,255,0.6)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.8)',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 14,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.text,
+    },
+    roleSelector: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    roleChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 100,
+        backgroundColor: 'rgba(255,255,255,0.6)',
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+    },
+    roleChipActive: {
+        backgroundColor: THEME.colors.primary,
+        borderColor: THEME.colors.primary,
+    },
+    roleChipText: {
+        fontSize: 12,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+    },
+    roleChipTextActive: {
+        color: '#064E3B',
+    },
+    registerButton: {
+        backgroundColor: THEME.colors.secondary,
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        marginTop: 12,
+    },
+    registerButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontFamily: THEME.fonts.black,
+    },
+    closeButton: {
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        color: THEME.colors.textSecondary,
+        fontFamily: THEME.fonts.bold,
     },
 });

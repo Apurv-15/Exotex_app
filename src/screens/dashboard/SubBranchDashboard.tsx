@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
 import { FieldVisitService } from '../../services/FieldVisitService';
+import { StockService } from '../../services/StockService';
+import { Stock } from '../../types';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
@@ -15,6 +17,24 @@ import FloatingTabBar from '../../components/FloatingTabBar';
 
 const { width } = Dimensions.get('window');
 
+const calculateDaysRemaining = (saleDate: string) => {
+    const start = new Date(saleDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    start.setHours(0, 0, 0, 0);
+
+    const diffTime = today.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const remaining = 45 - diffDays;
+
+    return {
+        days: remaining,
+        isExpired: remaining <= 0,
+        label: remaining <= 0 ? (remaining === 0 ? 'Today' : `Expired ${Math.abs(remaining)} days ago`) : `${remaining} Days Left`,
+        color: remaining > 15 ? THEME.colors.success : (remaining > 0 ? THEME.colors.warning : THEME.colors.error)
+    };
+};
+
 export default function SubBranchDashboard() {
     const { logout, user } = useAuth();
     const navigation = useNavigation<any>();
@@ -23,6 +43,8 @@ export default function SubBranchDashboard() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [period, setPeriod] = useState<'Today' | '7d' | '30d' | '1y'>('7d');
+    const [branchStock, setBranchStock] = useState<Stock[]>([]);
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Stock'>('Dashboard');
 
     const fetchSales = useCallback(async () => {
         try {
@@ -32,6 +54,12 @@ export default function SubBranchDashboard() {
             // Fetch field visits
             const visits = await FieldVisitService.getFieldVisitsByBranch(user?.branchId || '');
             setFieldVisits(visits);
+
+            // Fetch regional stock
+            if (user?.region) {
+                const stock = await StockService.getStockByRegion(user.region);
+                setBranchStock(stock);
+            }
         } catch (error) {
             console.error(error);
         } finally {
@@ -244,8 +272,6 @@ export default function SubBranchDashboard() {
                         ]}
                     >
                         <View style={styles.avatar}>
-                            {/* Placeholder for user image if available, else initial */}
-                            {/* <Image source={{ uri: '...' }} style={styles.avatarImg} /> */}
                             <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
                             <View style={styles.onlineBadge} />
                         </View>
@@ -259,8 +285,23 @@ export default function SubBranchDashboard() {
                     </GlassPanel>
                 </View>
 
-                {/* Header Subtitle Card */}
-                <View style={{ marginBottom: 16 }} />
+                {/* Tab Switcher */}
+                <View style={[styles.tabContainer, { marginBottom: 20 }]}>
+                    <GlassPanel style={styles.tabSwitcher} intensity={30}>
+                        <Pressable
+                            onPress={() => setActiveTab('Dashboard')}
+                            style={[styles.tabButton, activeTab === 'Dashboard' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setActiveTab('Stock')}
+                            style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
+                        </Pressable>
+                    </GlassPanel>
+                </View>
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
@@ -269,7 +310,7 @@ export default function SubBranchDashboard() {
                             <Text style={styles.loadingText}>Loading your data...</Text>
                         </GlassPanel>
                     </View>
-                ) : (
+                ) : activeTab === 'Dashboard' ? (
                     <>
                         {/* Total Sales Graph Card */}
                         <GlassPanel style={styles.graphCard}>
@@ -421,30 +462,42 @@ export default function SubBranchDashboard() {
                                     <Text style={styles.emptyText}>No warranties yet</Text>
                                 </View>
                             ) : (
-                                sales.filter(s => s.warrantyId).slice(0, 3).map(item => (
-                                    <Pressable
-                                        key={item.id}
-                                        style={styles.listItem}
-                                        onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
-                                    >
-                                        <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
-                                            <MaterialIcons name="verified-user" size={20} color={THEME.colors.success} />
-                                        </View>
-                                        <View style={styles.listInfo}>
-                                            <Text style={styles.listTitle}>{item.productModel}</Text>
-                                            <Text style={styles.listSub}>{item.customerName} • {item.city}</Text>
-                                        </View>
-                                        <View style={styles.listAmount}>
-                                            <Text style={styles.amountText}>{item.warrantyId}</Text>
-                                            <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                        </View>
-                                    </Pressable>
-                                ))
+                                sales.filter(s => s.warrantyId).slice(0, 3).map(item => {
+                                    const countdown = calculateDaysRemaining(item.saleDate);
+                                    return (
+                                        <Pressable
+                                            key={item.id}
+                                            style={styles.listItem}
+                                            onPress={() => navigation.navigate('WarrantyCard', { sale: item })}
+                                        >
+                                            <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                                <MaterialIcons name="verified-user" size={20} color={THEME.colors.success} />
+                                            </View>
+                                            <View style={styles.listInfo}>
+                                                <Text style={styles.listTitle}>{item.productModel}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Text style={styles.listSub}>{item.customerName} • {item.city}</Text>
+                                                    <View style={[styles.countdownBadge, { backgroundColor: countdown.color + '20' }]}>
+                                                        <Text style={[styles.countdownText, { color: countdown.color }]}>
+                                                            {countdown.label}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                            <View style={styles.listAmount}>
+                                                <Text style={styles.amountText}>{item.warrantyId}</Text>
+                                                <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                            </View>
+                                        </Pressable>
+                                    );
+                                })
                             )}
                         </GlassPanel>
 
                         <View style={{ height: 100 }} />
                     </>
+                ) : (
+                    <StockViewContent branchStock={branchStock} userRegion={user?.region} />
                 )}
             </ScrollView>
 
@@ -762,6 +815,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 16,
     },
+    countdownBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    countdownText: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.bold,
+    },
     listInfo: {
         flex: 1,
     },
@@ -819,4 +881,75 @@ const styles = StyleSheet.create({
         color: THEME.colors.textSecondary,
         marginTop: 8,
     },
+    tabContainer: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    tabSwitcher: {
+        flexDirection: 'row',
+        padding: 6,
+        borderRadius: 100,
+        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+        width: '100%',
+        maxWidth: 320,
+    },
+    tabButton: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 100,
+    },
+    tabButtonActive: {
+        backgroundColor: '#FFFFFF',
+        ...THEME.shadows.small,
+    },
+    tabButtonText: {
+        fontSize: 15,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.textSecondary,
+    },
+    tabButtonTextActive: {
+        color: THEME.colors.text,
+    },
 });
+
+const StockViewContent = ({ branchStock, userRegion }: { branchStock: Stock[], userRegion?: string }) => {
+    return (
+        <View style={{ paddingBottom: 20 }}>
+            <View style={styles.recentHeader}>
+                <Text style={styles.sectionTitle}>Current Stock ({userRegion || 'No Region'})</Text>
+            </View>
+
+            {branchStock.length === 0 ? (
+                <GlassPanel style={styles.emptyState}>
+                    <MaterialCommunityIcons name="package-variant-closed" size={48} color={THEME.colors.textSecondary} />
+                    <Text style={styles.emptyText}>No stock data available</Text>
+                </GlassPanel>
+            ) : (
+                <GlassPanel style={styles.listContainer}>
+                    {branchStock.map((s, index) => (
+                        <View
+                            key={s.id}
+                            style={[
+                                styles.listItem,
+                                index === branchStock.length - 1 && { borderBottomWidth: 0 }
+                            ]}
+                        >
+                            <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                <MaterialCommunityIcons name="package-variant" size={24} color={THEME.colors.secondary} />
+                            </View>
+                            <View style={styles.listInfo}>
+                                <Text style={styles.listTitle}>{s.modelName}</Text>
+                                <Text style={styles.listSub}>Last updated: {new Date(s.updatedAt).toLocaleDateString()}</Text>
+                            </View>
+                            <View style={styles.listAmount}>
+                                <Text style={[styles.amountText, { fontSize: 24, color: THEME.colors.text }]}>{s.quantity}</Text>
+                                <Text style={styles.dateText}>Units</Text>
+                            </View>
+                        </View>
+                    ))}
+                </GlassPanel>
+            )}
+        </View>
+    );
+};

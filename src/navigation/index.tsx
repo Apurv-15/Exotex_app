@@ -45,7 +45,7 @@ function AdminStack() {
             <Stack.Screen
                 name="WarrantyCard"
                 component={WarrantyCard}
-                options={{ title: 'Sale Details', headerBackTitle: 'Back' }}
+                options={{ headerShown: false }}
             />
         </Stack.Navigator>
     );
@@ -98,7 +98,7 @@ export default function RootNavigator() {
     return (
         <NavigationContainer>
             {user ? (
-                user.role === 'Admin' ? <AdminStack /> : <UserStack />
+                (user.role === 'Admin' || user.role === 'Super Admin') ? <AdminStack /> : <UserStack />
             ) : (
                 <AuthStack />
             )}
