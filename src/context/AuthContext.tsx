@@ -1,12 +1,16 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback, useMemo } from 'react';
 import { User, AuthResponse } from '../types';
 import { AuthService } from '../services/AuthService';
+import { supabase } from '../config/supabase';
 
 interface AuthContextData {
     user: User | null;
     loading: boolean;
     login: (email: string, pass: string) => Promise<void>;
     logout: () => Promise<void>;
+    updateProfile: (updates: { name?: string, region?: string }) => Promise<void>;
+    updatePassword: (newPassword: string) => Promise<void>;
+    refreshProfile: () => Promise<User | null>;
     isLoadingStorage: boolean;
 }
 
@@ -18,35 +22,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [isLoadingStorage, setIsLoadingStorage] = useState<boolean>(true);
 
     useEffect(() => {
-        loadStorageData();
+        // Initial session check
+        const initAuth = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    const profile = await AuthService.getUser();
+                    if (profile) setUser(profile);
+                }
+            } catch (err) {
+                console.log('Initial auth check failed', err);
+            } finally {
+                setIsLoadingStorage(false);
+            }
+        };
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth State Changed:', event);
+            if (session?.user) {
+                const profile = await AuthService.getUser();
+                setUser(profile);
+            } else {
+                setUser(null);
+            }
+            setIsLoadingStorage(false);
+        });
+
+        initAuth();
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
+    // Helper to load profile data manually if needed (already handled by listener)
     async function loadStorageData() {
-        try {
-            // Add timeout to prevent hanging
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Storage load timeout')), 5000)
-            );
-
-            const loadPromise = (async () => {
-                const storedUser = await AuthService.getUser();
-                const token = await AuthService.getToken();
-
-                if (storedUser && token) {
-                    setUser(storedUser);
-                }
-            })();
-
-            await Promise.race([loadPromise, timeoutPromise]);
-        } catch (error) {
-            console.log('Failed to load auth data', error);
-            // Continue anyway - user can log in
-        } finally {
-            setIsLoadingStorage(false);
-        }
+        setIsLoadingStorage(true);
+        const profile = await AuthService.getUser();
+        setUser(profile);
+        setIsLoadingStorage(false);
     }
 
-    async function login(email: string, pass: string) {
+    const login = useCallback(async (email: string, pass: string) => {
         setLoading(true);
         try {
             const response = await AuthService.login(email, pass);
@@ -57,15 +75,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } finally {
             setLoading(false);
         }
-    }
+    }, []);
 
-    async function logout() {
+    const logout = useCallback(async () => {
         await AuthService.logout();
         setUser(null);
-    }
+    }, []);
+
+    const updateProfile = useCallback(async (updates: { name?: string, region?: string }) => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            await AuthService.updateProfile(user.id, user.email, updates);
+            // Refresh user data
+            const updatedUser = await AuthService.getUser();
+            setUser(updatedUser);
+        } catch (error) {
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
+    const updatePassword = useCallback(async (newPassword: string) => {
+        setLoading(true);
+        try {
+            await AuthService.updatePassword(newPassword);
+        } catch (error) {
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const refreshProfile = useCallback(async () => {
+        const profile = await AuthService.getUser();
+        if (profile) setUser(profile);
+        return profile;
+    }, []);
+
+    const contextValue = useMemo(() => ({
+        user,
+        loading,
+        login,
+        logout,
+        updateProfile,
+        updatePassword,
+        refreshProfile,
+        isLoadingStorage
+    }), [user, loading, login, logout, updateProfile, updatePassword, refreshProfile, isLoadingStorage]);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, isLoadingStorage }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );
