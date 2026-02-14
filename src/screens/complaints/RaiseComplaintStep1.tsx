@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator, Keyboard, Alert, Platform, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
 import { SalesService, Sale } from '../../services/SalesService';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../../components/GlassPanel';
@@ -9,6 +10,7 @@ import MeshBackground from '../../components/MeshBackground';
 
 const RaiseComplaintStep1 = () => {
     const navigation = useNavigation<any>();
+    const { user } = useAuth();
     const [invoiceNo, setInvoiceNo] = useState('');
     const [loading, setLoading] = useState(false);
     const [clientData, setClientData] = useState<Sale | null>(null);
@@ -56,12 +58,18 @@ const RaiseComplaintStep1 = () => {
         }
     };
 
-    return (
-        <View style={styles.container}>
-            <MeshBackground />
+    const handleExit = () => {
+        if (user?.role === 'Admin' || user?.role === 'Super Admin') {
+            navigation.navigate('MainDashboard');
+        } else {
+            navigation.navigate('SubDashboard');
+        }
+    };
 
+    return (
+        <MeshBackground>
             <View style={styles.header}>
-                <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+                <Pressable onPress={handleExit} style={styles.backBtn}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color={THEME.colors.text} />
                 </Pressable>
                 <Text style={styles.headerTitle}>Raise Complaint</Text>
@@ -77,6 +85,7 @@ const RaiseComplaintStep1 = () => {
                         <TextInput
                             style={styles.input}
                             placeholder="Enter Warranty ID (e.g. WAR-...)"
+                            placeholderTextColor="#9CA3AF"
                             value={invoiceNo}
                             onChangeText={handleTextChange}
                             autoCapitalize="characters"
@@ -140,7 +149,7 @@ const RaiseComplaintStep1 = () => {
                     </GlassPanel>
                 )}
             </ScrollView>
-        </View>
+        </MeshBackground>
     );
 };
 

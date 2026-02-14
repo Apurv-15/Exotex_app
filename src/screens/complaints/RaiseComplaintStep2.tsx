@@ -3,12 +3,19 @@ import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndic
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { Asset } from 'expo-asset';
 import { THEME } from '../../constants/theme';
 import { ComplaintService, Complaint } from '../../services/ComplaintService';
 import { SalesService } from '../../services/SalesService';
 import { useAuth } from '../../context/AuthContext';
 import GlassPanel from '../../components/GlassPanel';
 import MeshBackground from '../../components/MeshBackground';
+import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
+
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 
 const CATEGORIES = ['Billing', 'Service', 'Delay', 'Technical', 'Other'];
 const STATUSES = ['Open', 'In Progress', 'Resolved', 'Closed'];
@@ -20,23 +27,26 @@ export default function RaiseComplaintStep2() {
     const { clientData } = route.params;
 
     const [loading, setLoading] = useState(false);
-    const [complaintId] = useState(`CMP-${Math.floor(100000 + Math.random() * 900000)}`);
+    const [isEditMode] = useState(!!route.params.complaint);
+    const [complaintId, setComplaintId] = useState(
+        route.params.complaint?.complaintId || `CMP-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`
+    );
 
     const [formData, setFormData] = useState({
-        category: 'Service' as any,
-        description: '',
-        dept: '',
-        officer: '',
-        actionTaken: '',
-        status: 'Open' as any,
-        confirmation: 'No' as 'Yes' | 'No',
-        feedback: '',
-        resolvedBy: '',
-        designation: '',
-        warrantyAttached: false
+        category: route.params.complaint?.category || 'Service' as any,
+        description: route.params.complaint?.description || '',
+        dept: route.params.complaint?.assignedDepartment || '',
+        officer: route.params.complaint?.assignedOfficer || '',
+        actionTaken: route.params.complaint?.actionTaken || '',
+        status: route.params.complaint?.status || 'Open' as any,
+        confirmation: route.params.complaint?.clientConfirmation || 'No' as 'Yes' | 'No',
+        feedback: route.params.complaint?.clientFeedback || '',
+        resolvedBy: route.params.complaint?.resolvedByName || '',
+        designation: route.params.complaint?.resolvedByDesignation || '',
+        warrantyAttached: route.params.complaint?.warrantyCardAttached || false
     });
 
-    const [imageUris, setImageUris] = useState<string[]>([]);
+    const [imageUris, setImageUris] = useState<string[]>(route.params.complaint?.imageUrls || []);
     const [uploading, setUploading] = useState(false);
 
     const handlePickImage = async () => {
@@ -139,14 +149,20 @@ export default function RaiseComplaintStep2() {
         setLoading(true);
         setUploading(true);
         try {
-            // Upload images first
+            // Upload only local uris (ones that don't start with http/https)
             let uploadedUrls: string[] = [];
-            if (imageUris.length > 0) {
-                uploadedUrls = await Promise.all(
-                    imageUris.map((uri, index) =>
-                        ComplaintService.uploadImage(uri, complaintId, index)
+            const localUris = imageUris.filter(uri => !uri.startsWith('http'));
+            const existingUrls = imageUris.filter(uri => uri.startsWith('http'));
+
+            if (localUris.length > 0) {
+                const newUrls = await Promise.all(
+                    localUris.map((uri, index) =>
+                        ComplaintService.uploadImage(uri, complaintId, existingUrls.length + index)
                     )
                 );
+                uploadedUrls = [...existingUrls, ...newUrls];
+            } else {
+                uploadedUrls = existingUrls;
             }
 
             const complaint: Complaint = {
@@ -157,7 +173,7 @@ export default function RaiseComplaintStep2() {
                 customerEmail: clientData.email,
                 category: formData.category,
                 description: formData.description,
-                dateOfComplaint: new Date().toISOString().split('T')[0],
+                dateOfComplaint: route.params.complaint?.dateOfComplaint || new Date().toISOString().split('T')[0],
                 assignedDepartment: formData.dept,
                 assignedOfficer: formData.officer,
                 actionTaken: formData.actionTaken,
@@ -172,16 +188,88 @@ export default function RaiseComplaintStep2() {
                 city: clientData.city
             };
 
-            await ComplaintService.createComplaint(complaint);
-            Alert.alert('Success', 'Complaint has been registered successfully.', [
-                { text: 'OK', onPress: () => navigation.popToTop() }
-            ]);
+            if (isEditMode) {
+                await ComplaintService.updateComplaint(complaintId, complaint);
+                navigation.navigate('ComplaintSuccess', { complaint });
+            } else {
+                try {
+                    await ComplaintService.createComplaint(complaint);
+                    navigation.navigate('ComplaintSuccess', { complaint });
+                } catch (err: any) {
+                    if (err.code === '23505') {
+                        // Handle duplicate key by suggesting a new ID or just regenerating it
+                        const newId = `CMP-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`;
+                        setComplaintId(newId);
+                        Alert.alert('Duplicate ID', 'The generated ID was already in use. We have updated the ID, please try submitting again.');
+                    } else {
+                        throw err;
+                    }
+                }
+            }
         } catch (error) {
             console.error('Submit error:', error);
-            Alert.alert('Error', 'Failed to submit complaint.');
+            Alert.alert('Error', 'Failed to save complaint.');
         } finally {
             setLoading(false);
             setUploading(false);
+        }
+    };
+
+    const handleDownloadReport = async (complaintData?: Complaint) => {
+        try {
+            setLoading(true);
+
+            // Resolve logo
+            const logoAsset = Asset.fromModule(LogoImage);
+            await logoAsset.downloadAsync();
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+
+            const complaintToPrint = complaintData || {
+                complaintId,
+                invoiceNo: clientData.invoiceNumber,
+                customerName: clientData.customerName,
+                customerPhone: clientData.phone,
+                customerEmail: clientData.email,
+                category: formData.category,
+                description: formData.description,
+                dateOfComplaint: route.params.complaint?.dateOfComplaint || new Date().toISOString().split('T')[0],
+                assignedDepartment: formData.dept,
+                assignedOfficer: formData.officer,
+                actionTaken: formData.actionTaken,
+                status: formData.status,
+                clientConfirmation: formData.confirmation,
+                clientFeedback: formData.feedback,
+                resolvedByName: formData.resolvedBy,
+                resolvedByDesignation: formData.designation,
+                imageUrls: imageUris,
+                warrantyCardAttached: formData.warrantyAttached,
+                city: clientData.city
+            };
+
+            const html = generateComplaintPDFHTML(complaintToPrint, logoUri);
+
+            if (Platform.OS === 'web') {
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                }
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: 'Download Complaint Report',
+                    UTI: 'com.adobe.pdf'
+                });
+            }
+        } catch (error) {
+            console.error('Report generation error:', error);
+            Alert.alert('Error', 'Failed to generate report PDF');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -199,21 +287,10 @@ export default function RaiseComplaintStep2() {
     );
 
     return (
-        <View style={styles.container}>
-            <MeshBackground />
+        <MeshBackground>
             {renderHeader()}
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Test Autofill Button */}
-                <Pressable onPress={handleAutofill} style={{ alignSelf: 'center', marginBottom: 15, padding: 8, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
-                    <Text style={{ color: THEME.colors.primary, fontSize: 12, fontFamily: THEME.fonts.bold }}>⚡ Auto-fill Form (Test)</Text>
-                </Pressable>
-
-                <GlassPanel style={styles.section}>
-                    <Text style={styles.sectionTitle}>Complaint ID</Text>
-                    <Text style={styles.complaintIdText}>{complaintId}</Text>
-                </GlassPanel>
-
                 <GlassPanel style={styles.section}>
                     <Text style={styles.label}>Complaint Category</Text>
                     <View style={styles.pickerRow}>
@@ -232,37 +309,44 @@ export default function RaiseComplaintStep2() {
                     <TextInput
                         style={[styles.input, styles.textArea]}
                         multiline
-                        numberOfLines={4}
+                        numberOfLines={3}
                         placeholder="Detail the client's concern..."
+                        placeholderTextColor="#9CA3AF"
                         value={formData.description}
                         onChangeText={(t) => setFormData({ ...formData, description: t })}
                     />
                 </GlassPanel>
 
                 <GlassPanel style={styles.section}>
-                    <Text style={styles.label}>Assigned Department</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="e.g. Technical Support"
-                        value={formData.dept}
-                        onChangeText={(t) => setFormData({ ...formData, dept: t })}
-                    />
+                    <View style={styles.inputRow}>
+                        <View style={{ flex: 1, marginRight: 10 }}>
+                            <Text style={styles.label}>Department</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g. Support"
+                                placeholderTextColor="#9CA3AF"
+                                value={formData.dept}
+                                onChangeText={(t) => setFormData({ ...formData, dept: t })}
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.label}>Officer</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Name"
+                                placeholderTextColor="#9CA3AF"
+                                value={formData.officer}
+                                onChangeText={(t) => setFormData({ ...formData, officer: t })}
+                            />
+                        </View>
+                    </View>
 
-                    <Text style={styles.label}>Assigned Officer</Text>
+                    <Text style={styles.label}>Action Taken / Resolution</Text>
                     <TextInput
-                        style={styles.input}
-                        placeholder="Officer Name"
-                        value={formData.officer}
-                        onChangeText={(t) => setFormData({ ...formData, officer: t })}
-                    />
-                </GlassPanel>
-
-                <GlassPanel style={styles.section}>
-                    <Text style={styles.label}>Action Taken / Resolution Details</Text>
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
+                        style={[styles.input, styles.textArea, { height: 60, minHeight: 60 }]}
                         multiline
-                        placeholder="What was done to resolve this?"
+                        placeholder="Resolution details..."
+                        placeholderTextColor="#9CA3AF"
                         value={formData.actionTaken}
                         onChangeText={(t) => setFormData({ ...formData, actionTaken: t })}
                     />
@@ -282,33 +366,39 @@ export default function RaiseComplaintStep2() {
                 </GlassPanel>
 
                 <GlassPanel style={styles.section}>
-                    <Text style={styles.sectionTitle}>Client Confirmation</Text>
-                    <View style={styles.confirmationRow}>
-                        <Pressable
-                            style={[styles.confirmBtn, formData.confirmation === 'Yes' && styles.confirmBtnYes]}
-                            onPress={() => setFormData({ ...formData, confirmation: 'Yes' })}
-                        >
-                            <Text style={[styles.confirmBtnText, formData.confirmation === 'Yes' && { color: 'white' }]}>Yes</Text>
-                        </Pressable>
-                        <Pressable
-                            style={[styles.confirmBtn, formData.confirmation === 'No' && styles.confirmBtnNo]}
-                            onPress={() => setFormData({ ...formData, confirmation: 'No' })}
-                        >
-                            <Text style={[styles.confirmBtnText, formData.confirmation === 'No' && { color: 'white' }]}>No</Text>
-                        </Pressable>
+                    <View style={styles.inputRow}>
+                        <View style={{ flex: 1.5, marginRight: 10 }}>
+                            <Text style={styles.label}>Confirmed?</Text>
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                                <Pressable
+                                    style={[styles.confirmBtn, formData.confirmation === 'Yes' && styles.confirmBtnYes]}
+                                    onPress={() => setFormData({ ...formData, confirmation: 'Yes' })}
+                                >
+                                    <Text style={[styles.confirmBtnText, formData.confirmation === 'Yes' && { color: 'white' }]}>Yes</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.confirmBtn, formData.confirmation === 'No' && styles.confirmBtnNo]}
+                                    onPress={() => setFormData({ ...formData, confirmation: 'No' })}
+                                >
+                                    <Text style={[styles.confirmBtnText, formData.confirmation === 'No' && { color: 'white' }]}>No</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                        <View style={{ flex: 2 }}>
+                            <Text style={styles.label}>Client Feedback</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Remarks..."
+                                placeholderTextColor="#9CA3AF"
+                                value={formData.feedback}
+                                onChangeText={(t) => setFormData({ ...formData, feedback: t })}
+                            />
+                        </View>
                     </View>
-
-                    <Text style={styles.label}>Client Feedback / Remarks</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Client's thoughts..."
-                        value={formData.feedback}
-                        onChangeText={(t) => setFormData({ ...formData, feedback: t })}
-                    />
                 </GlassPanel>
 
                 <GlassPanel style={styles.section}>
-                    <Text style={styles.sectionTitle}>Supporting Documents</Text>
+                    <Text style={styles.sectionTitleCompact}>Supporting Documents</Text>
 
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
                         {imageUris.map((uri, index) => (
@@ -329,31 +419,31 @@ export default function RaiseComplaintStep2() {
                                     <ActivityIndicator color={THEME.colors.primary} />
                                 ) : (
                                     <>
-                                        <MaterialCommunityIcons name="camera-plus" size={32} color={THEME.colors.primary} />
-                                        <Text style={styles.uploadText}>ADD PHOTO</Text>
+                                        <MaterialCommunityIcons name="camera-plus" size={24} color={THEME.colors.primary} />
+                                        <Text style={styles.uploadText}>ADD</Text>
                                     </>
                                 )}
                             </Pressable>
                         )}
                     </ScrollView>
 
-                    <View style={styles.switchRow}>
-                        <Text style={styles.label}>Warranty Card Attached?</Text>
+                    <View style={styles.switchRowCompact}>
+                        <Text style={styles.labelCompact}>Warranty Card Attached?</Text>
                         <Pressable
                             onPress={() => setFormData({ ...formData, warrantyAttached: !formData.warrantyAttached })}
                         >
                             <MaterialCommunityIcons
                                 name={formData.warrantyAttached ? "checkbox-marked" : "checkbox-blank-outline"}
-                                size={28}
+                                size={24}
                                 color={THEME.colors.primary}
                             />
                         </Pressable>
                     </View>
                 </GlassPanel>
 
-                <View style={styles.declaration}>
-                    <MaterialCommunityIcons name="information-outline" size={18} color={THEME.colors.textSecondary} />
-                    <Text style={styles.declarationText}>I confirm that the information provided in this form is accurate to the best of my knowledge.</Text>
+                <View style={styles.declarationCompact}>
+                    <MaterialCommunityIcons name="information-outline" size={16} color={THEME.colors.textSecondary} />
+                    <Text style={styles.declarationTextCompact}>Information provided is accurate to my knowledge.</Text>
                 </View>
 
                 <Pressable
@@ -364,13 +454,13 @@ export default function RaiseComplaintStep2() {
                     {loading ? (
                         <ActivityIndicator color="black" />
                     ) : (
-                        <Text style={styles.submitBtnText}>Submit Complaint Record</Text>
+                        <Text style={styles.submitBtnText}>{isEditMode ? 'Update Record' : 'Submit Record'}</Text>
                     )}
                 </Pressable>
 
-                <View style={{ height: 40 }} />
+                <View style={{ height: 30 }} />
             </ScrollView>
-        </View>
+        </MeshBackground>
     );
 }
 
@@ -379,56 +469,59 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingTop: 60,
+        paddingTop: Platform.OS === 'ios' ? 50 : 40,
         paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingBottom: 15,
         backgroundColor: 'rgba(255,255,255,0.7)',
     },
     backBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
     headerCenter: { flex: 1, alignItems: 'center' },
     headerTitle: { fontSize: 16, fontFamily: THEME.fonts.bold, color: 'black' },
     headerId: { fontSize: 13, color: THEME.colors.primary, fontFamily: THEME.fonts.bold },
-    content: { padding: 16 },
-    section: { padding: 20, marginBottom: 20 },
-    sectionTitle: { fontSize: 16, fontFamily: THEME.fonts.black, color: 'black', marginBottom: 15 },
-    label: { fontSize: 13, fontFamily: THEME.fonts.bold, color: 'black', marginBottom: 8, marginTop: 10 },
-    complaintIdText: { fontSize: 24, fontFamily: THEME.fonts.black, color: 'black' },
+    content: { padding: 12 },
+    section: { padding: 15, marginBottom: 12, borderRadius: 20 },
+    sectionTitle: { fontSize: 16, fontFamily: THEME.fonts.black, color: 'black', marginBottom: 12 },
+    sectionTitleCompact: { fontSize: 14, fontFamily: THEME.fonts.black, color: 'black', marginBottom: 10 },
+    label: { fontSize: 12, fontFamily: THEME.fonts.bold, color: 'rgba(0,0,0,0.6)', marginBottom: 6, marginTop: 8 },
+    labelCompact: { fontSize: 12, fontFamily: THEME.fonts.bold, color: 'rgba(0,0,0,0.6)' },
+    inputRow: { flexDirection: 'row', gap: 0 },
     input: {
         backgroundColor: 'white',
         borderRadius: 12,
-        padding: 15,
+        padding: 12,
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.05)',
         fontFamily: THEME.fonts.body,
-        fontSize: 15,
+        fontSize: 14,
+        color: 'black'
     },
-    textArea: { height: 100, textAlignVertical: 'top' },
-    pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-    chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F3F4F6' },
-    chipActive: { backgroundColor: THEME.colors.primary },
-    chipText: { fontSize: 12, fontFamily: THEME.fonts.bold, color: 'black' },
+    textArea: { height: 80, textAlignVertical: 'top' },
+    pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 5 },
+    chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' },
+    chipActive: { backgroundColor: THEME.colors.primary, borderColor: THEME.colors.primary },
+    chipText: { fontSize: 12, fontFamily: THEME.fonts.bold, color: 'rgba(0,0,0,0.7)' },
     chipTextActive: { color: 'black' },
     statusChip: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, backgroundColor: '#F3F4F6' },
     statusChipActive: { backgroundColor: THEME.colors.primary + '20', borderWidth: 1, borderColor: THEME.colors.primary },
-    statusText: { fontSize: 11, fontFamily: THEME.fonts.bold, color: 'black' },
+    statusText: { fontSize: 11, fontFamily: THEME.fonts.bold, color: 'rgba(0,0,0,0.7)' },
     statusTextActive: { color: THEME.colors.primary },
-    confirmationRow: { flexDirection: 'row', gap: 15, marginBottom: 10 },
-    confirmBtn: { flex: 1, height: 44, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' },
+    confirmationRowCompact: { flexDirection: 'row', alignItems: 'flex-end' },
+    confirmBtn: { flex: 1, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' },
     confirmBtnYes: { backgroundColor: THEME.colors.success },
     confirmBtnNo: { backgroundColor: THEME.colors.error },
-    confirmBtnText: { fontFamily: THEME.fonts.bold, color: 'black' },
+    confirmBtnText: { fontFamily: THEME.fonts.bold, color: 'black', fontSize: 12 },
 
-    photosRow: { flexDirection: 'row', marginBottom: 15 },
-    photoContainer: { width: 100, height: 100, borderRadius: 12, marginRight: 10, position: 'relative' },
+    photosRow: { flexDirection: 'row', marginBottom: 10 },
+    photoContainer: { width: 80, height: 80, borderRadius: 12, marginRight: 10, position: 'relative' },
     photo: { width: '100%', height: '100%', borderRadius: 12 },
     removePhotoBtn: {
         position: 'absolute', top: -5, right: -5,
         backgroundColor: 'rgba(0,0,0,0.7)',
         borderRadius: 12, width: 24, height: 24,
-        justifyContent: 'center', alignItems: 'center'
+        justifyContent: 'center', alignItems: 'center', zIndex: 10
     },
     uploadBox: {
-        width: 100, height: 100,
+        width: 80, height: 80,
         borderRadius: 12,
         borderStyle: 'dashed', borderWidth: 2,
         borderColor: THEME.colors.primary + '40',
@@ -436,11 +529,11 @@ const styles = StyleSheet.create({
         backgroundColor: THEME.colors.primary + '05',
         marginRight: 10,
     },
-    uploadText: { marginTop: 6, fontSize: 10, fontFamily: THEME.fonts.black, color: THEME.colors.primary },
+    uploadText: { marginTop: 4, fontSize: 10, fontFamily: THEME.fonts.black, color: THEME.colors.primary },
 
-    switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 15 },
-    declaration: { flexDirection: 'row', gap: 8, paddingHorizontal: 10, marginBottom: 25 },
-    declarationText: { flex: 1, fontSize: 12, color: 'black', lineHeight: 18 },
-    submitBtn: { backgroundColor: THEME.colors.primary, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-    submitBtnText: { color: 'black', fontSize: 16, fontFamily: THEME.fonts.bold },
+    switchRowCompact: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 },
+    declarationCompact: { flexDirection: 'row', gap: 8, paddingHorizontal: 10, marginBottom: 20, alignItems: 'center' },
+    declarationTextCompact: { flex: 1, fontSize: 11, color: 'rgba(0,0,0,0.5)', fontFamily: THEME.fonts.body },
+    submitBtn: { backgroundColor: THEME.colors.primary, height: 54, borderRadius: 15, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+    submitBtnText: { color: 'black', fontSize: 16, fontFamily: THEME.fonts.black },
 });
