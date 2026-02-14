@@ -9,6 +9,9 @@ import { Stock } from '../../types';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { ComplaintService, Complaint } from '../../services/ComplaintService';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 // @ts-ignore
@@ -36,7 +39,7 @@ const calculateDaysRemaining = (saleDate: string) => {
 };
 
 export default function SubBranchDashboard() {
-    const { logout, user } = useAuth();
+    const { logout, user, refreshProfile } = useAuth();
     const navigation = useNavigation<any>();
     const [sales, setSales] = useState<Sale[]>([]);
     const [fieldVisits, setFieldVisits] = useState<any[]>([]);
@@ -44,29 +47,39 @@ export default function SubBranchDashboard() {
     const [refreshing, setRefreshing] = useState(false);
     const [period, setPeriod] = useState<'Today' | '7d' | '30d' | '1y'>('7d');
     const [branchStock, setBranchStock] = useState<Stock[]>([]);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Stock'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Complaints'>('Dashboard');
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
     const fetchSales = useCallback(async () => {
         try {
-            const data = await SalesService.getSalesByBranch(user?.branchId || '');
+            // First, refresh user profile to catch any region changes from Admin
+            const latestProfile = await refreshProfile();
+            const activeUser = latestProfile || user;
+
+            const data = await SalesService.getSalesByBranch(activeUser?.branchId || '');
             setSales(data);
 
             // Fetch field visits
-            const visits = await FieldVisitService.getFieldVisitsByBranch(user?.branchId || '');
+            const visits = await FieldVisitService.getFieldVisitsByBranch(activeUser?.branchId || '');
             setFieldVisits(visits);
 
             // Fetch regional stock
-            if (user?.region) {
-                const stock = await StockService.getStockByRegion(user.region);
+            if (activeUser?.region) {
+                const stock = await StockService.getStockByRegion(activeUser.region);
                 setBranchStock(stock);
             }
+
+            // Fetch branch complaints
+            const branchComplaints = await ComplaintService.getComplaints(activeUser?.branchId || '');
+            setComplaints(branchComplaints);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [user?.branchId]);
+    }, [user?.branchId, user?.region, user?.email, refreshProfile]);
 
     useFocusEffect(
         useCallback(() => {
@@ -193,6 +206,114 @@ export default function SubBranchDashboard() {
 
     const chartData = getChartData();
 
+    const handleDownloadComplaint = async (complaint: Complaint) => {
+        try {
+            const html = `
+                <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Complaint Report - ${complaint.complaintId}</title>
+                        <style>
+                            body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; line-height: 1.6; padding: 40px; }
+                            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #EF4444; padding-bottom: 10px; margin-bottom: 30px; }
+                            .logo { font-size: 24px; font-weight: bold; color: #74C69D; }
+                            .title { font-size: 28px; color: #EF4444; margin: 0; }
+                            .section { margin-bottom: 25px; background: #f9fafb; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; }
+                            .section-title { font-size: 18px; font-weight: bold; color: #111; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+                            .row { display: flex; margin-bottom: 8px; }
+                            .label { width: 150px; font-weight: bold; color: #666; }
+                            .value { flex: 1; color: #111; }
+                            .badge { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+                            .badge-open { background: #fee2e2; color: #ef4444; }
+                            .badge-resolved { background: #dcfce7; color: #16a34a; }
+                            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                            .description-box { background: #fff; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-top: 10px; min-height: 100px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div>
+                                <div class="logo">EXOTEX SYSTEM</div>
+                                <div style="font-size: 12px; color: #666;">Modern Warranty & Complaint Management</div>
+                            </div>
+                            <h1 class="title">COMPLAINT REPORT</h1>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">General Information</div>
+                            <div class="row"><div class="label">Complaint ID:</div><div class="value">${complaint.complaintId}</div></div>
+                            <div class="row"><div class="label">Invoice No:</div><div class="value">${complaint.invoiceNo}</div></div>
+                            <div class="row"><div class="label">Date Raised:</div><div class="value">${new Date(complaint.dateOfComplaint).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
+                            <div class="row">
+                                <div class="label">Status:</div>
+                                <div class="value">
+                                    <span class="badge ${complaint.status === 'Resolved' || complaint.status === 'Closed' ? 'badge-resolved' : 'badge-open'}">
+                                        ${complaint.status}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="row"><div class="label">Category:</div><div class="value">${complaint.category}</div></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Customer Details</div>
+                            <div class="row"><div class="label">Name:</div><div class="value">${complaint.customerName}</div></div>
+                            <div class="row"><div class="label">Phone:</div><div class="value">${complaint.customerPhone}</div></div>
+                            <div class="row"><div class="label">Email:</div><div class="value">${complaint.customerEmail || 'N/A'}</div></div>
+                            <div class="row"><div class="label">City/Branch:</div><div class="value">${complaint.city || 'N/A'}</div></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Complaint Description</div>
+                            <div class="description-box">${complaint.description}</div>
+                        </div>
+
+                        ${complaint.actionTaken ? `
+                        <div class="section">
+                            <div class="section-title">Resolution / Action Taken</div>
+                            <div class="description-box" style="background: #f0fdf4;">${complaint.actionTaken}</div>
+                            ${complaint.resolvedByName ? `<p style="margin-top:10px;"><strong>Resolved By:</strong> ${complaint.resolvedByName} (${complaint.resolvedByDesignation || 'Officer'})</p>` : ''}
+                        </div>
+                        ` : ''}
+
+                        <div class="footer">
+                            <p>This is an electronically generated report from EXOTEX System.</p>
+                            <p>Generated on: ${new Date().toLocaleString()}</p>
+                        </div>
+                    </body>
+                </html>
+            `;
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to generate complaint report');
+        }
+    };
+
+    const activeComplaintsCount = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+
+    const sortedComplaints = useMemo(() => {
+        return [...complaints].sort((a, b) => {
+            const dateA = new Date(a.dateOfComplaint || a.createdAt || 0).getTime();
+            const dateB = new Date(b.dateOfComplaint || b.createdAt || 0).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [complaints, sortOrder]);
+
+    const sortedVisits = useMemo(() => {
+        return [...fieldVisits].sort((a, b) => {
+            const dateA = new Date(a.visitDate || a.createdAt || 0).getTime();
+            const dateB = new Date(b.visitDate || b.createdAt || 0).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [fieldVisits, sortOrder]);
+
     const handleLogout = () => {
         const logoutTask = () => logout();
 
@@ -264,25 +385,31 @@ export default function SubBranchDashboard() {
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <Pressable
-                        onPress={handleLogout}
-                        style={({ pressed }) => [
-                            styles.headerTitleRow,
-                            pressed && { opacity: 0.7 }
-                        ]}
-                    >
-                        <View style={styles.avatar}>
+                    <View style={styles.headerTitleRow}>
+                        <Pressable
+                            onPress={() => navigation.navigate('Profile')}
+                            style={styles.avatar}
+                        >
                             <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
                             <View style={styles.onlineBadge} />
-                        </View>
+                        </Pressable>
                         <View>
-                            <Text style={styles.subtitle}>EXOTEX System</Text>
+                            <Text style={styles.subtitle}>EXOTEX System • {user?.region || 'No Region'}</Text>
                             <Text style={styles.greeting}>{user?.name}</Text>
                         </View>
-                    </Pressable>
-                    <GlassPanel style={styles.notificationBtn}>
-                        <MaterialCommunityIcons name="bell-outline" size={24} color={THEME.colors.text} />
-                    </GlassPanel>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Pressable onPress={() => navigation.navigate('Profile')}>
+                            <GlassPanel style={styles.notificationBtn}>
+                                <MaterialCommunityIcons name="account-cog-outline" size={24} color={THEME.colors.text} />
+                            </GlassPanel>
+                        </Pressable>
+                        <Pressable onPress={handleLogout}>
+                            <GlassPanel style={styles.notificationBtn}>
+                                <MaterialCommunityIcons name="logout" size={24} color={THEME.colors.error} />
+                            </GlassPanel>
+                        </Pressable>
+                    </View>
                 </View>
 
                 {/* Tab Switcher */}
@@ -295,10 +422,22 @@ export default function SubBranchDashboard() {
                             <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
                         </Pressable>
                         <Pressable
+                            onPress={() => setActiveTab('Analytics')}
+                            style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
+                        </Pressable>
+                        <Pressable
                             onPress={() => setActiveTab('Stock')}
                             style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
                         >
                             <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setActiveTab('Complaints')}
+                            style={[styles.tabButton, activeTab === 'Complaints' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'Complaints' && styles.tabButtonTextActive]}>Hub</Text>
                         </Pressable>
                     </GlassPanel>
                 </View>
@@ -312,87 +451,6 @@ export default function SubBranchDashboard() {
                     </View>
                 ) : activeTab === 'Dashboard' ? (
                     <>
-                        {/* Total Sales Graph Card */}
-                        <GlassPanel style={styles.graphCard}>
-                            <View style={styles.graphHeader}>
-                                <View>
-                                    <Text style={styles.graphTitle}>Activity Overview</Text>
-                                    <View style={styles.amountSelectorRow}>
-                                        <Text style={styles.graphAmount}>{warrantiesGenerated + fieldVisitsCompleted}</Text>
-                                        <View style={styles.periodSelector}>
-                                            <Pressable onPress={() => setPeriod('Today')} style={[styles.periodBtn, period === 'Today' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === 'Today' && styles.periodBtnTextActive]}>1D</Text>
-                                            </Pressable>
-                                            <Pressable onPress={() => setPeriod('7d')} style={[styles.periodBtn, period === '7d' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === '7d' && styles.periodBtnTextActive]}>7D</Text>
-                                            </Pressable>
-                                            <Pressable onPress={() => setPeriod('30d')} style={[styles.periodBtn, period === '30d' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === '30d' && styles.periodBtnTextActive]}>1M</Text>
-                                            </Pressable>
-                                            <Pressable onPress={() => setPeriod('1y')} style={[styles.periodBtn, period === '1y' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === '1y' && styles.periodBtnTextActive]}>1Y</Text>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                </View>
-                                <View style={styles.trendBadge}>
-                                    <MaterialIcons name="trending-up" size={14} color="white" />
-                                    <Text style={styles.trendText}>+12.5%</Text>
-                                </View>
-                            </View>
-
-                            <LineChart
-                                data={chartData}
-                                width={width - 48} // More responsive width
-                                height={120}
-                                withInnerLines={false}
-                                withOuterLines={false}
-                                withVerticalLines={false}
-                                withHorizontalLines={false}
-                                withDots={true}
-                                withShadow={false}
-                                formatYLabel={(label) => Math.round(parseFloat(label)).toString()}
-                                chartConfig={{
-                                    backgroundColor: "#ffffff",
-                                    backgroundGradientFrom: "#ffffff",
-                                    backgroundGradientTo: "#ffffff",
-                                    decimalPlaces: 0,
-                                    color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
-                                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                                    style: {
-                                        borderRadius: 16
-                                    },
-                                    propsForDots: {
-                                        r: "3",
-                                        strokeWidth: 1.5,
-                                        stroke: "#ffffff"
-                                    },
-                                    strokeWidth: 2,
-                                    propsForLabels: {
-                                        fontSize: 9,
-                                    }
-                                }}
-                                bezier
-                                style={{
-                                    paddingRight: 35, // Adjust for Y labels
-                                    marginTop: 8,
-                                    marginLeft: -10,
-                                }}
-                            />
-                            {/* Legend */}
-                            <View style={styles.legendRow}>
-                                <View style={styles.legendItem}>
-                                    <View style={[styles.legendDot, { backgroundColor: THEME.colors.secondary }]} />
-                                    <Text style={styles.legendText}>Warranties</Text>
-                                </View>
-                                <View style={styles.legendItem}>
-                                    <View style={[styles.legendDot, { backgroundColor: '#7C3AED' }]} />
-                                    <Text style={styles.legendText}>Field Visits</Text>
-                                </View>
-                            </View>
-
-                        </GlassPanel>
-
                         {/* Stats Grid */}
                         <View style={styles.statsGrid}>
                             <GlassPanel style={styles.statCard}>
@@ -404,14 +462,19 @@ export default function SubBranchDashboard() {
                                     <Text style={styles.statLabel}>ACTIVE WARRANTIES</Text>
                                 </View>
                             </GlassPanel>
-                            <GlassPanel style={styles.statCard}>
-                                <View style={styles.statIconWrapperPending}>
-                                    <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
-                                </View>
-                                <View>
-                                    <Text style={styles.statValue}>{fieldVisitsCompleted}</Text>
-                                    <Text style={styles.statLabel}>FIELD VISITS</Text>
-                                </View>
+                            <GlassPanel style={[styles.statCard, { backgroundColor: '#FEE2E280', padding: 0 }]}>
+                                <Pressable
+                                    style={{ flex: 1, padding: 12, justifyContent: 'space-between' }}
+                                    onPress={() => setActiveTab('Complaints')}
+                                >
+                                    <View style={[styles.statIconWrapperPending, { backgroundColor: '#FEE2E2' }]}>
+                                        <MaterialIcons name="report-problem" size={20} color="#EF4444" />
+                                    </View>
+                                    <View>
+                                        <Text style={[styles.statValue, { color: '#EF4444' }]}>{activeComplaintsCount}</Text>
+                                        <Text style={[styles.statLabel, { color: '#B91C1C' }]}>ACTIVE COMPLAINTS</Text>
+                                    </View>
+                                </Pressable>
                             </GlassPanel>
                         </View>
 
@@ -514,17 +577,222 @@ export default function SubBranchDashboard() {
 
                         <View style={{ height: 100 }} />
                     </>
-                ) : (
+                ) : activeTab === 'Analytics' ? (
+                    <View style={{ paddingHorizontal: 16 }}>
+                        <View style={styles.recentHeader}>
+                            <Text style={styles.sectionTitle}>Activity Analytics</Text>
+                        </View>
+                        {/* Total Sales Graph Card */}
+                        <GlassPanel style={[styles.graphCard, { marginTop: 0 }]}>
+                            <View style={styles.graphHeader}>
+                                <View>
+                                    <Text style={styles.graphTitle}>Success Overview</Text>
+                                    <View style={styles.amountSelectorRow}>
+                                        <Text style={styles.graphAmount}>{warrantiesGenerated + fieldVisitsCompleted}</Text>
+                                        <View style={styles.periodSelector}>
+                                            <Pressable onPress={() => setPeriod('Today')} style={[styles.periodBtn, period === 'Today' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === 'Today' && styles.periodBtnTextActive]}>1D</Text>
+                                            </Pressable>
+                                            <Pressable onPress={() => setPeriod('7d')} style={[styles.periodBtn, period === '7d' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === '7d' && styles.periodBtnTextActive]}>7D</Text>
+                                            </Pressable>
+                                            <Pressable onPress={() => setPeriod('30d')} style={[styles.periodBtn, period === '30d' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === '30d' && styles.periodBtnTextActive]}>1M</Text>
+                                            </Pressable>
+                                            <Pressable onPress={() => setPeriod('1y')} style={[styles.periodBtn, period === '1y' && styles.periodBtnActive]}>
+                                                <Text style={[styles.periodBtnText, period === '1y' && styles.periodBtnTextActive]}>1Y</Text>
+                                            </Pressable>
+                                        </View>
+                                    </View>
+                                </View>
+                                <View style={styles.trendBadge}>
+                                    <MaterialIcons name="trending-up" size={14} color="white" />
+                                    <Text style={styles.trendText}>+12.5%</Text>
+                                </View>
+                            </View>
+
+                            <LineChart
+                                data={chartData}
+                                width={width - 48}
+                                height={180}
+                                withInnerLines={false}
+                                withOuterLines={false}
+                                withVerticalLines={false}
+                                withHorizontalLines={false}
+                                withDots={true}
+                                withShadow={false}
+                                formatYLabel={(label) => Math.round(parseFloat(label)).toString()}
+                                chartConfig={{
+                                    backgroundColor: "#ffffff",
+                                    backgroundGradientFrom: "#ffffff",
+                                    backgroundGradientTo: "#ffffff",
+                                    decimalPlaces: 0,
+                                    color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
+                                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                                    style: {
+                                        borderRadius: 16
+                                    },
+                                    propsForDots: {
+                                        r: "4",
+                                        strokeWidth: 2,
+                                        stroke: "#ffffff"
+                                    },
+                                    strokeWidth: 3,
+                                    propsForLabels: {
+                                        fontSize: 10,
+                                    }
+                                }}
+                                bezier
+                                style={{
+                                    paddingRight: 35,
+                                    marginTop: 16,
+                                    marginLeft: -10,
+                                }}
+                            />
+                            {/* Legend */}
+                            <View style={styles.legendRow}>
+                                <View style={styles.legendItem}>
+                                    <View style={[styles.legendDot, { backgroundColor: THEME.colors.secondary }]} />
+                                    <Text style={styles.legendText}>Warranties Generated</Text>
+                                </View>
+                            </View>
+                        </GlassPanel>
+                    </View>
+                ) : activeTab === 'Stock' ? (
                     <StockViewContent branchStock={branchStock} userRegion={user?.region} />
+                ) : (
+                    <View style={{ paddingBottom: 100 }}>
+                        <View style={styles.recentHeader}>
+                            <Pressable
+                                onPress={() => setActiveTab('Dashboard')}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                            >
+                                <MaterialIcons name="arrow-back" size={24} color={THEME.colors.text} />
+                                <Text style={styles.sectionTitle}>Complaints Hub</Text>
+                            </Pressable>
+                        </View>
+
+                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+
+                        <GlassPanel style={{ padding: 8 }}>
+                            {sortedComplaints.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <MaterialCommunityIcons name="check-circle-outline" size={48} color={THEME.colors.success} />
+                                    <Text style={styles.emptyText}>No complaints found</Text>
+                                </View>
+                            ) : (
+                                sortedComplaints.map((comp: any, idx: number) => {
+                                    const isResolved = comp.status === 'Resolved' || comp.status === 'Closed';
+                                    return (
+                                        <Pressable
+                                            key={comp.id || idx}
+                                            style={[styles.listItem, idx === sortedComplaints.length - 1 && { borderBottomWidth: 0 }]}
+                                            onPress={() => navigation.navigate('RaiseComplaintStep2', {
+                                                complaint: comp,
+                                                clientData: {
+                                                    invoiceNumber: comp.invoiceNo,
+                                                    customerName: comp.customerName,
+                                                    phone: comp.customerPhone,
+                                                    email: comp.customerEmail,
+                                                    city: comp.city
+                                                }
+                                            })}
+                                        >
+                                            <View style={[styles.listIcon, { backgroundColor: isResolved ? THEME.colors.mintLight : '#FEE2E2' }]}>
+                                                <MaterialIcons
+                                                    name={isResolved ? "check-circle" : "warning"}
+                                                    size={20}
+                                                    color={isResolved ? THEME.colors.success : '#EF4444'}
+                                                />
+                                            </View>
+                                            <View style={styles.listInfo}>
+                                                <Text style={styles.listTitle}>{comp.customerName}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <View style={[styles.countdownBadge, { backgroundColor: isResolved ? THEME.colors.success + '20' : '#EF444420' }]}>
+                                                        <Text style={[styles.countdownText, { color: isResolved ? THEME.colors.success : '#EF4444' }]}>
+                                                            {comp.status}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={styles.dateText}>{new Date(comp.dateOfComplaint).toLocaleDateString()}</Text>
+                                                </View>
+                                            </View>
+                                            <Pressable
+                                                onPress={() => handleDownloadComplaint(comp)}
+                                                style={{ padding: 8 }}
+                                            >
+                                                <MaterialCommunityIcons name="file-download-outline" size={24} color={THEME.colors.primary} />
+                                            </Pressable>
+                                        </Pressable>
+                                    );
+                                })
+                            )}
+                        </GlassPanel>
+                    </View>
                 )}
             </ScrollView>
 
-            <FloatingTabBar activeTab="home" onTabPress={handleTabPress} />
+            <FloatingTabBar activeTab="home" onTabPress={(tab: string) => {
+                if (tab === 'stock') setActiveTab('Stock');
+                else if (tab === 'home') setActiveTab('Dashboard');
+                else if (tab === 'create') navigation.navigate('CreateSaleStep1');
+                else if (tab === 'fieldvisit') navigation.navigate('FieldVisitForm');
+            }} />
         </MeshBackground>
     );
 }
 
+const SortControls = ({ sortOrder, setSortOrder }: { sortOrder: 'newest' | 'oldest', setSortOrder: (order: 'newest' | 'oldest') => void }) => (
+    <View style={styles.sortContainer}>
+        <Pressable
+            onPress={() => setSortOrder('newest')}
+            style={[styles.sortBtn, sortOrder === 'newest' && styles.sortBtnActive]}
+        >
+            <MaterialIcons name="arrow-downward" size={16} color={sortOrder === 'newest' ? 'white' : THEME.colors.textSecondary} />
+            <Text style={[styles.sortBtnText, sortOrder === 'newest' && styles.sortBtnTextActive]}>Newest First</Text>
+        </Pressable>
+        <Pressable
+            onPress={() => setSortOrder('oldest')}
+            style={[styles.sortBtn, sortOrder === 'oldest' && styles.sortBtnActive]}
+        >
+            <MaterialIcons name="arrow-upward" size={16} color={sortOrder === 'oldest' ? 'white' : THEME.colors.textSecondary} />
+            <Text style={[styles.sortBtnText, sortOrder === 'oldest' && styles.sortBtnTextActive]}>Oldest First</Text>
+        </Pressable>
+    </View>
+);
+
+const handleTabPress = (tab: string) => { };
+
 const styles = StyleSheet.create({
+    sortContainer: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
+        paddingHorizontal: 4,
+    },
+    sortBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        backgroundColor: THEME.colors.glassBackground,
+        borderWidth: 1,
+        borderColor: THEME.colors.glassBorder,
+    },
+    sortBtnActive: {
+        backgroundColor: THEME.colors.secondary,
+        borderColor: THEME.colors.secondary,
+    },
+    sortBtnText: {
+        fontSize: 12,
+        color: THEME.colors.textSecondary,
+        fontWeight: '500',
+    },
+    sortBtnTextActive: {
+        color: 'white',
+        fontWeight: '600',
+    },
     content: {
         padding: 16,
         paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
@@ -844,6 +1112,7 @@ const styles = StyleSheet.create({
     },
     listInfo: {
         flex: 1,
+        paddingRight: 8,
     },
     listTitle: {
         fontSize: 14,
@@ -858,6 +1127,8 @@ const styles = StyleSheet.create({
     },
     listAmount: {
         alignItems: 'flex-end',
+        marginLeft: 12,
+        minWidth: 80,
     },
     amountText: {
         fontSize: 14,
@@ -905,11 +1176,11 @@ const styles = StyleSheet.create({
     },
     tabSwitcher: {
         flexDirection: 'row',
-        padding: 6,
+        padding: 4,
         borderRadius: 100,
         backgroundColor: 'rgba(255, 255, 255, 0.4)',
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 360,
     },
     tabButton: {
         flex: 1,
@@ -922,7 +1193,7 @@ const styles = StyleSheet.create({
         ...THEME.shadows.small,
     },
     tabButtonText: {
-        fontSize: 15,
+        fontSize: 13,
         fontFamily: THEME.fonts.bold,
         color: THEME.colors.textSecondary,
     },

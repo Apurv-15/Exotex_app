@@ -41,14 +41,17 @@ export const StockService = {
 
     // Get stock for a specific region
     getStockByRegion: async (region: string): Promise<Stock[]> => {
+        if (!region) return [];
+
         if (isSupabaseConfigured()) {
             try {
                 const { data, error } = await supabase
                     .from('stock')
                     .select('*')
-                    .eq('region', region);
+                    .ilike('region', region.trim());
 
                 if (error) throw error;
+
                 return (data || []).map(row => ({
                     id: row.id,
                     region: row.region,
@@ -63,7 +66,7 @@ export const StockService = {
 
         // Fallback to local
         const allStock = await StockService.getAllStock();
-        return allStock.filter(s => s.region === region);
+        return allStock.filter(s => s.region.toLowerCase().trim() === region.toLowerCase().trim());
     },
 
     // Update stock (Admin action)
