@@ -254,8 +254,8 @@ function PlaceholderItem({ label, tag }: { label: string; tag: string }) {
     return (
         <View style={styles.placeholderItem}>
             <Text style={styles.placeholderLabel}>{label}</Text>
-            <View style={styles.tagBadge}>
-                <Text style={styles.tagText}>{tag}</Text>
+            <View style={[styles.tagBadge, { flex: 1, marginLeft: 16, alignItems: 'flex-end' }]}>
+                <Text style={styles.tagText} numberOfLines={1} ellipsizeMode="tail">{tag}</Text>
             </View>
         </View>
     );

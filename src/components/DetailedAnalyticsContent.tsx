@@ -168,8 +168,8 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         ...THEME.shadows.small
     },
-    title: { fontSize: 28, fontFamily: THEME.fonts.black, color: THEME.colors.text, letterSpacing: -0.5 },
-    subtitle: { fontSize: 14, fontFamily: THEME.fonts.semiBold, color: THEME.colors.textSecondary, marginTop: 4 },
+    title: { fontSize: screenWidth < 380 ? 24 : 28, fontFamily: THEME.fonts.black, color: THEME.colors.text, letterSpacing: -0.5 },
+    subtitle: { fontSize: screenWidth < 380 ? 12 : 14, fontFamily: THEME.fonts.semiBold, color: THEME.colors.textSecondary, marginTop: 4 },
     filterRow: { flexDirection: 'row', gap: 8, marginBottom: 24, justifyContent: 'center' },
     chip: {
         paddingHorizontal: 16,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: 'rgba(255, 255, 255, 0.5)',
         borderRadius: 28,
-        padding: 20,
+        padding: screenWidth < 380 ? 16 : 20,
         marginBottom: 20,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.6)',
@@ -227,6 +227,7 @@ const styles = StyleSheet.create({
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0,0,0,0.03)'
