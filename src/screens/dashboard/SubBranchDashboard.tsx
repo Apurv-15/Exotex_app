@@ -418,7 +418,7 @@ export default function SubBranchDashboard() {
                         {/* Quick Actions */}
                         <View style={styles.sectionCmd}>
                             <Text style={styles.sectionTitle}>Quick Actions</Text>
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
                                 <Pressable
                                     style={({ pressed }) => [
                                         styles.actionBtn,
@@ -444,6 +444,22 @@ export default function SubBranchDashboard() {
                                         <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
                                     </View>
                                     <Text style={styles.actionText}>Field Visit</Text>
+                                </Pressable>
+                            </View>
+
+                            <View style={{ flexDirection: 'row' }}>
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.actionBtn,
+                                        { flex: 1 },
+                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                                    ]}
+                                    onPress={() => navigation.navigate('RaiseComplaintStep1')}
+                                >
+                                    <View style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
+                                        <MaterialIcons name="report-problem" size={20} color="#EF4444" />
+                                    </View>
+                                    <Text style={styles.actionText}>Raise Complaint</Text>
                                 </Pressable>
                             </View>
                         </View>
@@ -475,8 +491,10 @@ export default function SubBranchDashboard() {
                                             </View>
                                             <View style={styles.listInfo}>
                                                 <Text style={styles.listTitle}>{item.productModel}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Text style={styles.listSub}>{item.customerName} • {item.city}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                                    <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
+                                                        {item.customerName} • {item.city}
+                                                    </Text>
                                                     <View style={[styles.countdownBadge, { backgroundColor: countdown.color + '20' }]}>
                                                         <Text style={[styles.countdownText, { color: countdown.color }]}>
                                                             {countdown.label}

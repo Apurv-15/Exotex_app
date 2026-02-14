@@ -15,7 +15,9 @@ import GlassPanel from '../../components/GlassPanel';
 import DetailedAnalyticsContent from '../../components/DetailedAnalyticsContent';
 const FileSystem = require('expo-file-system/legacy');
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import { Alert } from 'react-native';
+import { ComplaintService, Complaint } from '../../services/ComplaintService';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // import { SoundManager } from '../../utils/SoundManager';
@@ -67,6 +69,8 @@ export default function MainBranchDashboard() {
     const [showAllSales, setShowAllSales] = useState(false);
     const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Photos'>('Dashboard');
     const [allStock, setAllStock] = useState<Stock[]>([]);
+    const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
+    const [complaintLoading, setComplaintLoading] = useState(false);
     const [stockLoading, setStockLoading] = useState(false);
 
     // Photos selection state (lifted for floating toolbar)
@@ -81,32 +85,38 @@ export default function MainBranchDashboard() {
             let salesData: Sale[] = [];
             let visitsData: any[] = [];
             let stockData: Stock[] = [];
+            let complaintsData: Complaint[] = [];
 
             // If Super Admin, get everything. If Admin and has branchId, filter by branch.
             if (user?.role === 'Super Admin' || !user?.branchId) {
-                const [s, v, st] = await Promise.all([
+                const [s, v, st, c] = await Promise.all([
                     SalesService.getAllSales(),
                     FieldVisitService.getFieldVisits(),
-                    StockService.getAllStock()
+                    StockService.getAllStock(),
+                    ComplaintService.getComplaints()
                 ]);
                 salesData = s;
                 visitsData = v;
                 stockData = st;
+                complaintsData = c;
             } else {
                 // Admin restricted to branch
-                const [s, v, st] = await Promise.all([
+                const [s, v, st, c] = await Promise.all([
                     SalesService.getSalesByBranch(user.branchId),
                     FieldVisitService.getFieldVisitsByBranch(user.branchId),
-                    StockService.getAllStock() // Stock might still be global or we could filter too
+                    StockService.getAllStock(),
+                    ComplaintService.getComplaints(user.branchId)
                 ]);
                 salesData = s;
                 visitsData = v;
                 stockData = st;
+                complaintsData = c;
             }
 
             setAllSales(salesData);
             setAllVisits(visitsData);
             setAllStock(stockData);
+            setAllComplaints(complaintsData || []);
 
             // Set initial display sales
             setSales(salesData);
@@ -174,15 +184,24 @@ export default function MainBranchDashboard() {
         const labels: string[] = [];
         const counts: number[] = [];
 
+        // Apply region filter if selected
+        const baseVisits = selectedRegion
+            ? allVisits.filter(v => (v as any).city === selectedRegion)
+            : allVisits;
+
         for (let i = 6; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             labels.push(days[date.getDay()]);
 
             // Count visits for this day
-            const dayVisits = fieldVisits.filter(visit => {
-                const visitDate = new Date(visit.visitDate);
-                return visitDate.toDateString() === date.toDateString();
+            const dayVisits = baseVisits.filter(visit => {
+                const vDate = visit.visitDate || (visit as any).dateOfVisit;
+                if (!vDate) return false;
+                const vD = new Date(vDate);
+                return vD.getFullYear() === date.getFullYear() &&
+                    vD.getMonth() === date.getMonth() &&
+                    vD.getDate() === date.getDate();
             }).length;
 
             counts.push(dayVisits);
@@ -196,7 +215,7 @@ export default function MainBranchDashboard() {
                 strokeWidth: 2
             }]
         };
-    }, [allVisits]); // Using allVisits for context of last 7 days
+    }, [allVisits, selectedRegion]); // Refresh when visits or selection changes
 
     // Calculate top selling models from filtered sales
     const topSellingModels = useMemo(() => {
@@ -239,6 +258,85 @@ export default function MainBranchDashboard() {
         });
         return Object.values(grouped).sort((a, b) => b.total - a.total);
     }, [filteredVisits]);
+    const filteredComplaints = useMemo(() => {
+        const now = new Date();
+        return allComplaints.filter(c => {
+            if (filter === 'All') return true;
+            const date = new Date(c.dateOfComplaint);
+            if (filter === 'Today') return date.toDateString() === now.toDateString();
+            if (filter === 'Month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            if (filter === 'Year') return date.getFullYear() === now.getFullYear();
+            return true;
+        });
+    }, [allComplaints, filter]);
+
+    const complaintRegionStats = useMemo(() => {
+        const grouped: Record<string, { region: string; total: number; resolved: number; unresolved: number }> = {};
+        filteredComplaints.forEach(item => {
+            const region = item.city || 'Unknown';
+            if (!grouped[region]) {
+                grouped[region] = { region, total: 0, resolved: 0, unresolved: 0 };
+            }
+            grouped[region].total++;
+            if (item.status === 'Resolved' || item.status === 'Closed') {
+                grouped[region].resolved++;
+            } else {
+                grouped[region].unresolved++;
+            }
+        });
+        return Object.values(grouped).sort((a, b) => b.total - a.total);
+    }, [filteredComplaints]);
+
+    // Display complaints (filtered by region if selected)
+    const displayComplaints = useMemo(() => {
+        let list = filteredComplaints;
+        if (selectedRegion) {
+            list = list.filter(c => (c as any).city === selectedRegion);
+        }
+        return list;
+    }, [filteredComplaints, selectedRegion]);
+
+    const activeComplaintCount = allComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+
+    const calculateDaysPassed = (date: string) => {
+        const start = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        start.setHours(0, 0, 0, 0);
+
+        const diffTime = today.getTime() - start.getTime();
+        return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    };
+
+    const handleDownloadComplaint = async (complaint: Complaint) => {
+        try {
+            const html = `
+                <html>
+                    <body style="font-family: Arial; padding: 20px;">
+                        <h1 style="color: #EF4444;">COMPLAINT REPORT</h1>
+                        <hr/>
+                        <p><strong>Complaint ID:</strong> ${complaint.complaintId}</p>
+                        <p><strong>Customer:</strong> ${complaint.customerName}</p>
+                        <p><strong>Phone:</strong> ${complaint.customerPhone}</p>
+                        <p><strong>City:</strong> ${complaint.city || 'N/A'}</p>
+                        <p><strong>Category:</strong> ${complaint.category}</p>
+                        <p><strong>Status:</strong> ${complaint.status}</p>
+                        <p><strong>Date Raised:</strong> ${complaint.dateOfComplaint}</p>
+                        <p><strong>Days Passed:</strong> ${calculateDaysPassed(complaint.dateOfComplaint)}</p>
+                        <p><strong>Description:</strong> ${complaint.description}</p>
+                        <hr/>
+                        <p style="font-size: 10px; color: #666;">Generated on ${new Date().toLocaleString()}</p>
+                    </body>
+                </html>
+            `;
+            const { uri } = await Print.printToFileAsync({ html });
+            await Sharing.shareAsync(uri);
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to download complaint report');
+        }
+    };
+
     const handleDownloadPhotos = async () => {
         if (selectedPhotos.length === 0) return;
         setIsDownloadingPhotos(true);
@@ -275,9 +373,9 @@ export default function MainBranchDashboard() {
                         <GlassPanel style={styles.logoWrapper} intensity={40}>
                             <Image source={LogoImage} style={styles.companyLogo} resizeMode="contain" />
                         </GlassPanel>
-                        <View>
-                            <Text style={styles.greeting}>EXOTEX Admin</Text>
-                            <Text style={styles.subtitle}>Welcome back, {user?.name}</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.greeting} numberOfLines={1}>{activeTab}</Text>
+                            <Text style={styles.subtitle} numberOfLines={1}>{user?.name ? `Welcome, ${user.name}` : 'EXOTEX Admin'}</Text>
                         </View>
                     </View>
                     <Pressable onPress={logout} style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}>
@@ -341,21 +439,97 @@ export default function MainBranchDashboard() {
                                     </View>
                                 </View>
                                 <View>
-                                    <Text style={styles.mainStatValue}>{totalSalesCount}</Text>
-                                    <Text style={styles.mainStatLabel}>Total Units Sold</Text>
+                                    <Text style={styles.mainStatValue} numberOfLines={1} adjustsFontSizeToFit>{totalSalesCount}</Text>
+                                    <Text style={styles.mainStatLabel} numberOfLines={1}>Total Units Sold</Text>
                                 </View>
                             </LinearGradient>
 
                             <View style={styles.bentoColumn}>
                                 <GlassPanel style={[styles.statBox, { backgroundColor: THEME.colors.mintLight + '80' }]}>
-                                    <Text style={[styles.statBoxValue, { color: '#047857' }]}>{totalVisitsCount}</Text>
-                                    <Text style={[styles.statBoxLabel, { color: '#065F46' }]}>Field Visits</Text>
+                                    <Text style={[styles.statBoxValue, { color: '#047857' }]} numberOfLines={1} adjustsFontSizeToFit>{totalVisitsCount}</Text>
+                                    <Text style={[styles.statBoxLabel, { color: '#065F46' }]} numberOfLines={1}>Field Visits</Text>
                                 </GlassPanel>
-                                <GlassPanel style={[styles.statBox, { backgroundColor: '#FEF3C780' }]}>
-                                    <Text style={[styles.statBoxValue, { color: '#D97706' }]}>{pendingVisitsCount}</Text>
-                                    <Text style={[styles.statBoxLabel, { color: '#B45309' }]}>Pending Visits</Text>
+                                <GlassPanel style={[styles.statBox, { backgroundColor: '#FEE2E280' }]}>
+                                    <Text style={[styles.statBoxValue, { color: '#EF4444' }]} numberOfLines={1} adjustsFontSizeToFit>{activeComplaintCount}</Text>
+                                    <Text style={[styles.statBoxLabel, { color: '#B91C1C' }]} numberOfLines={1}>Active Complaints</Text>
                                 </GlassPanel>
                             </View>
+                        </View>
+
+                        {/* Complaint Region & List Tracker */}
+                        <View style={{ paddingHorizontal: 4, marginBottom: 24 }}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Complaints Tracker</Text>
+                            </View>
+
+                            {complaintRegionStats.length === 0 ? (
+                                <GlassPanel style={styles.emptyState}>
+                                    <MaterialCommunityIcons name="alert-circle-check-outline" size={48} color={THEME.colors.success} />
+                                    <Text style={styles.emptyText}>No active complaints! Great job.</Text>
+                                </GlassPanel>
+                            ) : (
+                                <>
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        style={[styles.regionScroll, { marginBottom: 16 }]}
+                                        contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                                    >
+                                        {complaintRegionStats.map(({ region, total, resolved, unresolved }) => {
+                                            const colors = getRegionColor(region);
+                                            return (
+                                                <GlassPanel key={region} style={styles.regionCard}>
+                                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                                        <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.text} />
+                                                    </View>
+                                                    <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
+                                                    <Text style={styles.regionTotal} numberOfLines={1}>{total} Complaints</Text>
+                                                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
+                                                        <View style={{ backgroundColor: THEME.colors.success + '20', paddingHorizontal: 4, borderRadius: 4 }}>
+                                                            <Text style={{ fontSize: 9, color: THEME.colors.success }}>{resolved} Res</Text>
+                                                        </View>
+                                                        <View style={{ backgroundColor: THEME.colors.error + '20', paddingHorizontal: 4, borderRadius: 4 }}>
+                                                            <Text style={{ fontSize: 9, color: THEME.colors.error }}>{unresolved} Unres</Text>
+                                                        </View>
+                                                    </View>
+                                                </GlassPanel>
+                                            );
+                                        })}
+                                    </ScrollView>
+
+                                    <GlassPanel style={{ padding: 8 }}>
+                                        {displayComplaints.slice(0, 5).map((comp, idx) => {
+                                            const daysPassed = calculateDaysPassed(comp.dateOfComplaint);
+                                            const isResolved = comp.status === 'Resolved' || comp.status === 'Closed';
+                                            return (
+                                                <View key={comp.id || idx} style={[styles.listItem, idx === 4 && { borderBottomWidth: 0 }]}>
+                                                    <View style={[styles.listIcon, { backgroundColor: isResolved ? THEME.colors.mintLight : '#FEE2E2' }]}>
+                                                        <MaterialCommunityIcons
+                                                            name={isResolved ? "check-circle" : "alert-circle"}
+                                                            size={20}
+                                                            color={isResolved ? THEME.colors.success : THEME.colors.error}
+                                                        />
+                                                    </View>
+                                                    <View style={styles.listContent}>
+                                                        <Text style={styles.listTitle} numberOfLines={1}>{comp.customerName}</Text>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                            <View style={[styles.tag, { backgroundColor: isResolved ? THEME.colors.success + '20' : THEME.colors.error + '20' }]}>
+                                                                <Text style={[styles.tagText, { color: isResolved ? THEME.colors.success : THEME.colors.error }]}>
+                                                                    {isResolved ? 'Resolved' : 'Unresolved'}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={styles.listSub}>{daysPassed} days passed</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Pressable onPress={() => handleDownloadComplaint(comp)} style={styles.downloadIconBtn}>
+                                                        <MaterialCommunityIcons name="download" size={20} color={THEME.colors.primary} />
+                                                    </Pressable>
+                                                </View>
+                                            );
+                                        })}
+                                    </GlassPanel>
+                                </>
+                            )}
                         </View>
 
                         {/* Visit Analytics Graph */}
@@ -365,8 +539,9 @@ export default function MainBranchDashboard() {
                         <GlassPanel style={styles.graphCard}>
                             <LineChart
                                 data={visitGraphData}
-                                width={screenWidth - 48}
+                                width={screenWidth - 80}
                                 height={180}
+                                fromZero={true}
                                 chartConfig={{
                                     backgroundColor: 'transparent',
                                     backgroundGradientFrom: '#ffffff',
@@ -387,7 +562,7 @@ export default function MainBranchDashboard() {
                                 style={{
                                     marginVertical: 8,
                                     borderRadius: 16,
-                                    paddingRight: 40
+                                    paddingRight: 32
                                 }}
                             />
                         </GlassPanel>
@@ -437,8 +612,8 @@ export default function MainBranchDashboard() {
                                                     color={colors.text}
                                                 />
                                             </View>
-                                            <Text style={styles.regionName}>{region}</Text>
-                                            <Text style={styles.regionTotal}>{total} Visits</Text>
+                                            <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
+                                            <Text style={styles.regionTotal} numberOfLines={1}>{total} Visits</Text>
 
                                             <View style={styles.progressBar}>
                                                 <View
@@ -502,8 +677,8 @@ export default function MainBranchDashboard() {
                                                         color={colors.text}
                                                     />
                                                 </View>
-                                                <Text style={styles.regionName}>{region}</Text>
-                                                <Text style={styles.regionTotal}>{total} Sales</Text>
+                                                <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
+                                                <Text style={styles.regionTotal} numberOfLines={1}>{total} Sales</Text>
 
                                                 <View style={styles.progressBar}>
                                                     <View
@@ -559,9 +734,9 @@ export default function MainBranchDashboard() {
                                                 </View>
                                             </View>
                                             <View style={styles.listContent}>
-                                                <Text style={styles.listTitle}>{s.customerName}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <Text style={styles.listSub}>{s.productModel}</Text>
+                                                <Text style={styles.listTitle} numberOfLines={1}>{s.customerName}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                                    <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">{s.productModel}</Text>
                                                     <View style={[styles.countdownBadge, { backgroundColor: countdown.color + '20' }]}>
                                                         <Text style={[styles.countdownText, { color: countdown.color }]}>
                                                             {countdown.label}
@@ -571,7 +746,7 @@ export default function MainBranchDashboard() {
                                             </View>
                                             <View style={styles.listRight}>
                                                 <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                                <Text style={styles.listCity}>{s.city}</Text>
+                                                <Text style={styles.listCity} numberOfLines={1}>{s.city}</Text>
                                             </View>
                                             <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
                                         </Pressable>
@@ -988,21 +1163,21 @@ const styles = StyleSheet.create({
     logoutBtn: {},
     logoutIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
-    bentoGrid: { flexDirection: 'row', gap: 12, marginBottom: 28, height: 160 },
-    mainStatCard: { flex: 1.6, borderRadius: 24, padding: 20, justifyContent: 'space-between', elevation: 4, shadowColor: THEME.colors.secondary, shadowOpacity: 0.4, shadowOffset: { height: 8, width: 0 }, shadowRadius: 12 },
+    bentoGrid: { flexDirection: 'row', gap: 12, marginBottom: 28, minHeight: 160 },
+    mainStatCard: { flex: 1.6, borderRadius: 24, padding: 16, justifyContent: 'space-between', elevation: 4, shadowColor: THEME.colors.secondary, shadowOpacity: 0.4, shadowOffset: { height: 8, width: 0 }, shadowRadius: 12 },
     statTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-    statIconWrapper: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-    statBadge: { backgroundColor: 'rgba(0,0,0,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    badgeText: { color: 'white', fontSize: 10, fontFamily: THEME.fonts.bold },
-    mainStatValue: { color: 'white', fontSize: 36, fontFamily: THEME.fonts.black, lineHeight: 40 },
-    mainStatLabel: { color: THEME.colors.mintLight, fontSize: 14, fontFamily: THEME.fonts.semiBold },
+    statIconWrapper: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+    statBadge: { backgroundColor: 'rgba(0,0,0,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    badgeText: { color: 'white', fontSize: 9, fontFamily: THEME.fonts.bold },
+    mainStatValue: { color: 'white', fontSize: screenWidth < 380 ? 28 : 32, fontFamily: THEME.fonts.black, lineHeight: screenWidth < 380 ? 32 : 36 },
+    mainStatLabel: { color: THEME.colors.mintLight, fontSize: 13, fontFamily: THEME.fonts.semiBold },
 
     graphCard: { padding: 16, borderRadius: 24, marginBottom: 28, backgroundColor: 'rgba(255,255,255,0.7)' },
 
     bentoColumn: { flex: 1, gap: 12 },
-    statBox: { flex: 1, borderRadius: 20, padding: 16, justifyContent: 'center' },
-    statBoxValue: { fontSize: 20, fontFamily: THEME.fonts.black, marginBottom: 2 },
-    statBoxLabel: { fontSize: 12, fontFamily: THEME.fonts.bold },
+    statBox: { flex: 1, borderRadius: 20, padding: 12, justifyContent: 'center' },
+    statBoxValue: { fontSize: screenWidth < 380 ? 18 : 20, fontFamily: THEME.fonts.black, marginBottom: 2 },
+    statBoxLabel: { fontSize: 11, fontFamily: THEME.fonts.bold },
 
     filterRow: { flexDirection: 'row', gap: 8, marginBottom: 28 },
     chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.5)', borderWidth: 1, borderColor: 'transparent' },
@@ -1117,11 +1292,11 @@ const styles = StyleSheet.create({
     },
     tabSwitcher: {
         flexDirection: 'row',
-        padding: 5,
+        padding: 4,
         borderRadius: 100,
         backgroundColor: 'rgba(255, 255, 255, 0.4)',
         width: '100%',
-        maxWidth: 360,
+        maxWidth: 400,
     },
     tabButton: {
         flex: 1,
@@ -1134,7 +1309,7 @@ const styles = StyleSheet.create({
         ...THEME.shadows.small,
     },
     tabButtonText: {
-        fontSize: 15,
+        fontSize: screenWidth < 380 ? 12 : 14,
         fontFamily: THEME.fonts.bold,
         color: THEME.colors.textSecondary,
     },
@@ -1211,6 +1386,23 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: THEME.fonts.bold,
     },
+    tag: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    tagText: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.bold,
+    },
+    downloadIconBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.9)',
@@ -1243,5 +1435,29 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    actionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderRadius: 20,
+        backgroundColor: 'white',
+        shadowColor: 'black',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
+    },
+    actionIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    actionText: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
     },
 });
