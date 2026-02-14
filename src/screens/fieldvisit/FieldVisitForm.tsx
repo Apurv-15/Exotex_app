@@ -125,6 +125,14 @@ export default function FieldVisitForm() {
         hasUsedSoftener: false,
     });
 
+    const handleExit = () => {
+        if (user?.role === 'Admin' || user?.role === 'Super Admin') {
+            navigation.navigate('MainDashboard');
+        } else {
+            navigation.navigate('SubDashboard');
+        }
+    };
+
     const fillDummyData = () => {
         setFormData({
             dateOfVisit: new Date().toISOString().split('T')[0],
@@ -358,31 +366,7 @@ export default function FieldVisitForm() {
             setUploadStatus('Success!');
             // SoundManager.playSuccess();
 
-            if (Platform.OS === 'web') {
-                const download = window.confirm('Success! Field visit recorded successfully. Do you want to download the report?');
-                if (download) {
-                    await handleDownloadReport();
-                }
-                navigation.goBack();
-            } else {
-                Alert.alert(
-                    'Success',
-                    'Field visit recorded successfully!',
-                    [
-                        {
-                            text: 'Download Report',
-                            onPress: async () => {
-                                await handleDownloadReport();
-                                navigation.goBack();
-                            }
-                        },
-                        {
-                            text: 'Done',
-                            onPress: () => navigation.goBack()
-                        }
-                    ]
-                );
-            }
+            navigation.navigate('FieldVisitSuccess', { formData });
         } catch (error: any) {
             console.error('Submit error:', error);
             showAlert('Error', error.message || 'Failed to save field visit');
@@ -1261,7 +1245,7 @@ export default function FieldVisitForm() {
                 <View style={styles.headerSubtitleCard}>
                     <View style={styles.headerTitleRow}>
                         <Pressable
-                            onPress={() => navigation.goBack()}
+                            onPress={handleExit}
                             style={styles.backButton}
                         >
                             <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
@@ -1343,7 +1327,8 @@ export default function FieldVisitForm() {
                                 onPress={handleDownloadReport}
                                 disabled={loading}
                             >
-                                <MaterialCommunityIcons name="file-pdf-box" size={24} color="#EF4444" />
+                                <MaterialCommunityIcons name="file-pdf-box" size={20} color="#EF4444" />
+                                <Text style={styles.downloadLabel}>Report</Text>
                             </Pressable>
                         )}
 
@@ -1406,8 +1391,8 @@ const styles = StyleSheet.create({
         color: '#7C3AED',
     },
     downloadReportBtn: {
-        width: 44,
-        height: 44,
+        width: 54,
+        height: 54,
         borderRadius: 12,
         backgroundColor: '#FEE2E2',
         justifyContent: 'center',
@@ -1415,6 +1400,12 @@ const styles = StyleSheet.create({
         marginRight: 12,
         borderWidth: 1,
         borderColor: '#FECACA',
+    },
+    downloadLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#EF4444',
+        marginTop: 1,
     },
     backButton: {
         width: 40, height: 40, borderRadius: 12,

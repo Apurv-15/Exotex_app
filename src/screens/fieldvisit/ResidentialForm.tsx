@@ -46,6 +46,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>Date</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.dateOfVisit}
                             onChangeText={(v) => updateField('dateOfVisit', v)}
                         />
@@ -54,6 +56,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>Mobile Number</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="10-digit mobile"
+                            placeholderTextColor="#9CA3AF"
                             keyboardType="phone-pad"
                             value={formData.mobileNumber}
                             onChangeText={(v) => updateField('mobileNumber', v)}
@@ -65,6 +69,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                     <Text style={styles.label}>Name</Text>
                     <TextInput
                         style={styles.input}
+                        placeholder="Contact person name"
+                        placeholderTextColor="#9CA3AF"
                         value={formData.contactPersonName}
                         onChangeText={(v) => updateField('contactPersonName', v)}
                     />
@@ -74,6 +80,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                     <Text style={styles.label}>Address</Text>
                     <TextInput
                         style={styles.input}
+                        placeholder="Full site address"
+                        placeholderTextColor="#9CA3AF"
                         multiline
                         value={formData.siteAddress}
                         onChangeText={(v) => updateField('siteAddress', v)}
@@ -85,6 +93,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>City</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="Enter city"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.industryType} // Using industryType for city in regular form too
                             onChangeText={(v) => updateField('industryType', v)}
                         />
@@ -93,6 +103,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>Water Source</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="Select source"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.waterSource.join(', ')}
                             onFocus={() => { }} // Could add a picker here
                         />
@@ -104,6 +116,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>Pipe Size</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="e.g. 1 inch"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.pipeLineSize}
                             onChangeText={(v) => updateField('pipeLineSize', v)}
                         />
@@ -112,6 +126,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>Tank Capacity</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="e.g. 1000L"
+                            placeholderTextColor="#9CA3AF"
                             value={formData.tankCapacity}
                             onChangeText={(v) => updateField('tankCapacity', v)}
                         />
@@ -123,6 +139,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>PPM</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="PPM value"
+                            placeholderTextColor="#9CA3AF"
                             keyboardType="numeric"
                             value={formData.waterHardnessPPM}
                             onChangeText={(v) => updateField('waterHardnessPPM', v)}
@@ -132,6 +150,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>TDS</Text>
                         <TextInput
                             style={styles.input}
+                            placeholder="TDS value"
+                            placeholderTextColor="#9CA3AF"
                             keyboardType="numeric"
                             value={formData.waterTDS}
                             onChangeText={(v) => updateField('waterTDS', v)}
@@ -143,6 +163,8 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                     <Text style={styles.label}>Remarks</Text>
                     <TextInput
                         style={styles.input}
+                        placeholder="Additional notes or observation"
+                        placeholderTextColor="#9CA3AF"
                         multiline
                         value={formData.customerRemarks}
                         onChangeText={(v) => updateField('customerRemarks', v)}
