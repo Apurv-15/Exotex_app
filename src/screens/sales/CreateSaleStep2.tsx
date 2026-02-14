@@ -24,7 +24,7 @@ export default function CreateSaleStep2() {
     const { formData } = route.params || {};
     const { user } = useAuth();
 
-    const [images, setImages] = useState<string[]>(['', '', '', '']);
+    const [images, setImages] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number>(0);
     const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -46,40 +46,37 @@ export default function CreateSaleStep2() {
         }
     };
 
-    const pickImage = async (index: number) => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-            allowsMultipleSelection: false,
-        });
+    const handlePickImage = async () => {
+        if (images.length >= 6) {
+            showAlert('Limit Reached', 'Maximum 6 photos allowed');
+            return;
+        }
 
-        if (!result.canceled) {
-            const uri = result.assets[0].uri;
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsMultipleSelection: true,
+                quality: 0.8,
+                selectionLimit: 6 - images.length,
+            });
 
-            // File validation removed as per request to allow all image types returned by picker
-
-
-            const newImages = [...images];
-            newImages[index] = uri;
-            setImages(newImages);
+            if (!result.canceled && result.assets) {
+                const newUris = result.assets.map(asset => asset.uri);
+                setImages([...images, ...newUris]);
+            }
+        } catch (error) {
+            console.error('Image picker error:', error);
+            showAlert('Error', 'Failed to pick images');
         }
     };
 
     const removeImage = (index: number) => {
-        const newImages = [...images];
-        newImages[index] = '';
-        setImages(newImages);
+        setImages(images.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async () => {
-        // Check compulsory images (indexes 0 and 1)
-        const isProductFrontUploaded = !!images[0];
-        const isSerialNoUploaded = !!images[1];
-
-        if (!isProductFrontUploaded || !isSerialNoUploaded) {
-            showAlert('Images Required', 'Please upload at least the Product Front and Serial Number images.');
+        if (images.length < 2) {
+            showAlert('Images Required', 'Please upload at least 2 images (Product and Serial Number).');
             return;
         }
 
@@ -88,16 +85,13 @@ export default function CreateSaleStep2() {
         setUploadStatus(isOnline ? 'Uploading images...' : 'Saving locally (offline)...');
 
         try {
-            // Filter out empty images
-            const validImages = images.filter(img => img && img.length > 0);
-
             const newSale = await SalesService.createSale(
                 {
                     ...formData,
                     saleDate: new Date().toISOString().split('T')[0],
                     branchId: user?.branchId || 'unknown',
                 },
-                validImages, // Pass images to be uploaded
+                images, // Already filtered as valid strings
                 (progress) => {
                     setUploadProgress(progress);
                     if (progress === 100) {
@@ -107,7 +101,6 @@ export default function CreateSaleStep2() {
             );
 
             setUploadStatus('Success!');
-            // SoundManager.playSuccess();
             navigation.replace('WarrantyCard', { sale: newSale });
         } catch (error) {
             console.error('Submit error:', error);
@@ -159,19 +152,23 @@ export default function CreateSaleStep2() {
                     {/* Progress Card */}
                     <GlassPanel style={styles.card}>
                         <View style={styles.progressHeader}>
-                            <Text style={styles.progressLabel}>Uploads (2 Required)</Text>
-                            <Text style={[styles.progressValue, compulsoryUploaded && { color: '#10B981' }]}>
-                                {totalUploaded}/4 Files {compulsoryUploaded && '(Ready)'}
+                            <Text style={styles.progressLabel}>Warranty Photos (Min: 2)</Text>
+                            <Text style={[styles.progressValue, images.length >= 2 && { color: '#10B981' }]}>
+                                {images.length}/6 Files {images.length >= 2 && '(Ready)'}
                             </Text>
                         </View>
                         <View style={styles.progressBar}>
-                            <LinearGradient
-                                colors={compulsoryUploaded ? ['#10B981', '#059669'] : ['#F59E0B', '#D97706']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={[styles.progressFill, { width: `${(totalUploaded / 4) * 100}%` }]}
+                            <View
+                                style={[
+                                    styles.progressFill,
+                                    {
+                                        width: `${(images.length / 6) * 100}%`,
+                                        backgroundColor: images.length >= 2 ? '#10B981' : '#F59E0B'
+                                    }
+                                ]}
                             />
                         </View>
+                        <Text style={styles.description}>Please upload Product Front and Serial Number photos.</Text>
                     </GlassPanel>
 
                     {/* Upload Progress */}
@@ -187,43 +184,42 @@ export default function CreateSaleStep2() {
 
                     {/* Image Grid */}
                     <View style={styles.imageGrid}>
-                        {IMAGE_CONFIG.map((config, index) => (
-                            <Pressable
-                                key={index}
-                                style={({ pressed }) => [
-                                    styles.imageSlot,
-                                    pressed && { transform: [{ scale: 0.98 }] }
-                                ]}
-                                onPress={() => !images[index] && pickImage(index)}
-                            >
-                                {images[index] ? (
-                                    <View style={styles.imageContainer}>
-                                        <Image
-                                            source={{ uri: images[index] }}
-                                            style={styles.image}
-                                            resizeMode="cover"
-                                        />
-                                        <Pressable
-                                            style={styles.removeButton}
-                                            onPress={() => removeImage(index)}
-                                        >
-                                            <MaterialCommunityIcons name="close" size={16} color="white" />
-                                        </Pressable>
-                                        <View style={styles.imageOverlay}>
-                                            <MaterialCommunityIcons name="check-circle" size={16} color="#10B981" />
-                                            <Text style={styles.imageLabelDone}>{config.label}</Text>
-                                        </View>
+                        {/* Add Button */}
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.imageSlot,
+                                styles.emptySlot,
+                                pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={handlePickImage}
+                        >
+                            <View style={[styles.slotIcon, { backgroundColor: 'rgba(124, 58, 237, 0.1)' }]}>
+                                <MaterialCommunityIcons name="camera-plus" size={32} color="#7C3AED" />
+                            </View>
+                            <Text style={styles.slotLabel}>Add Photos</Text>
+                        </Pressable>
+
+                        {/* Selected Images */}
+                        {images.map((uri, index) => (
+                            <View key={index} style={styles.imageSlot}>
+                                <View style={styles.imageContainer}>
+                                    <Image
+                                        source={{ uri }}
+                                        style={styles.image}
+                                        resizeMode="cover"
+                                    />
+                                    <Pressable
+                                        style={styles.removeButton}
+                                        onPress={() => removeImage(index)}
+                                    >
+                                        <MaterialCommunityIcons name="close" size={16} color="white" />
+                                    </Pressable>
+                                    <View style={styles.imageOverlay}>
+                                        <MaterialCommunityIcons name="check-circle" size={16} color="#10B981" />
+                                        <Text style={styles.imageLabelDone}>Photo {index + 1}</Text>
                                     </View>
-                                ) : (
-                                    <View style={styles.emptySlot}>
-                                        <View style={[styles.slotIcon, { backgroundColor: config.bg }]}>
-                                            <MaterialCommunityIcons name={config.icon as any} size={24} color={config.color} />
-                                        </View>
-                                        <Text style={styles.slotLabel}>{config.label}</Text>
-                                        <Text style={styles.slotAction}>Tap to upload</Text>
-                                    </View>
-                                )}
-                            </Pressable>
+                                </View>
+                            </View>
                         ))}
                     </View>
 
@@ -235,14 +231,14 @@ export default function CreateSaleStep2() {
                     <Pressable
                         style={({ pressed }) => [
                             styles.submitButton,
-                            pressed && !(!compulsoryUploaded || submitting) && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-                            (!compulsoryUploaded || submitting) && styles.submitButtonDisabled
+                            pressed && !(images.length < 2 || submitting) && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+                            (images.length < 2 || submitting) && styles.submitButtonDisabled
                         ]}
                         onPress={handleSubmit}
-                        disabled={submitting || !compulsoryUploaded}
+                        disabled={submitting || images.length < 2}
                     >
                         <LinearGradient
-                            colors={compulsoryUploaded ? ['#10B981', '#059669'] : ['#E5E7EB', '#D1D5DB']}
+                            colors={images.length >= 2 ? ['#10B981', '#059669'] : ['#E5E7EB', '#D1D5DB']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.gradientButton}

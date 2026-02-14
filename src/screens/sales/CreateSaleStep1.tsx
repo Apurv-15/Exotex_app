@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import { useAuth } from '../../context/AuthContext';
 // import { SoundManager } from '../../utils/SoundManager';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -23,6 +24,7 @@ const PRODUCT_MODELS = [
 
 export default function CreateSaleStep1() {
     const navigation = useNavigation<any>();
+    const { user } = useAuth();
     const [showModelDropdown, setShowModelDropdown] = useState(false);
     const [formData, setFormData] = useState({
         customerName: '',
@@ -96,6 +98,14 @@ export default function CreateSaleStep1() {
         navigation.navigate('CreateSaleStep2', { formData });
     };
 
+    const handleExit = () => {
+        if (user?.role === 'Admin' || user?.role === 'Super Admin') {
+            navigation.navigate('MainDashboard');
+        } else {
+            navigation.navigate('SubDashboard');
+        }
+    };
+
     return (
         <MeshBackground>
             <KeyboardAvoidingView
@@ -111,7 +121,7 @@ export default function CreateSaleStep1() {
                     <View style={styles.header}>
                         <View style={styles.headerTitleRow}>
                             <Pressable
-                                onPress={() => navigation.goBack()}
+                                onPress={handleExit}
                                 style={styles.backButton}
                             >
                                 <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
