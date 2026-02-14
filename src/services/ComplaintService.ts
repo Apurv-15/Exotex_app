@@ -272,6 +272,7 @@ export const ComplaintService = {
                 return data;
             } catch (error) {
                 console.error('Supabase createComplaint error:', error);
+                throw error;
             }
         }
 
@@ -279,5 +280,46 @@ export const ComplaintService = {
         const newComplaint = { ...complaint, id: Math.random().toString(36).substr(2, 9) };
         await Storage.setItem(STORAGE_KEY, JSON.stringify([newComplaint, ...complaints]));
         return newComplaint;
+    },
+
+    // Update existing complaint
+    updateComplaint: async (complaintId: string, updates: Partial<Complaint>): Promise<void> => {
+        if (isSupabaseConfigured()) {
+            try {
+                const { error } = await supabase
+                    .from('complaints')
+                    .update({
+                        invoice_no: updates.invoiceNo,
+                        customer_name: updates.customerName,
+                        customer_phone: updates.customerPhone,
+                        customer_email: updates.customerEmail,
+                        category: updates.category,
+                        description: updates.description,
+                        assigned_department: updates.assignedDepartment,
+                        assigned_officer: updates.assignedOfficer,
+                        action_taken: updates.actionTaken,
+                        resolution_date: updates.resolutionDate,
+                        status: updates.status,
+                        client_confirmation: updates.clientConfirmation,
+                        client_feedback: updates.clientFeedback,
+                        resolved_by_name: updates.resolvedByName,
+                        resolved_by_designation: updates.resolvedByDesignation,
+                        image_urls: updates.imageUrls,
+                        warranty_card_attached: updates.warrantyCardAttached,
+                        city: updates.city
+                    })
+                    .eq('complaint_id', complaintId);
+
+                if (error) throw error;
+            } catch (error) {
+                console.error('Supabase updateComplaint error:', error);
+                throw error;
+            }
+            return;
+        }
+
+        const complaints = await ComplaintService.getComplaints();
+        const updated = complaints.map(c => c.complaintId === complaintId ? { ...c, ...updates } : c);
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
     }
 };

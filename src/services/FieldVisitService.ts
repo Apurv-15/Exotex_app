@@ -172,6 +172,8 @@ const dbToFieldVisit = (row: any): FieldVisit => ({
     createdBy: row.created_by,
     status: row.status,
     imageUrls: row.image_urls || [],
+
+    // Residential Specific Fields
     propertyType: row.property_type || '',
     tankCapacity: row.tank_capacity || '',
     waterTDS: row.water_tds || '',
@@ -182,6 +184,70 @@ const dbToFieldVisit = (row: any): FieldVisit => ({
     hasWaterPurifier: row.has_water_purifier || false,
     waterPurifierBrand: row.water_purifier_brand || '',
     hasUsedSoftener: row.has_used_softener || false,
+
+    // Industrial / New Fields
+    dateOfVisit: row.date_of_visit || row.visit_date,
+    branchName: row.branch_name || '',
+    salesEngineerName: row.sales_engineer_name || '',
+    clientCompanyName: row.client_company_name || '',
+    siteAddress: row.site_address || '',
+    industryType: row.industry_type || '',
+    contactPersonName: row.contact_person_name || '',
+    designation: row.designation || '',
+    mobileNumber: row.mobile_number || '',
+    emailId: row.email_id || '',
+
+    waterSource: row.water_source || [],
+    waterSourceOther: row.water_source_other || '',
+    dailyWaterConsumption: row.daily_water_consumption || '',
+    purposeOfWaterUsage: row.purpose_of_water_usage || [],
+    purposeOther: row.purpose_other || '',
+    waterHardnessPPM: row.water_hardness_ppm || '',
+    scalingIssueObserved: row.scaling_issue_observed || '',
+    scalingDescription: row.scaling_description || '',
+
+    existingWaterTreatment: row.existing_water_treatment || '',
+    existingSystemDetails: row.existing_system_details || '',
+    problemsFaced: row.problems_faced || [],
+    problemsOther: row.problems_other || '',
+    maintenanceFrequency: row.maintenance_frequency || '',
+    customerExpectations: row.customer_expectations || '',
+
+    applicationArea: row.application_area || [],
+    applicationOther: row.application_other || '',
+    pipeLineSize: row.pipe_line_size || '',
+    operatingPressure: row.operating_pressure || '',
+    operatingTemperature: row.operating_temperature || '',
+
+    ekotexInstallationFeasible: row.ekotex_installation_feasible || '',
+    recommendedEkotexModel: row.recommended_ekotex_model || '',
+    quantityRequired: row.quantity_required || '',
+    siteConstraints: row.site_constraints || '',
+    accessoriesRequired: row.accessories_required || '',
+
+    customerInterestLevel: row.customer_interest_level || '',
+    budgetDiscussed: row.budget_discussed || '',
+    expectedDecisionTimeline: row.expected_decision_timeline || '',
+    decisionMakerIdentified: row.decision_maker_identified || '',
+
+    existingCompetitorSolution: row.existing_competitor_solution || '',
+    competitorPriceRange: row.competitor_price_range || '',
+    customerRemarks: row.customer_remarks || '',
+
+    sitePhotographsTaken: row.site_photographs_taken || false,
+    existingSystemPhotographs: row.existing_system_photographs || false,
+    problemAreaPhotographs: row.problem_area_photographs || false,
+    drawingsCollected: row.drawings_collected || false,
+
+    nextActionRequired: row.next_action_required || [],
+    nextActionOther: row.next_action_other || '',
+    responsiblePerson: row.responsible_person || '',
+    expectedFollowUpDate: row.expected_follow_up_date || '',
+
+    salesEngineerRemarks: row.sales_engineer_remarks || '',
+    overallSiteAssessment: row.overall_site_assessment || '',
+    conversionProbability: row.conversion_probability || '',
+    visitedBySignature: row.visited_by_signature || '',
 });
 
 // Helper to convert FieldVisit object to DB row
@@ -219,6 +285,8 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
     created_by: visit.createdBy,
     status: visit.status,
     image_urls: visit.imageUrls || [],
+
+    // Residential Fields
     property_type: visit.propertyType || null,
     tank_capacity: visit.tankCapacity || null,
     water_tds: visit.waterTDS || null,
@@ -229,6 +297,69 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
     has_water_purifier: visit.hasWaterPurifier || false,
     water_purifier_brand: visit.waterPurifierBrand || null,
     has_used_softener: visit.hasUsedSoftener || false,
+
+    // Industrial / New Fields
+    branch_name: visit.branchName || null,
+    sales_engineer_name: visit.salesEngineerName || null,
+    client_company_name: visit.clientCompanyName || null,
+    site_address: visit.siteAddress || null,
+    industry_type: visit.industryType || null,
+    contact_person_name: visit.contactPersonName || null,
+    designation: visit.designation || null,
+    mobile_number: visit.mobileNumber || null,
+    email_id: visit.emailId || null,
+
+    water_source: visit.waterSource || [],
+    water_source_other: visit.waterSourceOther || null,
+    daily_water_consumption: visit.dailyWaterConsumption || null,
+    purpose_of_water_usage: visit.purposeOfWaterUsage || [],
+    purpose_other: visit.purposeOther || null,
+    water_hardness_ppm: visit.waterHardnessPPM || null,
+    scaling_issue_observed: visit.scalingIssueObserved || null,
+    scaling_description: visit.scalingDescription || null,
+
+    existing_water_treatment: visit.existingWaterTreatment || null,
+    existing_system_details: visit.existingSystemDetails || null,
+    problems_faced: visit.problemsFaced || [],
+    problems_other: visit.problemsOther || null,
+    maintenance_frequency: visit.maintenanceFrequency || null,
+    customer_expectations: visit.customerExpectations || null,
+
+    application_area: visit.applicationArea || [],
+    application_other: visit.applicationOther || null,
+    pipe_line_size: visit.pipeLineSize || null,
+    operating_pressure: visit.operatingPressure || null,
+    operating_temperature: visit.operatingTemperature || null,
+
+    ekotex_installation_feasible: visit.ekotexInstallationFeasible || null,
+    recommended_ekotex_model: visit.recommendedEkotexModel || null,
+    quantity_required: visit.quantityRequired || null,
+    site_constraints: visit.siteConstraints || null,
+    accessories_required: visit.accessoriesRequired || null,
+
+    customer_interest_level: visit.customerInterestLevel || null,
+    budget_discussed: visit.budgetDiscussed || null,
+    expected_decision_timeline: visit.expectedDecisionTimeline || null,
+    decision_maker_identified: visit.decisionMakerIdentified || null,
+
+    existing_competitor_solution: visit.existingCompetitorSolution || null,
+    competitor_price_range: visit.competitorPriceRange || null,
+    customer_remarks: visit.customerRemarks || null,
+
+    site_photographs_taken: visit.sitePhotographsTaken || false,
+    existing_system_photographs: visit.existingSystemPhotographs || false,
+    problem_area_photographs: visit.problemAreaPhotographs || false,
+    drawings_collected: visit.drawingsCollected || false,
+
+    next_action_required: visit.nextActionRequired || [],
+    next_action_other: visit.nextActionOther || null,
+    responsible_person: visit.responsiblePerson || null,
+    expected_follow_up_date: visit.expectedFollowUpDate || null,
+
+    sales_engineer_remarks: visit.salesEngineerRemarks || null,
+    overall_site_assessment: visit.overallSiteAssessment || null,
+    conversion_probability: visit.conversionProbability || null,
+    visited_by_signature: visit.visitedBySignature || null,
 });
 
 export const FieldVisitService = {
