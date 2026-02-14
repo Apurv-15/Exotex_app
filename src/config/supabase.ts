@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 // Supabase Configuration
 // These values come from environment variables (.env file)
@@ -12,10 +13,48 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.warn('⚠️ Supabase credentials not found. Please check your .env file.');
 }
 
+// Custom storage adapter for Supabase to work with expo-secure-store/localStorage
+// This is defined inline to avoid circular dependency issues
+const supabaseStorage = {
+    getItem: async (key: string) => {
+        try {
+            if (Platform.OS === 'web') {
+                return localStorage.getItem(key);
+            }
+            return await SecureStore.getItemAsync(key);
+        } catch (error) {
+            console.error('Storage getItem error:', error);
+            return null;
+        }
+    },
+    setItem: async (key: string, value: string) => {
+        try {
+            if (Platform.OS === 'web') {
+                localStorage.setItem(key, value);
+                return;
+            }
+            await SecureStore.setItemAsync(key, value);
+        } catch (error) {
+            console.error('Storage setItem error:', error);
+        }
+    },
+    removeItem: async (key: string) => {
+        try {
+            if (Platform.OS === 'web') {
+                localStorage.removeItem(key);
+                return;
+            }
+            await SecureStore.deleteItemAsync(key);
+        } catch (error) {
+            console.error('Storage removeItem error:', error);
+        }
+    },
+};
+
 // Create Supabase client
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-        storage: Platform.OS === 'web' ? undefined : undefined,
+        storage: supabaseStorage,
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,

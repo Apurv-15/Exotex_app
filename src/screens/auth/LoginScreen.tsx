@@ -38,6 +38,7 @@ export default function LoginScreen() {
     const [registerName, setRegisterName] = useState('');
     const [registerRole, setRegisterRole] = useState<'Super Admin' | 'Admin' | 'User'>('User');
     const [registerBranch, setRegisterBranch] = useState('');
+    const [registerRegion, setRegisterRegion] = useState('');
     const [registerLoading, setRegisterLoading] = useState(false);
 
     // Tap Secret Access
@@ -61,7 +62,7 @@ export default function LoginScreen() {
 
     const handleRegister = async () => {
         if (!registerEmail || !registerPassword || !registerName || !registerBranch) {
-            Alert.alert('Error', 'Please fill all fields for registration');
+            Alert.alert('Error', 'Please fill all required fields for registration');
             return;
         }
 
@@ -72,7 +73,8 @@ export default function LoginScreen() {
                 registerPassword,
                 registerName,
                 registerRole,
-                registerBranch
+                registerBranch,
+                registerRegion || undefined
             );
             Alert.alert('Success', 'Access created successfully. You can now login.');
             setShowRegister(false);
@@ -83,6 +85,7 @@ export default function LoginScreen() {
             setRegisterPassword('');
             setRegisterName('');
             setRegisterBranch('');
+            setRegisterRegion('');
         } catch (error: any) {
             Alert.alert('Registration Failed', error.message || 'Error creating access');
         } finally {
@@ -220,12 +223,12 @@ export default function LoginScreen() {
                     </View>
 
                     {/* Quick Access (Preserved) */}
-                    <View style={styles.quickAccessSection}>
+                    <View style={[styles.quickAccessSection, { marginTop: 24 }]}>
                         <Text style={styles.quickAccessTitle}>QUICK ACCESS</Text>
-                        <View style={styles.quickAccessRow}>
+                        <View style={[styles.quickAccessRow, { gap: 8 }]}>
                             <Pressable
                                 style={styles.quickChip}
-                                onPress={() => login('admin@mainbranch.com', 'admin')}
+                                onPress={() => login('admin@gmail.com', 'admin@123')}
                             >
                                 <View style={[styles.quickIconCircle, { backgroundColor: '#EEF2FF' }]}>
                                     <MaterialCommunityIcons name="shield-account" size={16} color="#4F46E5" />
@@ -235,7 +238,7 @@ export default function LoginScreen() {
 
                             <Pressable
                                 style={styles.quickChip}
-                                onPress={() => login('user@subbranch.com', 'user')}
+                                onPress={() => login('bom@gmail.com', 'asdfgh@123')}
                             >
                                 <View style={[styles.quickIconCircle, { backgroundColor: '#ECFDF5' }]}>
                                     <MaterialCommunityIcons name="account" size={16} color="#059669" />
@@ -307,6 +310,17 @@ export default function LoginScreen() {
                                         onChangeText={setRegisterBranch}
                                         placeholder="Main Branch / Nashik"
                                     />
+                                </View>
+
+                                <View style={styles.modalInputGroup}>
+                                    <Text style={styles.modalLabel}>REGION (Optional)</Text>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        value={registerRegion}
+                                        onChangeText={setRegisterRegion}
+                                        placeholder="Mumbai / Delhi / Bangalore"
+                                    />
+                                    <Text style={styles.modalHint}>For stock filtering. Leave empty for all regions.</Text>
                                 </View>
 
                                 <View style={styles.modalInputGroup}>
@@ -608,21 +622,27 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         borderRadius: 32,
-        padding: 24,
+        padding: 20,
         maxHeight: '80%',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)', // Nearly solid white
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
     },
     modalTitle: {
-        fontSize: 24,
+        fontSize: 22,
         fontFamily: THEME.fonts.black,
         color: THEME.colors.text,
-        marginBottom: 24,
+        marginBottom: 16,
         textAlign: 'center',
     },
     modalForm: {
-        gap: 16,
+        gap: 12,
     },
     modalInputGroup: {
-        gap: 8,
+        gap: 4,
     },
     modalLabel: {
         fontSize: 10,
@@ -631,15 +651,21 @@ const styles = StyleSheet.create({
         letterSpacing: 1.5,
     },
     modalInput: {
-        backgroundColor: 'rgba(255,255,255,0.6)',
+        backgroundColor: '#F9FAFB', // Solid light gray background
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.8)',
+        borderColor: '#E5E7EB',
         borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
         fontFamily: THEME.fonts.semiBold,
         color: THEME.colors.text,
+    },
+    modalHint: {
+        fontSize: 11,
+        color: THEME.colors.textSecondary,
+        marginTop: 4,
+        fontFamily: THEME.fonts.body,
     },
     roleSelector: {
         flexDirection: 'row',
