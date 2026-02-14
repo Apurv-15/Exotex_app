@@ -11,14 +11,14 @@ export const AuthService = {
         try {
             // For development: Keep mock login for demo accounts
             if (email === 'admin@mainbranch.com' && password === 'admin') {
-                const mockResponse = {
+                const mockResponse: AuthResponse = {
                     token: 'mock_admin_token',
                     user: { id: '1', name: 'Main Admin', email, role: 'Admin', branchId: 'main' },
                 };
                 await AuthService.saveAuth(mockResponse);
                 return mockResponse;
             } else if (email === 'user@subbranch.com' && password === 'user') {
-                const mockResponse = {
+                const mockResponse: AuthResponse = {
                     token: 'mock_user_token',
                     user: { id: '2', name: 'Sub User', email, role: 'User', branchId: 'sub1' },
                 };

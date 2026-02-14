@@ -450,4 +450,59 @@ export const SalesService = {
             throw error;
         }
     },
+
+    // Search sale by invoice number or warranty ID
+    getSaleByInvoice: async (invoiceNo: string): Promise<Sale | null> => {
+        if (isSupabaseConfigured()) {
+            try {
+                // We use warranty_id to store the Invoice Number based on current usage
+                const { data, error } = await supabase
+                    .from('sales')
+                    .select('*')
+                    .eq('warranty_id', invoiceNo)
+                    .single();
+
+                if (error) {
+                    if (error.code === 'PGRST116') return null; // Not found
+                    throw error;
+                }
+                return dbToSale(data);
+            } catch (error) {
+                console.error('Supabase getSaleByInvoice error:', error);
+            }
+        }
+
+        const sales = await SalesService.getSales();
+        return sales.find(s => s.invoiceNumber === invoiceNo || s.warrantyId === invoiceNo) || null;
+    },
+
+    // Autocomplete search for warranty ID
+    searchSales: async (queryText: string): Promise<Sale[]> => {
+        if (!queryText || queryText.length < 2) return [];
+
+        if (isSupabaseConfigured()) {
+            try {
+                const { data, error } = await supabase
+                    .from('sales')
+                    .select('*')
+                    .ilike('warranty_id', `%${queryText}%`)
+                    .limit(5);
+
+                if (error) throw error;
+                return (data || []).map(dbToSale);
+            } catch (error) {
+                console.error('Supabase searchSales error:', error);
+                return [];
+            }
+        }
+
+        // Local fallback
+        const sales = await SalesService.getSales();
+        return sales
+            .filter(s =>
+                (s.warrantyId && s.warrantyId.toLowerCase().includes(queryText.toLowerCase())) ||
+                (s.invoiceNumber && s.invoiceNumber.toLowerCase().includes(queryText.toLowerCase()))
+            )
+            .slice(0, 5);
+    }
 };
