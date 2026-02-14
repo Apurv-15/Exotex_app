@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar, Modal, TextInput } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
@@ -38,6 +38,18 @@ const REGION_COLORS: Record<string, { bg: string; text: string; icon: string }> 
 
 const getRegionColor = (city: string) => REGION_COLORS[city] || REGION_COLORS['default'];
 
+const PRODUCT_MODELS = [
+    'EKO-GREEN G3',
+    'EKO-GREEN G5',
+    'EKO-GREEN G6',
+    'EKO-GREEN G33',
+    'EKO-GREEN G130',
+    'EKO-GREEN G230',
+    'EKO-GREEN G330',
+    'EKO-GREEN G530',
+    'EKO-GREEN G600',
+];
+
 const calculateDaysRemaining = (saleDate: string) => {
     const start = new Date(saleDate);
     const today = new Date();
@@ -67,11 +79,12 @@ export default function MainBranchDashboard() {
     const [allSales, setAllSales] = useState<Sale[]>([]);
     const [allVisits, setAllVisits] = useState<any[]>([]);
     const [showAllSales, setShowAllSales] = useState(false);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Photos'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Complaints' | 'Visits' | 'Analytics' | 'Stock' | 'Photos'>('Dashboard');
     const [allStock, setAllStock] = useState<Stock[]>([]);
     const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
     const [complaintLoading, setComplaintLoading] = useState(false);
     const [stockLoading, setStockLoading] = useState(false);
+    const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
     // Photos selection state (lifted for floating toolbar)
     const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
@@ -87,8 +100,8 @@ export default function MainBranchDashboard() {
             let stockData: Stock[] = [];
             let complaintsData: Complaint[] = [];
 
-            // If Super Admin, get everything. If Admin and has branchId, filter by branch.
-            if (user?.role === 'Super Admin' || !user?.branchId) {
+            // If Super Admin, get everything. Otherwise filter by branch/region.
+            if (user?.role === 'Super Admin') {
                 const [s, v, st, c] = await Promise.all([
                     SalesService.getAllSales(),
                     FieldVisitService.getFieldVisits(),
@@ -100,12 +113,15 @@ export default function MainBranchDashboard() {
                 stockData = st;
                 complaintsData = c;
             } else {
-                // Admin restricted to branch
+                // Admin/User restricted to their branch or region
+                const userBranch = user?.branchId;
+                const userRegion = user?.region;
+
                 const [s, v, st, c] = await Promise.all([
-                    SalesService.getSalesByBranch(user.branchId),
-                    FieldVisitService.getFieldVisitsByBranch(user.branchId),
-                    StockService.getAllStock(),
-                    ComplaintService.getComplaints(user.branchId)
+                    userBranch ? SalesService.getSalesByBranch(userBranch) : SalesService.getAllSales(),
+                    userBranch ? FieldVisitService.getFieldVisitsByBranch(userBranch) : FieldVisitService.getFieldVisits(),
+                    userRegion ? StockService.getStockByRegion(userRegion) : StockService.getAllStock(),
+                    userBranch ? ComplaintService.getComplaints(userBranch) : ComplaintService.getComplaints()
                 ]);
                 salesData = s;
                 visitsData = v;
@@ -127,7 +143,7 @@ export default function MainBranchDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [user?.role, user?.branchId]);
+    }, [user?.role, user?.branchId, user?.region]);
 
     useFocusEffect(useCallback(() => {
         fetchData(true);
@@ -168,8 +184,27 @@ export default function MainBranchDashboard() {
         if (selectedRegion) {
             list = list.filter(s => s.city === selectedRegion);
         }
-        return list;
-    }, [filteredSales, selectedRegion]);
+
+        return [...list].sort((a, b) => {
+            const dateA = new Date(a.saleDate).getTime();
+            const dateB = new Date(b.saleDate).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [filteredSales, selectedRegion, sortOrder]);
+
+    // Display visits (filtered by region if selected)
+    const displayVisits = useMemo(() => {
+        let list = filteredVisits;
+        if (selectedRegion) {
+            list = list.filter(v => (v as any).city === selectedRegion);
+        }
+
+        return [...list].sort((a, b) => {
+            const dateA = new Date(a.visitDate || (a as any).dateOfVisit).getTime();
+            const dateB = new Date(b.visitDate || (b as any).dateOfVisit).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [filteredVisits, selectedRegion, sortOrder]);
 
     const totalSalesCount = filteredSales.length;
     const totalVisitsCount = filteredVisits.length;
@@ -293,8 +328,13 @@ export default function MainBranchDashboard() {
         if (selectedRegion) {
             list = list.filter(c => (c as any).city === selectedRegion);
         }
-        return list;
-    }, [filteredComplaints, selectedRegion]);
+
+        return [...list].sort((a, b) => {
+            const dateA = new Date(a.dateOfComplaint).getTime();
+            const dateB = new Date(b.dateOfComplaint).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [filteredComplaints, selectedRegion, sortOrder]);
 
     const activeComplaintCount = allComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
 
@@ -312,31 +352,161 @@ export default function MainBranchDashboard() {
         try {
             const html = `
                 <html>
-                    <body style="font-family: Arial; padding: 20px;">
-                        <h1 style="color: #EF4444;">COMPLAINT REPORT</h1>
-                        <hr/>
-                        <p><strong>Complaint ID:</strong> ${complaint.complaintId}</p>
-                        <p><strong>Customer:</strong> ${complaint.customerName}</p>
-                        <p><strong>Phone:</strong> ${complaint.customerPhone}</p>
-                        <p><strong>City:</strong> ${complaint.city || 'N/A'}</p>
-                        <p><strong>Category:</strong> ${complaint.category}</p>
-                        <p><strong>Status:</strong> ${complaint.status}</p>
-                        <p><strong>Date Raised:</strong> ${complaint.dateOfComplaint}</p>
-                        <p><strong>Days Passed:</strong> ${calculateDaysPassed(complaint.dateOfComplaint)}</p>
-                        <p><strong>Description:</strong> ${complaint.description}</p>
-                        <hr/>
-                        <p style="font-size: 10px; color: #666;">Generated on ${new Date().toLocaleString()}</p>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Complaint Report - ${complaint.complaintId}</title>
+                        <style>
+                            body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; line-height: 1.6; padding: 40px; }
+                            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #EF4444; padding-bottom: 10px; margin-bottom: 30px; }
+                            .logo { font-size: 24px; font-weight: bold; color: #74C69D; }
+                            .title { font-size: 28px; color: #EF4444; margin: 0; }
+                            .section { margin-bottom: 25px; background: #f9fafb; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; }
+                            .section-title { font-size: 18px; font-weight: bold; color: #111; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+                            .row { display: flex; margin-bottom: 8px; }
+                            .label { width: 150px; font-weight: bold; color: #666; }
+                            .value { flex: 1; color: #111; }
+                            .badge { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+                            .badge-open { background: #fee2e2; color: #ef4444; }
+                            .badge-resolved { background: #dcfce7; color: #16a34a; }
+                            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                            .description-box { background: #fff; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-top: 10px; min-height: 100px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div>
+                                <div class="logo">EXOTEX SYSTEM</div>
+                                <div style="font-size: 12px; color: #666;">Admin Dashboard - Official Report</div>
+                            </div>
+                            <h1 class="title">COMPLAINT REPORT</h1>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">General Information</div>
+                            <div class="row"><div class="label">Complaint ID:</div><div class="value">${complaint.complaintId}</div></div>
+                            <div class="row"><div class="label">Invoice No:</div><div class="value">${complaint.invoiceNo}</div></div>
+                            <div class="row"><div class="label">Date Raised:</div><div class="value">${new Date(complaint.dateOfComplaint).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
+                            <div class="row">
+                                <div class="label">Status:</div>
+                                <div class="value">
+                                    <span class="badge ${complaint.status === 'Resolved' || complaint.status === 'Closed' ? 'badge-resolved' : 'badge-open'}">
+                                        ${complaint.status}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="row"><div class="label">Category:</div><div class="value">${complaint.category}</div></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Customer Details</div>
+                            <div class="row"><div class="label">Name:</div><div class="value">${complaint.customerName}</div></div>
+                            <div class="row"><div class="label">Phone:</div><div class="value">${complaint.customerPhone}</div></div>
+                            <div class="row"><div class="label">Email:</div><div class="value">${complaint.customerEmail || 'N/A'}</div></div>
+                            <div class="row"><div class="label">City/Region:</div><div class="value">${complaint.city || 'N/A'}</div></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Complaint Description</div>
+                            <div class="description-box">${complaint.description}</div>
+                        </div>
+
+                        ${complaint.actionTaken ? `
+                        <div class="section">
+                            <div class="section-title">Resolution Details</div>
+                            <div class="description-box" style="background: #f0fdf4;">${complaint.actionTaken}</div>
+                            ${complaint.resolvedByName ? `<p style="margin-top:10px;"><strong>Resolved By:</strong> ${complaint.resolvedByName} (${complaint.resolvedByDesignation || 'Officer'})</p>` : ''}
+                        </div>
+                        ` : ''}
+
+                        <div class="footer">
+                            <p>This is an official document generated by EXOTEX Admin System.</p>
+                            <p>Generated on: ${new Date().toLocaleString()}</p>
+                        </div>
                     </body>
                 </html>
             `;
-            const { uri } = await Print.printToFileAsync({ html });
-            await Sharing.shareAsync(uri);
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to download complaint report');
+            Alert.alert('Error', 'Failed to generate complaint report');
         }
     };
 
+    const handleDownloadVisit = async (visit: any) => {
+        try {
+            const html = `
+                <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Field Visit Report - ${visit.id || 'Visit'}</title>
+                        <style>
+                            body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; line-height: 1.6; padding: 40px; }
+                            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; padding-bottom: 10px; margin-bottom: 30px; }
+                            .logo { font-size: 24px; font-weight: bold; color: #74C69D; }
+                            .title { font-size: 28px; color: #059669; margin: 0; }
+                            .section { margin-bottom: 25px; background: #f0fdf4; padding: 20px; border-radius: 12px; border: 1px solid #dcfce7; }
+                            .section-title { font-size: 18px; font-weight: bold; color: #065f46; margin-bottom: 15px; border-bottom: 1px solid #a7f3d0; padding-bottom: 5px; }
+                            .row { display: flex; margin-bottom: 8px; }
+                            .label { width: 150px; font-weight: bold; color: #065f46; }
+                            .value { flex: 1; color: #111; }
+                            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                            .notes-box { background: #fff; border: 1px solid #d1fae5; padding: 15px; border-radius: 8px; min-height: 80px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div>
+                                <div class="logo">EXOTEX SYSTEM</div>
+                                <div style="font-size: 12px; color: #666;">Field Service Department</div>
+                            </div>
+                            <h1 class="title">FIELD VISIT REPORT</h1>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Visit Information</div>
+                            <div class="row"><div class="label">Visit ID:</div><div class="value">${visit.id || 'N/A'}</div></div>
+                            <div class="row"><div class="label">Visit Date:</div><div class="value">${visit.visitDate || visit.dateOfVisit || 'N/A'}</div></div>
+                            <div class="row"><div class="label">Status:</div><div class="value"><strong style="color:#059669;">${visit.status || 'N/A'}</strong></div></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Customer & Property</div>
+                            <div class="row"><div class="label">Customer Name:</div><div class="value">${visit.customerName}</div></div>
+                            <div class="row"><div class="label">Phone:</div><div class="value">${visit.customerPhone}</div></div>
+                            <div class="row"><div class="label">City/Region:</div><div class="value">${visit.city || 'N/A'}</div></div>
+                            <div class="row"><div class="label">Property Type:</div><div class="value">${visit.propertyType || 'N/A'}</div></div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Technician Notes / Remarks</div>
+                            <div class="notes-box">${visit.notes || visit.remarks || 'No remarks provided.'}</div>
+                        </div>
+
+                        <div class="footer">
+                            <p>This report serves as an official record of the field service provided.</p>
+                            <p>Generated on: ${new Date().toLocaleString()}</p>
+                        </div>
+                    </body>
+                </html>
+            `;
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to generate field visit report');
+        }
+    };
     const handleDownloadPhotos = async () => {
         if (selectedPhotos.length === 0) return;
         setIsDownloadingPhotos(true);
@@ -378,11 +548,18 @@ export default function MainBranchDashboard() {
                             <Text style={styles.subtitle} numberOfLines={1}>{user?.name ? `Welcome, ${user.name}` : 'EXOTEX Admin'}</Text>
                         </View>
                     </View>
-                    <Pressable onPress={logout} style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}>
-                        <GlassPanel style={styles.logoutIcon}>
-                            <MaterialCommunityIcons name="logout" size={20} color={THEME.colors.error} />
-                        </GlassPanel>
-                    </Pressable>
+                    <View style={styles.headerActions}>
+                        <Pressable onPress={() => navigation.navigate('Profile')} style={({ pressed }) => [styles.profileBtn, pressed && { opacity: 0.7 }]}>
+                            <GlassPanel style={styles.profileIcon} intensity={40}>
+                                <MaterialCommunityIcons name="account-cog-outline" size={20} color={THEME.colors.secondary} />
+                            </GlassPanel>
+                        </Pressable>
+                        <Pressable onPress={logout} style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}>
+                            <GlassPanel style={styles.logoutIcon} intensity={40}>
+                                <MaterialCommunityIcons name="logout" size={20} color={THEME.colors.error} />
+                            </GlassPanel>
+                        </Pressable>
+                    </View>
                 </View>
 
                 {/* Tab Switcher */}
@@ -394,6 +571,7 @@ export default function MainBranchDashboard() {
                         >
                             <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
                         </Pressable>
+
                         <Pressable
                             onPress={() => setActiveTab('Analytics')}
                             style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
@@ -445,91 +623,35 @@ export default function MainBranchDashboard() {
                             </LinearGradient>
 
                             <View style={styles.bentoColumn}>
-                                <GlassPanel style={[styles.statBox, { backgroundColor: THEME.colors.mintLight + '80' }]}>
-                                    <Text style={[styles.statBoxValue, { color: '#047857' }]} numberOfLines={1} adjustsFontSizeToFit>{totalVisitsCount}</Text>
+                                <Pressable
+                                    onPress={() => setActiveTab('Visits')}
+                                    style={({ pressed }) => [
+                                        styles.statBox,
+                                        { backgroundColor: THEME.colors.mintLight + '80' },
+                                        pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                                    ]}
+                                >
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={[styles.statBoxValue, { color: '#047857' }]} numberOfLines={1} adjustsFontSizeToFit>{totalVisitsCount}</Text>
+                                        <MaterialCommunityIcons name="chevron-right" size={20} color="#047857" />
+                                    </View>
                                     <Text style={[styles.statBoxLabel, { color: '#065F46' }]} numberOfLines={1}>Field Visits</Text>
-                                </GlassPanel>
-                                <GlassPanel style={[styles.statBox, { backgroundColor: '#FEE2E280' }]}>
-                                    <Text style={[styles.statBoxValue, { color: '#EF4444' }]} numberOfLines={1} adjustsFontSizeToFit>{activeComplaintCount}</Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => setActiveTab('Complaints')}
+                                    style={({ pressed }) => [
+                                        styles.statBox,
+                                        { backgroundColor: '#FEE2E280' },
+                                        pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                                    ]}
+                                >
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={[styles.statBoxValue, { color: '#EF4444' }]} numberOfLines={1} adjustsFontSizeToFit>{activeComplaintCount}</Text>
+                                        <MaterialCommunityIcons name="chevron-right" size={20} color="#EF4444" />
+                                    </View>
                                     <Text style={[styles.statBoxLabel, { color: '#B91C1C' }]} numberOfLines={1}>Active Complaints</Text>
-                                </GlassPanel>
+                                </Pressable>
                             </View>
-                        </View>
-
-                        {/* Complaint Region & List Tracker */}
-                        <View style={{ paddingHorizontal: 4, marginBottom: 24 }}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>Complaints Tracker</Text>
-                            </View>
-
-                            {complaintRegionStats.length === 0 ? (
-                                <GlassPanel style={styles.emptyState}>
-                                    <MaterialCommunityIcons name="alert-circle-check-outline" size={48} color={THEME.colors.success} />
-                                    <Text style={styles.emptyText}>No active complaints! Great job.</Text>
-                                </GlassPanel>
-                            ) : (
-                                <>
-                                    <ScrollView
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        style={[styles.regionScroll, { marginBottom: 16 }]}
-                                        contentContainerStyle={{ gap: 12, paddingRight: 20 }}
-                                    >
-                                        {complaintRegionStats.map(({ region, total, resolved, unresolved }) => {
-                                            const colors = getRegionColor(region);
-                                            return (
-                                                <GlassPanel key={region} style={styles.regionCard}>
-                                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
-                                                        <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.text} />
-                                                    </View>
-                                                    <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
-                                                    <Text style={styles.regionTotal} numberOfLines={1}>{total} Complaints</Text>
-                                                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
-                                                        <View style={{ backgroundColor: THEME.colors.success + '20', paddingHorizontal: 4, borderRadius: 4 }}>
-                                                            <Text style={{ fontSize: 9, color: THEME.colors.success }}>{resolved} Res</Text>
-                                                        </View>
-                                                        <View style={{ backgroundColor: THEME.colors.error + '20', paddingHorizontal: 4, borderRadius: 4 }}>
-                                                            <Text style={{ fontSize: 9, color: THEME.colors.error }}>{unresolved} Unres</Text>
-                                                        </View>
-                                                    </View>
-                                                </GlassPanel>
-                                            );
-                                        })}
-                                    </ScrollView>
-
-                                    <GlassPanel style={{ padding: 8 }}>
-                                        {displayComplaints.slice(0, 5).map((comp, idx) => {
-                                            const daysPassed = calculateDaysPassed(comp.dateOfComplaint);
-                                            const isResolved = comp.status === 'Resolved' || comp.status === 'Closed';
-                                            return (
-                                                <View key={comp.id || idx} style={[styles.listItem, idx === 4 && { borderBottomWidth: 0 }]}>
-                                                    <View style={[styles.listIcon, { backgroundColor: isResolved ? THEME.colors.mintLight : '#FEE2E2' }]}>
-                                                        <MaterialCommunityIcons
-                                                            name={isResolved ? "check-circle" : "alert-circle"}
-                                                            size={20}
-                                                            color={isResolved ? THEME.colors.success : THEME.colors.error}
-                                                        />
-                                                    </View>
-                                                    <View style={styles.listContent}>
-                                                        <Text style={styles.listTitle} numberOfLines={1}>{comp.customerName}</Text>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <View style={[styles.tag, { backgroundColor: isResolved ? THEME.colors.success + '20' : THEME.colors.error + '20' }]}>
-                                                                <Text style={[styles.tagText, { color: isResolved ? THEME.colors.success : THEME.colors.error }]}>
-                                                                    {isResolved ? 'Resolved' : 'Unresolved'}
-                                                                </Text>
-                                                            </View>
-                                                            <Text style={styles.listSub}>{daysPassed} days passed</Text>
-                                                        </View>
-                                                    </View>
-                                                    <Pressable onPress={() => handleDownloadComplaint(comp)} style={styles.downloadIconBtn}>
-                                                        <MaterialCommunityIcons name="download" size={20} color={THEME.colors.primary} />
-                                                    </Pressable>
-                                                </View>
-                                            );
-                                        })}
-                                    </GlassPanel>
-                                </>
-                            )}
                         </View>
 
                         {/* Visit Analytics Graph */}
@@ -569,68 +691,45 @@ export default function MainBranchDashboard() {
 
                         {/* Filter Chips */}
                         <View style={styles.filterRow}>
-                            {(['All', 'Today', 'Month', 'Year'] as const).map(f => (
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                {(['All', 'Today', 'Month', 'Year'] as const).map(f => (
+                                    <Pressable
+                                        key={f}
+                                        style={[styles.chip, filter === f && styles.chipActive]}
+                                        onPress={() => setFilter(f)}
+                                    >
+                                        <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{f}</Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                                 <Pressable
-                                    key={f}
-                                    style={[styles.chip, filter === f && styles.chipActive]}
-                                    onPress={() => setFilter(f)}
+                                    style={[styles.sortChip, sortOrder === 'newest' && styles.sortChipActive]}
+                                    onPress={() => setSortOrder('newest')}
                                 >
-                                    <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{f}</Text>
+                                    <MaterialCommunityIcons
+                                        name="sort-calendar-descending"
+                                        size={14}
+                                        color={sortOrder === 'newest' ? THEME.colors.secondary : THEME.colors.textSecondary}
+                                    />
+                                    <Text style={[styles.sortChipText, sortOrder === 'newest' && styles.sortChipTextActive]}>Newest First</Text>
                                 </Pressable>
-                            ))}
+                                <Pressable
+                                    style={[styles.sortChip, sortOrder === 'oldest' && styles.sortChipActive]}
+                                    onPress={() => setSortOrder('oldest')}
+                                >
+                                    <MaterialCommunityIcons
+                                        name="sort-calendar-ascending"
+                                        size={14}
+                                        color={sortOrder === 'oldest' ? THEME.colors.secondary : THEME.colors.textSecondary}
+                                    />
+                                    <Text style={[styles.sortChipText, sortOrder === 'oldest' && styles.sortChipTextActive]}>Oldest First</Text>
+                                </Pressable>
+                            </View>
                         </View>
 
-                        {/* Visit Region Performance */}
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Visit Hubs (Region Wise)</Text>
-                        </View>
-                        {loading ? (
-                            <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
-                        ) : visitRegionStats.length === 0 ? (
-                            <GlassPanel style={styles.emptyState}>
-                                <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
-                                <Text style={styles.emptyText}>No visit data available</Text>
-                            </GlassPanel>
-                        ) : (
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                style={styles.regionScroll}
-                                contentContainerStyle={{ gap: 12, paddingRight: 20 }}
-                            >
-                                {visitRegionStats.map(({ region, total, completed, pending }) => {
-                                    const colors = getRegionColor(region);
-                                    return (
-                                        <GlassPanel
-                                            key={region}
-                                            style={styles.regionCard}
-                                        >
-                                            <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
-                                                <MaterialCommunityIcons
-                                                    name={colors.icon as any}
-                                                    size={20}
-                                                    color={colors.text}
-                                                />
-                                            </View>
-                                            <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
-                                            <Text style={styles.regionTotal} numberOfLines={1}>{total} Visits</Text>
 
-                                            <View style={styles.progressBar}>
-                                                <View
-                                                    style={[
-                                                        styles.progressFill,
-                                                        { width: `${(completed / (total || 1)) * 100}%` as any, backgroundColor: colors.text }
-                                                    ]}
-                                                />
-                                            </View>
-                                            <Text style={{ fontSize: 10, color: THEME.colors.textSecondary, marginTop: 4 }}>
-                                                {completed} Done • {pending} Left
-                                            </Text>
-                                        </GlassPanel>
-                                    );
-                                })}
-                            </ScrollView>
-                        )}
 
                         {/* Sales Region Performance */}
                         <View style={styles.sectionHeader}>
@@ -642,9 +741,7 @@ export default function MainBranchDashboard() {
                             )}
                         </View>
 
-                        {loading ? (
-                            <ActivityIndicator size="large" color={THEME.colors.primary} style={{ marginVertical: 40 }} />
-                        ) : regionStats.length === 0 ? (
+                        {regionStats.length === 0 ? (
                             <GlassPanel style={styles.emptyState}>
                                 <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
                                 <Text style={styles.emptyText}>No sales data available</Text>
@@ -694,10 +791,6 @@ export default function MainBranchDashboard() {
                                 })}
                             </ScrollView>
                         )}
-
-
-
-
 
                         {/* Recent Activity List */}
                         <View style={styles.listHeader}>
@@ -775,6 +868,204 @@ export default function MainBranchDashboard() {
                             </GlassPanel>
                         )}
                     </>
+                ) : activeTab === 'Complaints' ? (
+                    <View style={{ paddingHorizontal: 4, marginBottom: 24 }}>
+                        <View style={styles.sectionHeader}>
+                            <Pressable
+                                onPress={() => setActiveTab('Dashboard')}
+                                style={({ pressed }) => [
+                                    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+                                    pressed && { opacity: 0.7 }
+                                ]}
+                            >
+                                <MaterialCommunityIcons name="arrow-left" size={24} color={THEME.colors.text} />
+                                <Text style={styles.sectionTitle}>Back to Dashboard</Text>
+                            </Pressable>
+                        </View>
+                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+
+                        {complaintRegionStats.length === 0 ? (
+                            <GlassPanel style={styles.emptyState}>
+                                <MaterialCommunityIcons name="alert-circle-check-outline" size={48} color={THEME.colors.success} />
+                                <Text style={styles.emptyText}>No active complaints! Great job.</Text>
+                            </GlassPanel>
+                        ) : (
+                            <>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    style={[styles.regionScroll, { marginBottom: 16 }]}
+                                    contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                                >
+                                    {complaintRegionStats.map(({ region, total, resolved, unresolved }) => {
+                                        const colors = getRegionColor(region);
+                                        const isSelected = selectedRegion === region;
+                                        return (
+                                            <Pressable key={region} onPress={() => setSelectedRegion(isSelected ? null : region)}>
+                                                <GlassPanel
+                                                    style={[
+                                                        styles.regionCard,
+                                                        isSelected && styles.regionCardSelected
+                                                    ]}
+                                                >
+                                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                                        <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.text} />
+                                                    </View>
+                                                    <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
+                                                    <Text style={styles.regionTotal} numberOfLines={1}>{total} Complaints</Text>
+                                                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
+                                                        <View style={{ backgroundColor: THEME.colors.success + '20', paddingHorizontal: 4, borderRadius: 4 }}>
+                                                            <Text style={{ fontSize: 9, color: THEME.colors.success }}>{resolved} Res</Text>
+                                                        </View>
+                                                        <View style={{ backgroundColor: THEME.colors.error + '20', paddingHorizontal: 4, borderRadius: 4 }}>
+                                                            <Text style={{ fontSize: 9, color: THEME.colors.error }}>{unresolved} Unres</Text>
+                                                        </View>
+                                                    </View>
+                                                </GlassPanel>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </ScrollView>
+
+                                <GlassPanel style={{ padding: 8 }}>
+                                    {displayComplaints.map((comp: any, idx: number) => {
+                                        const daysPassed = calculateDaysPassed(comp.dateOfComplaint);
+                                        const isResolved = comp.status === 'Resolved' || comp.status === 'Closed';
+                                        return (
+                                            <Pressable
+                                                key={comp.id || idx}
+                                                style={[styles.listItem, idx === displayComplaints.length - 1 && { borderBottomWidth: 0 }]}
+                                                onPress={() => navigation.navigate('RaiseComplaintStep2', {
+                                                    complaint: comp,
+                                                    clientData: {
+                                                        invoiceNumber: comp.invoiceNo,
+                                                        customerName: comp.customerName,
+                                                        phone: comp.customerPhone,
+                                                        email: comp.customerEmail,
+                                                        city: comp.city
+                                                    }
+                                                })}
+                                            >
+                                                <View style={[styles.listIcon, { backgroundColor: isResolved ? THEME.colors.mintLight : '#FEE2E2' }]}>
+                                                    <MaterialCommunityIcons
+                                                        name={isResolved ? "check-circle" : "alert-circle"}
+                                                        size={20}
+                                                        color={isResolved ? THEME.colors.success : THEME.colors.error}
+                                                    />
+                                                </View>
+                                                <View style={styles.listContent}>
+                                                    <Text style={styles.listTitle} numberOfLines={1}>{comp.customerName}</Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <View style={[styles.tag, { backgroundColor: isResolved ? THEME.colors.success + '20' : THEME.colors.error + '20' }]}>
+                                                            <Text style={[styles.tagText, { color: isResolved ? THEME.colors.success : THEME.colors.error }]}>
+                                                                {isResolved ? 'Resolved' : 'Unresolved'}
+                                                            </Text>
+                                                        </View>
+                                                        <Text style={styles.listSub}>{daysPassed} days passed</Text>
+                                                    </View>
+                                                </View>
+                                                <Pressable onPress={() => handleDownloadComplaint(comp)} style={styles.downloadIconBtn}>
+                                                    <MaterialCommunityIcons name="download" size={20} color={THEME.colors.primary} />
+                                                </Pressable>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </GlassPanel>
+                            </>
+                        )}
+                    </View>
+                ) : activeTab === 'Visits' ? (
+                    <View style={{ paddingHorizontal: 4, marginBottom: 24 }}>
+                        <View style={styles.sectionHeader}>
+                            <Pressable
+                                onPress={() => setActiveTab('Dashboard')}
+                                style={({ pressed }) => [
+                                    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+                                    pressed && { opacity: 0.7 }
+                                ]}
+                            >
+                                <MaterialCommunityIcons name="arrow-left" size={24} color={THEME.colors.text} />
+                                <Text style={styles.sectionTitle}>Back to Dashboard</Text>
+                            </Pressable>
+                        </View>
+                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+
+                        {visitRegionStats.length === 0 ? (
+                            <GlassPanel style={styles.emptyState}>
+                                <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
+                                <Text style={styles.emptyText}>No field visits found.</Text>
+                            </GlassPanel>
+                        ) : (
+                            <>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    style={[styles.regionScroll, { marginBottom: 16 }]}
+                                    contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                                >
+                                    {visitRegionStats.map(({ region, total, completed, pending }) => {
+                                        const colors = getRegionColor(region);
+                                        const isSelected = selectedRegion === region;
+                                        return (
+                                            <Pressable key={region} onPress={() => setSelectedRegion(isSelected ? null : region)}>
+                                                <GlassPanel
+                                                    style={[
+                                                        styles.regionCard,
+                                                        isSelected && styles.regionCardSelected
+                                                    ]}
+                                                >
+                                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                                        <MaterialCommunityIcons name={colors.icon as any} size={20} color={colors.text} />
+                                                    </View>
+                                                    <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
+                                                    <Text style={styles.regionTotal} numberOfLines={1}>{total} Visits</Text>
+                                                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
+                                                        <View style={{ backgroundColor: THEME.colors.success + '20', paddingHorizontal: 4, borderRadius: 4 }}>
+                                                            <Text style={{ fontSize: 9, color: THEME.colors.success }}>{completed} Done</Text>
+                                                        </View>
+                                                        <View style={{ backgroundColor: THEME.colors.warning + '20', paddingHorizontal: 4, borderRadius: 4 }}>
+                                                            <Text style={{ fontSize: 9, color: THEME.colors.warning }}>{pending} Pend</Text>
+                                                        </View>
+                                                    </View>
+                                                </GlassPanel>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </ScrollView>
+
+                                <GlassPanel style={{ padding: 8 }}>
+                                    {displayVisits.map((visit, idx) => {
+                                        const isDone = visit.status === 'completed' || visit.status === 'Done';
+                                        return (
+                                            <View key={visit.id || idx} style={[styles.listItem, idx === allVisits.length - 1 && { borderBottomWidth: 0 }]}>
+                                                <View style={[styles.listIcon, { backgroundColor: isDone ? THEME.colors.mintLight : '#FEF3C7' }]}>
+                                                    <MaterialCommunityIcons
+                                                        name={isDone ? "check-circle" : "clock-outline"}
+                                                        size={20}
+                                                        color={isDone ? THEME.colors.success : THEME.colors.warning}
+                                                    />
+                                                </View>
+                                                <View style={styles.listContent}>
+                                                    <Text style={styles.listTitle} numberOfLines={1}>{visit.customerName}</Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <View style={[styles.tag, { backgroundColor: isDone ? THEME.colors.success + '20' : THEME.colors.warning + '20' }]}>
+                                                            <Text style={[styles.tagText, { color: isDone ? THEME.colors.success : THEME.colors.warning }]}>
+                                                                {isDone ? 'Completed' : 'Pending'}
+                                                            </Text>
+                                                        </View>
+                                                        <Text style={styles.listSub}>{visit.city}</Text>
+                                                    </View>
+                                                </View>
+                                                <Pressable onPress={() => handleDownloadVisit(visit)} style={styles.downloadIconBtn}>
+                                                    <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
+                                                </Pressable>
+                                            </View>
+                                        );
+                                    })}
+                                </GlassPanel>
+                            </>
+                        )}
+                    </View>
                 ) : activeTab === 'Analytics' ? (
                     <DetailedAnalyticsContent sales={allSales} />
                 ) : activeTab === 'Stock' ? (
@@ -789,6 +1080,8 @@ export default function MainBranchDashboard() {
                         setSelectedPhotos={setSelectedPhotos}
                         isSelectionMode={isSelectionMode}
                         setIsSelectionMode={setIsSelectionMode}
+                        sortOrder={sortOrder}
+                        setSortOrder={setSortOrder}
                     />
                 )}
             </ScrollView>
@@ -832,6 +1125,8 @@ const StockManagementContent = ({ allStock, onUpdate }: { allStock: Stock[], onU
     const [modelName, setModelName] = useState('');
     const [quantity, setQuantity] = useState('');
     const [updating, setUpdating] = useState(false);
+
+    const [showModelDropdown, setShowModelDropdown] = useState(false);
 
     const handleUpdate = async () => {
         if (!modelName || !quantity) {
@@ -884,20 +1179,19 @@ const StockManagementContent = ({ allStock, onUpdate }: { allStock: Stock[], onU
                 <View style={{ gap: 12, marginTop: 8 }}>
                     <View>
                         <Text style={styles.listSub}>Model Name</Text>
-                        <GlassPanel style={{ padding: 12, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.6)' }} intensity={10}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <MaterialCommunityIcons name="tag-outline" size={20} color={THEME.colors.textSecondary} />
-                                <View style={{ flex: 1, marginLeft: 8 }}>
-                                    {/* Using View as placeholder for TextInput for simplicity in this artifact, but normally would use TextInput */}
-                                    <View style={{ height: 20 }}>
-                                        <Text style={{ color: modelName ? THEME.colors.text : THEME.colors.textSecondary }}>
-                                            {modelName || 'e.g. RO-100'}
+                        <Pressable onPress={() => setShowModelDropdown(true)}>
+                            <GlassPanel style={{ padding: 12, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.6)' }} intensity={10}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <MaterialCommunityIcons name="tag-outline" size={20} color={THEME.colors.textSecondary} />
+                                        <Text style={{ marginLeft: 8, color: modelName ? THEME.colors.text : THEME.colors.textSecondary }}>
+                                            {modelName || 'Select Model'}
                                         </Text>
                                     </View>
+                                    <MaterialCommunityIcons name="chevron-down" size={20} color={THEME.colors.textSecondary} />
                                 </View>
-                            </View>
-                        </GlassPanel>
-                        {/* Note: In a real app, I'd use a proper Input component. For this demo/plan, I'm illustrating the UI. */}
+                            </GlassPanel>
+                        </Pressable>
                     </View>
 
                     <View>
@@ -906,9 +1200,14 @@ const StockManagementContent = ({ allStock, onUpdate }: { allStock: Stock[], onU
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <MaterialCommunityIcons name="numeric" size={20} color={THEME.colors.textSecondary} />
                                 <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <Text style={{ color: quantity ? THEME.colors.text : THEME.colors.textSecondary }}>
-                                        {quantity || 'e.g. 50'}
-                                    </Text>
+                                    <TextInput
+                                        style={{ color: THEME.colors.text, fontSize: 14, padding: 0 }}
+                                        placeholder="Enter Quantity"
+                                        placeholderTextColor={THEME.colors.textSecondary}
+                                        value={quantity}
+                                        onChangeText={setQuantity}
+                                        keyboardType="number-pad"
+                                    />
                                 </View>
                             </View>
                         </GlassPanel>
@@ -936,6 +1235,53 @@ const StockManagementContent = ({ allStock, onUpdate }: { allStock: Stock[], onU
                     </Pressable>
                 </View>
             </GlassPanel>
+
+            {/* Model Selection Modal */}
+            <Modal
+                visible={showModelDropdown}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowModelDropdown(false)}
+            >
+                <Pressable
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}
+                    onPress={() => setShowModelDropdown(false)}
+                >
+                    <View style={{ width: '85%', maxHeight: '60%', backgroundColor: 'white', borderRadius: 24, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5 }}>
+                        <Text style={[styles.listTitle, { marginBottom: 16, textAlign: 'center' }]}>Select Model</Text>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {PRODUCT_MODELS.map((model, index) => (
+                                <Pressable
+                                    key={index}
+                                    style={({ pressed }) => [
+                                        {
+                                            paddingVertical: 12,
+                                            paddingHorizontal: 16,
+                                            borderBottomWidth: index === PRODUCT_MODELS.length - 1 ? 0 : 1,
+                                            borderBottomColor: '#F3F4F6',
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between'
+                                        },
+                                        pressed && { backgroundColor: '#F9FAFB' }
+                                    ]}
+                                    onPress={() => {
+                                        setModelName(model);
+                                        setShowModelDropdown(false);
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 16, color: THEME.colors.text, fontWeight: modelName === model ? '700' : '400' }}>
+                                        {model}
+                                    </Text>
+                                    {modelName === model && (
+                                        <MaterialCommunityIcons name="check" size={20} color={THEME.colors.primary} />
+                                    )}
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </Pressable>
+            </Modal>
 
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Current Stock in {selectedRegion}</Text>
@@ -975,39 +1321,77 @@ const StockManagementContent = ({ allStock, onUpdate }: { allStock: Stock[], onU
     );
 };
 
+const PhotoItem = React.memo(({ url, itemSize, isSelectionMode, isSelected, onPress, onLongPress }: any) => {
+    const [loading, setLoading] = useState(true);
+
+    return (
+        <Pressable
+            onPress={onPress}
+            onLongPress={onLongPress}
+            style={{ width: itemSize, height: itemSize, marginBottom: 12, position: 'relative' }}
+        >
+            <Image
+                source={{ uri: url }}
+                style={{ width: '100%', height: '100%', borderRadius: 12, backgroundColor: '#f0f0f0' }}
+                resizeMode="cover"
+                onLoadStart={() => setLoading(true)}
+                onLoadEnd={() => setLoading(false)}
+            />
+            {loading && (
+                <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0', borderRadius: 12 }]}>
+                    <ActivityIndicator size="small" color={THEME.colors.primary} />
+                </View>
+            )}
+            {isSelectionMode && (
+                <View style={styles.selectionIndicator}>
+                    <MaterialCommunityIcons
+                        name={isSelected ? "check-circle" : "circle-outline"}
+                        size={22}
+                        color={isSelected ? THEME.colors.secondary : "rgba(255,255,255,0.9)"}
+                    />
+                </View>
+            )}
+            {isSelectionMode && isSelected && (
+                <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 12 }} />
+            )}
+        </Pressable>
+    );
+});
+
 const PhotosGalleryContent = ({
     allSales,
     selectedPhotos,
     setSelectedPhotos,
     isSelectionMode,
-    setIsSelectionMode
+    setIsSelectionMode,
+    sortOrder,
+    setSortOrder
 }: {
     allSales: Sale[],
     selectedPhotos: string[],
     setSelectedPhotos: React.Dispatch<React.SetStateAction<string[]>>,
     isSelectionMode: boolean,
-    setIsSelectionMode: React.Dispatch<React.SetStateAction<boolean>>
+    setIsSelectionMode: React.Dispatch<React.SetStateAction<boolean>>,
+    sortOrder: 'newest' | 'oldest',
+    setSortOrder: (order: 'newest' | 'oldest') => void
 }) => {
+    const [viewingSale, setViewingSale] = useState<Sale | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
     const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
     const screenWidth = Dimensions.get('window').width;
-    const GAP = 2; // Very tight gap like Apple Photos
+    const GAP = 4;
     const COLUMN_COUNT = screenWidth > 768 ? 4 : 2;
-    const itemSize = (screenWidth - 40 - (GAP * (COLUMN_COUNT - 1))) / COLUMN_COUNT; // 40 is container padding
+    const itemSize = (screenWidth - 40 - (GAP * (COLUMN_COUNT - 1))) / COLUMN_COUNT;
 
-    const allPhotos = useMemo(() => {
-        const photos: { url: string; customer: string; id: string }[] = [];
-        allSales.forEach(sale => {
-            (sale.imageUrls || []).forEach((url, index) => {
-                // Only show valid web URLs. Local file:// URIs from other devices won't load here.
-                if (url && (url.startsWith('http') || url.startsWith('https'))) {
-                    photos.push({ url, customer: sale.customerName, id: `${sale.id}_${index}` });
-                }
+    const salesWithPhotos = useMemo(() => {
+        return allSales
+            .filter(s => s.imageUrls && s.imageUrls.length > 0)
+            .sort((a, b) => {
+                const dateA = new Date(a.saleDate).getTime();
+                const dateB = new Date(b.saleDate).getTime();
+                return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
             });
-        });
-        // Remove duplicates if any
-        return photos.filter((v, i, a) => a.findIndex(t => t.url === v.url) === i);
-    }, [allSales]);
+    }, [allSales, sortOrder]);
 
     const toggleSelection = (url: string) => {
         if (selectedPhotos.includes(url)) {
@@ -1052,88 +1436,171 @@ const PhotosGalleryContent = ({
         }
     };
 
-    return (
-        <View style={{ paddingBottom: 100 }}>
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Photos</Text>
-                <Pressable onPress={() => {
-                    if (isSelectionMode) {
-                        setSelectedPhotos([]);
-                        setIsSelectionMode(false);
-                    } else {
-                        setIsSelectionMode(true);
-                    }
-                }}>
-                    <Text style={styles.seeAllText}>{isSelectionMode ? 'Cancel' : 'Select'}</Text>
-                </Pressable>
-            </View>
+    if (viewingSale) {
+        const salePhotos = (viewingSale.imageUrls || []).filter(url =>
+            url && (url.startsWith('http') || url.startsWith('https'))
+        );
 
-            {allPhotos.length === 0 ? (
-                <GlassPanel style={styles.emptyState}>
-                    <MaterialCommunityIcons name="image-off-outline" size={48} color={THEME.colors.textSecondary} />
-                    <Text style={styles.emptyText}>No photos found</Text>
-                </GlassPanel>
-            ) : (
-                <>
-                    <View style={[styles.photoGrid, { gap: GAP }]}>
-                        {allPhotos.map((item) => (
-                            <Pressable
-                                key={item.id}
-                                onPress={() => handlePress(item.url)}
-                                onLongPress={() => handleLongPress(item.url)}
-                                style={{ width: itemSize, height: itemSize, marginBottom: GAP, position: 'relative' }}
-                            >
-                                <Image
-                                    source={{ uri: item.url }}
-                                    style={{ width: '100%', height: '100%', borderRadius: 0, backgroundColor: '#f0f0f0' }}
-                                    resizeMode="cover"
-                                />
-                                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.05)' }]} />
-                                {isSelectionMode && (
-                                    <View style={styles.selectionIndicator}>
-                                        <MaterialCommunityIcons
-                                            name={selectedPhotos.includes(item.url) ? "check-circle" : "circle-outline"}
-                                            size={22}
-                                            color={selectedPhotos.includes(item.url) ? THEME.colors.primary : "rgba(255,255,255,0.9)"}
-                                        />
-                                        {selectedPhotos.includes(item.url) && (
-                                            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'white', borderRadius: 100, zIndex: -1, margin: 4 }]} />
-                                        )}
-                                    </View>
-                                )}
-                                {isSelectionMode && selectedPhotos.includes(item.url) && (
-                                    <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.3)' }} />
-                                )}
-                            </Pressable>
-                        ))}
+        return (
+            <View style={{ paddingBottom: 100 }}>
+                <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+                <View style={styles.sectionHeader}>
+                    <Pressable
+                        onPress={() => {
+                            setViewingSale(null);
+                            setIsSelectionMode(false);
+                            setSelectedPhotos([]);
+                        }}
+                        style={({ pressed }) => [
+                            { flexDirection: 'row', alignItems: 'center', gap: 8 },
+                            pressed && { opacity: 0.7 }
+                        ]}
+                    >
+                        <MaterialCommunityIcons name="arrow-left" size={24} color={THEME.colors.text} />
+                        <Text style={styles.sectionTitle}>Back to List</Text>
+                    </Pressable>
+                    <Pressable onPress={() => {
+                        if (isSelectionMode) {
+                            setSelectedPhotos([]);
+                            setIsSelectionMode(false);
+                        } else {
+                            setIsSelectionMode(true);
+                        }
+                    }}>
+                        <Text style={styles.seeAllText}>{isSelectionMode ? 'Cancel' : 'Select'}</Text>
+                    </Pressable>
+                </View>
+
+                <GlassPanel style={{ padding: 20, marginBottom: 20 }}>
+                    <Text style={styles.listTitle}>{viewingSale.customerName}</Text>
+                    <Text style={styles.listSub}>{viewingSale.productModel}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                        <View style={[styles.tag, { backgroundColor: THEME.colors.primary + '20' }]}>
+                            <Text style={[styles.tagText, { color: THEME.colors.primary }]}>{viewingSale.warrantyId || viewingSale.invoiceNumber}</Text>
+                        </View>
+                        <Text style={styles.listDate}>{new Date(viewingSale.saleDate).toLocaleDateString()}</Text>
                     </View>
-                </>
-            )}
+                </GlassPanel>
 
-            <Modal visible={!!previewPhoto} transparent={true} animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
-                <View style={styles.modalOverlay}>
-                    <Pressable style={styles.modalBackdrop} onPress={() => setPreviewPhoto(null)} />
-                    <View style={styles.modalContent}>
-                        <Image source={{ uri: previewPhoto || '' }} style={styles.fullImage} resizeMode="contain" />
-                        <View style={styles.modalActions}>
-                            <Pressable onPress={() => setPreviewPhoto(null)} style={styles.modalBtn}>
-                                <MaterialCommunityIcons name="close" size={24} color="white" />
-                            </Pressable>
-                            <Pressable
-                                onPress={() => previewPhoto && handleDownloadSingle(previewPhoto)}
-                                style={[styles.modalBtn, { backgroundColor: THEME.colors.secondary }]}
-                                disabled={isDownloading}
-                            >
-                                {isDownloading ? (
-                                    <ActivityIndicator size="small" color="white" />
-                                ) : (
-                                    <MaterialCommunityIcons name="download" size={24} color="white" />
-                                )}
-                            </Pressable>
+                <View style={[styles.photoGrid, { gap: GAP }]}>
+                    {salePhotos.map((url, index) => (
+                        <PhotoItem
+                            key={`${viewingSale.id}_${index}`}
+                            url={url}
+                            itemSize={itemSize}
+                            isSelectionMode={isSelectionMode}
+                            isSelected={selectedPhotos.includes(url)}
+                            onPress={() => handlePress(url)}
+                            onLongPress={() => handleLongPress(url)}
+                        />
+                    ))}
+                </View>
+
+                {/* Single Photo Preview Modal */}
+                <Modal visible={!!previewPhoto} transparent={true} animationType="fade" onRequestClose={() => setPreviewPhoto(null)}>
+                    <View style={styles.modalOverlay}>
+                        <Pressable style={styles.modalBackdrop} onPress={() => setPreviewPhoto(null)} />
+                        <View style={styles.modalContent}>
+                            <Image source={{ uri: previewPhoto || '' }} style={styles.fullImage} resizeMode="contain" />
+                            <View style={styles.modalActions}>
+                                <Pressable onPress={() => setPreviewPhoto(null)} style={styles.modalBtn}>
+                                    <MaterialCommunityIcons name="close" size={24} color="white" />
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => previewPhoto && handleDownloadSingle(previewPhoto)}
+                                    style={[styles.modalBtn, { backgroundColor: THEME.colors.secondary }]}
+                                    disabled={isDownloading}
+                                >
+                                    {isDownloading ? (
+                                        <ActivityIndicator size="small" color="white" />
+                                    ) : (
+                                        <MaterialCommunityIcons name="download" size={24} color="white" />
+                                    )}
+                                </Pressable>
+                            </View>
                         </View>
                     </View>
+                </Modal>
+            </View>
+        );
+    }
+
+    return (
+        <View style={{ paddingBottom: 100 }}>
+            <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Warranty Gallery</Text>
+            </View>
+
+            {salesWithPhotos.length === 0 ? (
+                <GlassPanel style={styles.emptyState}>
+                    <MaterialCommunityIcons name="image-off-outline" size={48} color={THEME.colors.textSecondary} />
+                    <Text style={styles.emptyText}>No registered warranties with photos</Text>
+                </GlassPanel>
+            ) : (
+                <View style={{ gap: 12 }}>
+                    {salesWithPhotos.map((sale) => (
+                        <Pressable
+                            key={sale.id}
+                            onPress={() => setViewingSale(sale)}
+                            style={({ pressed }) => [
+                                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                            ]}
+                        >
+                            <GlassPanel style={[styles.listItem, { borderRadius: 20, padding: 16 }]}>
+                                <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                    <MaterialCommunityIcons name="folder-image" size={24} color={THEME.colors.secondary} />
+                                </View>
+                                <View style={styles.listContent}>
+                                    <Text style={styles.listTitle}>{sale.customerName}</Text>
+                                    <Text style={styles.listSub}>{sale.warrantyId || sale.invoiceNumber}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                        <MaterialCommunityIcons name="clock-outline" size={14} color={THEME.colors.textSecondary} />
+                                        <Text style={styles.listDate}>{new Date(sale.saleDate).toLocaleDateString()}</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.listRight}>
+                                    <View style={[styles.tag, { backgroundColor: THEME.colors.secondary + '20', marginBottom: 4 }]}>
+                                        <Text style={[styles.tagText, { color: THEME.colors.secondary }]}>
+                                            {sale.imageUrls?.length || 0} Photos
+                                        </Text>
+                                    </View>
+                                    <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} />
+                                </View>
+                            </GlassPanel>
+                        </Pressable>
+                    ))}
                 </View>
-            </Modal>
+            )}
+        </View>
+    );
+};
+
+const SortControls = ({ sortOrder, setSortOrder }: { sortOrder: 'newest' | 'oldest', setSortOrder: (order: 'newest' | 'oldest') => void }) => {
+    return (
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            <Pressable
+                style={[styles.sortChip, sortOrder === 'newest' && styles.sortChipActive]}
+                onPress={() => setSortOrder('newest')}
+            >
+                <MaterialCommunityIcons
+                    name="sort-calendar-descending"
+                    size={14}
+                    color={sortOrder === 'newest' ? THEME.colors.secondary : THEME.colors.textSecondary}
+                />
+                <Text style={[styles.sortChipText, sortOrder === 'newest' && styles.sortChipTextActive]}>Newest First</Text>
+            </Pressable>
+            <Pressable
+                style={[styles.sortChip, sortOrder === 'oldest' && styles.sortChipActive]}
+                onPress={() => setSortOrder('oldest')}
+            >
+                <MaterialCommunityIcons
+                    name="sort-calendar-ascending"
+                    size={14}
+                    color={sortOrder === 'oldest' ? THEME.colors.secondary : THEME.colors.textSecondary}
+                />
+                <Text style={[styles.sortChipText, sortOrder === 'oldest' && styles.sortChipTextActive]}>Oldest First</Text>
+            </Pressable>
         </View>
     );
 };
@@ -1146,7 +1613,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24,
     },
-    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
     logoWrapper: {
         width: 48,
         height: 48,
@@ -1160,7 +1627,16 @@ const styles = StyleSheet.create({
     },
     greeting: { fontSize: 20, fontFamily: THEME.fonts.bold, color: THEME.colors.text, letterSpacing: -0.5 },
     subtitle: { fontSize: 13, color: THEME.colors.textSecondary, marginTop: 1 },
-    logoutBtn: {},
+    headerActions: {
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'center',
+        flexShrink: 0,
+        marginLeft: 12,
+    },
+    profileBtn: { borderRadius: 12, overflow: 'hidden' },
+    profileIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    logoutBtn: { borderRadius: 12, overflow: 'hidden' },
     logoutIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
     bentoGrid: { flexDirection: 'row', gap: 12, marginBottom: 28, minHeight: 160 },
@@ -1179,11 +1655,36 @@ const styles = StyleSheet.create({
     statBoxValue: { fontSize: screenWidth < 380 ? 18 : 20, fontFamily: THEME.fonts.black, marginBottom: 2 },
     statBoxLabel: { fontSize: 11, fontFamily: THEME.fonts.bold },
 
-    filterRow: { flexDirection: 'row', gap: 8, marginBottom: 28 },
+    filterRow: { marginBottom: 28 },
     chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.5)', borderWidth: 1, borderColor: 'transparent' },
     chipActive: { backgroundColor: THEME.colors.text },
     chipText: { fontSize: 13, fontFamily: THEME.fonts.semiBold, color: THEME.colors.textSecondary },
     chipTextActive: { color: 'white' },
+
+    sortChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+    },
+    sortChipActive: {
+        backgroundColor: THEME.colors.secondary + '15',
+        borderColor: THEME.colors.secondary + '30',
+    },
+    sortChipText: {
+        fontSize: 12,
+        color: THEME.colors.textSecondary,
+        fontFamily: THEME.fonts.semiBold,
+    },
+    sortChipTextActive: {
+        color: THEME.colors.secondary,
+        fontFamily: THEME.fonts.bold,
+    },
 
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     sectionTitle: { fontSize: 18, fontFamily: THEME.fonts.bold, color: THEME.colors.text },

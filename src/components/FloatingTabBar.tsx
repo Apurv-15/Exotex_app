@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Pressable, StyleSheet, Animated, Platform, Dimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Platform, Dimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { THEME } from '../constants/theme';
@@ -32,11 +32,13 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
 
     const TabButton = ({
         tab,
+        label,
         icon,
         activeIcon,
         isPlaceholder = false
     }: {
         tab?: 'home' | 'fieldvisit' | 'create';
+        label: string;
         icon: keyof typeof MaterialCommunityIcons.glyphMap;
         activeIcon: keyof typeof MaterialCommunityIcons.glyphMap;
         isPlaceholder?: boolean;
@@ -56,6 +58,12 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
                     size={26}
                     color={isActive ? '#059669' : '#94A3B8'}
                 />
+                <Animated.Text style={[
+                    styles.tabLabel,
+                    { color: isActive ? '#059669' : '#94A3B8' }
+                ]}>
+                    {label}
+                </Animated.Text>
             </Pressable>
         );
     };
@@ -64,21 +72,22 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
         <View style={styles.tabBarInner}>
             {/* Left side: Home */}
             <View style={styles.sideGroup}>
-                <TabButton tab="home" icon="view-grid-outline" activeIcon="view-grid" />
+                <TabButton tab="home" label="Home" icon="view-grid-outline" activeIcon="view-grid" />
             </View>
 
             {/* Center: Create */}
             <View style={styles.centerButtonOuter}>
-                <Pressable onPress={handleCenterPress}>
+                <Pressable onPress={handleCenterPress} style={{ alignItems: 'center' }}>
                     <Animated.View style={[styles.centerButton, { transform: [{ scale: scaleAnim }] }]}>
                         <MaterialCommunityIcons name="plus" size={32} color="#065F46" />
                     </Animated.View>
+                    <Text style={styles.centerLabel}>Create</Text>
                 </Pressable>
             </View>
 
             {/* Right side: Field Visit */}
             <View style={styles.sideGroup}>
-                <TabButton tab="fieldvisit" icon="chart-box-outline" activeIcon="chart-bar" />
+                <TabButton tab="fieldvisit" label="Visit" icon="chart-box-outline" activeIcon="chart-bar" />
             </View>
         </View>
     );
@@ -171,6 +180,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 3,
         borderColor: 'white',
+    },
+    tabLabel: {
+        fontSize: 10,
+        fontFamily: THEME.fonts.bold,
+        marginTop: 2,
+    },
+    centerLabel: {
+        fontSize: 11,
+        fontFamily: THEME.fonts.bold,
+        color: '#065F46',
+        marginTop: 2,
     },
 });
 

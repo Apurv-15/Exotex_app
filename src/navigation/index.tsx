@@ -14,6 +14,9 @@ import TemplateManagement from '../screens/admin/TemplateManagement';
 import FieldVisitForm from '../screens/fieldvisit/FieldVisitForm';
 import RaiseComplaintStep1 from '../screens/complaints/RaiseComplaintStep1';
 import RaiseComplaintStep2 from '../screens/complaints/RaiseComplaintStep2';
+import ComplaintSuccess from '../screens/complaints/ComplaintSuccess';
+import FieldVisitSuccess from '../screens/fieldvisit/FieldVisitSuccess';
+import ProfileScreen from '../screens/profile/ProfileScreen';
 import { THEME } from '../constants/config';
 
 const Stack = createNativeStackNavigator();
@@ -59,6 +62,21 @@ function AdminStack() {
                 component={RaiseComplaintStep2}
                 options={{ headerShown: false }}
             />
+            <Stack.Screen
+                name="ComplaintSuccess"
+                component={ComplaintSuccess}
+                options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen
+                name="FieldVisitSuccess"
+                component={FieldVisitSuccess}
+                options={{ headerShown: false, gestureEnabled: false }}
+            />
+            <Stack.Screen
+                name="Profile"
+                component={ProfileScreen}
+                options={{ title: 'Profile Settings' }}
+            />
         </Stack.Navigator>
     );
 }
@@ -99,6 +117,21 @@ function UserStack() {
             <Stack.Screen
                 name="RaiseComplaintStep2"
                 component={RaiseComplaintStep2}
+            />
+            <Stack.Screen
+                name="ComplaintSuccess"
+                component={ComplaintSuccess}
+                options={{ gestureEnabled: false }}
+            />
+            <Stack.Screen
+                name="FieldVisitSuccess"
+                component={FieldVisitSuccess}
+                options={{ gestureEnabled: false }}
+            />
+            <Stack.Screen
+                name="Profile"
+                component={ProfileScreen}
+                options={{ headerShown: true, title: 'Profile Settings' }}
             />
         </Stack.Navigator>
     );
