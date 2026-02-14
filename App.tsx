@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, LogBox } from 'react-native';
+
+// Ignore specific deprecation warnings from dependencies
+LogBox.ignoreLogs(['TouchableMixin is deprecated']);
 import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation';
 import {

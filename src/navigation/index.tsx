@@ -12,6 +12,8 @@ import WarrantyCard from '../screens/warranty/WarrantyCard';
 import AnalyticsScreen from '../screens/analytics/AnalyticsScreen';
 import TemplateManagement from '../screens/admin/TemplateManagement';
 import FieldVisitForm from '../screens/fieldvisit/FieldVisitForm';
+import RaiseComplaintStep1 from '../screens/complaints/RaiseComplaintStep1';
+import RaiseComplaintStep2 from '../screens/complaints/RaiseComplaintStep2';
 import { THEME } from '../constants/config';
 
 const Stack = createNativeStackNavigator();
@@ -47,6 +49,16 @@ function AdminStack() {
                 component={WarrantyCard}
                 options={{ headerShown: false }}
             />
+            <Stack.Screen
+                name="RaiseComplaintStep1"
+                component={RaiseComplaintStep1}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="RaiseComplaintStep2"
+                component={RaiseComplaintStep2}
+                options={{ headerShown: false }}
+            />
         </Stack.Navigator>
     );
 }
@@ -79,6 +91,14 @@ function UserStack() {
                 name="AnalyticsScreen"
                 component={AnalyticsScreen}
                 options={{ headerShown: true, title: 'My Analytics' }}
+            />
+            <Stack.Screen
+                name="RaiseComplaintStep1"
+                component={RaiseComplaintStep1}
+            />
+            <Stack.Screen
+                name="RaiseComplaintStep2"
+                component={RaiseComplaintStep2}
             />
         </Stack.Navigator>
     );
