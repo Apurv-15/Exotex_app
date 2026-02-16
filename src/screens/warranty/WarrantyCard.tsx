@@ -7,13 +7,19 @@ import { useAuth } from '../../context/AuthContext';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TemplateService } from '../../services/TemplateService';
-import { Storage } from '../../utils/storage';
+
 import { Asset } from 'expo-asset';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
+// @ts-ignore
+import * as FileSystem from 'expo-file-system/legacy';
+import PizZip from 'pizzip';
+import { Buffer } from 'buffer';
+
+// @ts-ignore
+import UserManualPdf from '../../assets/User_manual.pdf';
 
 export default function WarrantyCard() {
     const route = useRoute<any>();
@@ -21,14 +27,8 @@ export default function WarrantyCard() {
     const { user } = useAuth();
     const sale: Sale = route.params?.sale;
     const [loading, setLoading] = useState(false);
-    const [docxLoading, setDocxLoading] = useState(false);
-    const [templateConfig, setTemplateConfig] = useState<any>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-    useEffect(() => {
-        Storage.getItem('WARRANTY_TEMPLATE_CONFIG').then((val: string | null) => {
-            if (val) setTemplateConfig(JSON.parse(val));
-        });
-    }, []);
 
     // Animation values
     const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -385,79 +385,69 @@ export default function WarrantyCard() {
         `;
     };
 
-    const handleDownloadDocx = async () => {
-        setDocxLoading(true);
+    const downloadAsZip = async (mainFileUri: string, mainFileName: string) => {
         try {
-            console.log('Starting Word document generation...');
-            let templateUri = templateConfig?.url;
+            console.log('🔄 Starting ZIP creation...');
 
-            // Use default local template if no admin template is set
-            if (!templateUri) {
-                console.log('Using default local template...');
-                try {
-                    // Load the asset
-                    const asset = Asset.fromModule(require('../../assets/Warranty_pdf_template/WARRANTY CARD.docx'));
-                    await asset.downloadAsync();
-                    templateUri = asset.localUri || asset.uri;
-                } catch (err) {
-                    console.error('Failed to load default template:', err);
-                    throw new Error('Default template not found. Please contact admin to upload a template.');
-                }
-            }
-
-            if (!templateUri) {
-                throw new Error('No template available.');
-            }
-
-            // Format the sale data for the template
-            const templateData = TemplateService.formatSaleDataForTemplate({
-                ...sale,
-                saleDate: formattedDate, // Use pre-formatted date
+            // 1. Read the Main File (Warranty Card)
+            console.log('📖 Reading main file:', mainFileUri);
+            const mainFileContent = await FileSystem.readAsStringAsync(mainFileUri, {
+                encoding: 'base64',
             });
 
-            console.log('Formatted template data:', templateData);
+            // 2. Read the User Manual
+            console.log('📖 Reading User Manual asset...');
+            const manualAsset = Asset.fromModule(UserManualPdf);
+            await manualAsset.downloadAsync(); // Ensure it's downloaded
+            const manualUri = manualAsset.localUri || manualAsset.uri;
+            console.log('Manual URI:', manualUri);
 
-            // Validate template before attempting to use it
-            const isValid = await TemplateService.validateTemplate(templateUri);
-            if (!isValid) {
-                throw new Error('Template file is not accessible or has been removed');
-            }
+            const manualContent = await FileSystem.readAsStringAsync(manualUri, {
+                encoding: 'base64',
+            });
 
-            // Generate the document
-            const result = await TemplateService.fillDocxTemplate(
-                templateUri,
-                templateData,
-                `Warranty_${sale.warrantyId}.docx`
-            );
+            // 3. Create ZIP
+            console.log('📦 Creating ZIP bundle...');
+            const zip = new PizZip();
+            zip.file(mainFileName, mainFileContent, { base64: true });
+            zip.file("User_Manual.pdf", manualContent, { base64: true });
 
-            if (!result) {
-                throw new Error('Failed to generate document');
-            }
+            // 4. Generate ZIP file
+            const zipContent = zip.generate({ type: "base64" });
+            const zipFileName = `Warranty_Bundle_${sale.warrantyId}.zip`;
+            const docDir = (FileSystem as any).cacheDirectory;
+            const zipFileUri = `${docDir}${zipFileName}`;
+
+            // 5. Save ZIP
+            console.log('💾 Saving ZIP to:', zipFileUri);
+            await FileSystem.writeAsStringAsync(zipFileUri, zipContent, {
+                encoding: 'base64',
+            });
+
+            // 6. Share ZIP
+            console.log('📤 Sharing ZIP...');
+            await Sharing.shareAsync(zipFileUri, {
+                mimeType: 'application/zip',
+                UTI: 'public.zip-archive',
+            });
+            console.log('✅ ZIP shared successfully');
 
             if (Platform.OS === 'web') {
-                window.alert('✅ Warranty document downloaded successfully!');
+                window.alert('✅ Warranty bundle downloaded successfully!');
             } else {
-                Alert.alert(
-                    'Success',
-                    'Warranty document generated successfully!',
-                    [{ text: 'OK' }]
-                );
+                // Show beautiful success modal
+                setShowSuccessModal(true);
+                setTimeout(() => setShowSuccessModal(false), 2500);
             }
+
+
         } catch (error: any) {
-            console.error('Docx generation error:', error);
-
-            const errorMessage = error.message || 'Could not generate Word document.';
-            const detailedMessage = `${errorMessage}\n\nIf this problem persists, please check:\n1. The template file is properly formatted\n2. All placeholders use the correct format: {placeholderName}\n3. The template file is accessible`;
-
-            if (Platform.OS === 'web') {
-                window.alert(`❌ Error: ${detailedMessage}`);
-            } else {
-                Alert.alert('Error', detailedMessage, [{ text: 'OK' }]);
-            }
-        } finally {
-            setDocxLoading(false);
+            console.error('ZIP Generation Error:', error);
+            Alert.alert('Error', 'Failed to create ZIP bundle: ' + error.message);
         }
     };
+
+
 
     const handleDownloadPDF = async () => {
         setLoading(true);
@@ -475,9 +465,11 @@ export default function WarrantyCard() {
                     }, 500);
                 }
             } else {
-                // For native, generate PDF and share
+                // For native, generate PDF but DON'T share yet
                 const { uri } = await Print.printToFileAsync({ html });
-                await Sharing.shareAsync(uri);
+
+                // Now bundle with User Manual
+                await downloadAsZip(uri, `Warranty_${sale.warrantyId}.pdf`);
             }
         } catch (error) {
             console.error('Download error:', error);
@@ -615,10 +607,7 @@ export default function WarrantyCard() {
                         </View>
                     </View>
 
-                    <View style={styles.validityBadge}>
-                        <MaterialCommunityIcons name="history" size={16} color="#40916C" />
 
-                    </View>
                 </Animated.View>
 
                 {/* Actions */}
@@ -654,24 +643,7 @@ export default function WarrantyCard() {
                         </LinearGradient>
                     </Pressable>
 
-                    {templateConfig && (
-                        <Pressable
-                            style={({ pressed }) => [styles.docxButton, pressed && !docxLoading && { transform: [{ scale: 0.98 }] }]}
-                            onPress={handleDownloadDocx}
-                            disabled={docxLoading}
-                        >
-                            <View style={styles.docxButtonContent}>
-                                {docxLoading ? (
-                                    <ActivityIndicator color="#2B579A" size="small" />
-                                ) : (
-                                    <MaterialCommunityIcons name="file-word-box" size={20} color="#2B579A" />
-                                )}
-                                <Text style={styles.docxButtonText}>
-                                    {docxLoading ? 'Generating Word...' : 'Download Word (.docx)'}
-                                </Text>
-                            </View>
-                        </Pressable>
-                    )}
+
 
                     {user?.role === 'Super Admin' && (
                         <Pressable
@@ -693,6 +665,30 @@ export default function WarrantyCard() {
                     </Pressable>
                 </Animated.View>
             </ScrollView>
+
+            {/* Success Modal - iOS Style */}
+            {showSuccessModal && (
+                <View style={styles.modalOverlay}>
+                    <Animated.View style={styles.successModal}>
+                        <View style={styles.successModalIcon}>
+                            <LinearGradient
+                                colors={['#52B788', '#40916C']}
+                                style={styles.successIconGradient}
+                            >
+                                <MaterialCommunityIcons name="check" size={48} color="white" />
+                            </LinearGradient>
+                        </View>
+                        <Text style={styles.successModalTitle}>Bundle Saved!</Text>
+                        <Text style={styles.successModalMessage}>
+                            Your warranty card and user manual have been bundled together
+                        </Text>
+                        <View style={styles.successModalBadge}>
+                            <MaterialCommunityIcons name="zip-box" size={16} color="#52B788" />
+                            <Text style={styles.successModalBadgeText}>ZIP Archive</Text>
+                        </View>
+                    </Animated.View>
+                </View>
+            )}
         </View>
     );
 }
@@ -936,5 +932,78 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#EF4444',
         fontWeight: '700',
+    },
+    // Success Modal Styles
+    modalOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    successModal: {
+        backgroundColor: 'white',
+        borderRadius: 32,
+        padding: 32,
+        marginHorizontal: 24,
+        maxWidth: 340,
+        width: '100%',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.25,
+        shadowRadius: 40,
+        elevation: 20,
+    },
+    successModalIcon: {
+        marginBottom: 20,
+    },
+    successIconGradient: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#52B788',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    successModalTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#111827',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    successModalMessage: {
+        fontSize: 15,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 20,
+        paddingHorizontal: 8,
+    },
+    successModalBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    successModalBadgeText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#16A34A',
+        letterSpacing: 0.5,
     },
 });

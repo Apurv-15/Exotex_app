@@ -55,7 +55,8 @@ export const TemplateService = {
     fillDocxTemplate: async (
         templateUri: string,
         data: WarrantyTemplateData,
-        outputFileName: string
+        outputFileName: string,
+        shouldShare: boolean = true
     ): Promise<string | null> => {
         try {
             console.log('📄 Starting Word template generation...');
@@ -154,13 +155,17 @@ export const TemplateService = {
                     encoding: 'base64',
                 });
 
-                console.log('📤 Sharing file...');
-                await Sharing.shareAsync(fileUri, {
-                    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    UTI: 'com.microsoft.word.doc',
-                });
+                if (shouldShare) {
+                    console.log('📤 Sharing file...');
+                    await Sharing.shareAsync(fileUri, {
+                        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        UTI: 'com.microsoft.word.doc',
+                    });
+                    console.log('✅ File shared successfully');
+                } else {
+                    console.log('✅ File generated successfully (sharing skipped)');
+                }
 
-                console.log('✅ File shared successfully');
                 return fileUri;
             }
         } catch (error: any) {
