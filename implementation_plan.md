@@ -92,7 +92,7 @@ Create a new file `src/components/PhotosGalleryContent.tsx`.
 
 ## 4. UI/UX Specifications (Aesthetic)
 
--   **Color Palette**: Use `THEME.colors.mintLight` and `THEME.colors.secondary` for accents to match the "Exotex" branding.
+-   **Color Palette**: Use `THEME.colors.mintLight` and `THEME.colors.secondary` for accents to match the "EKOTEX" branding.
 -   **Glass Effect**: Ensure the photo grid items use `rgba(255, 255, 255, 0.5)` with the standard `GlassPanel` styling.
 -   **Typography**: Use `THEME.fonts.bold` for titles and `THEME.fonts.semiBold` for subtitles/dates.
 

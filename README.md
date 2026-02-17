@@ -1,4 +1,4 @@
-# 🛡️ Exotex Warranty Manager
+# 🛡️ EKOTEX Warranty Manager
 
 [![Expo](https://img.shields.io/badge/Expo-54.0-blue.svg)](https://expo.dev/)
 [![React Native](https://img.shields.io/badge/React%20Native-0.81-61dafb.svg)](https://reactnative.dev/)
