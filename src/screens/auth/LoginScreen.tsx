@@ -143,7 +143,7 @@ export default function LoginScreen() {
                             />
                         </View>
                         <Pressable onPress={handleSecretTap}>
-                            <Text style={styles.brandTitle}>EXOTEX SYSTEM</Text>
+                            <Text style={styles.brandTitle}>EKOTEX SYSTEM</Text>
                         </Pressable>
                     </View>
 
@@ -161,7 +161,7 @@ export default function LoginScreen() {
                                 <Text style={styles.label}>EMAIL ADDRESS</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="alex.sterling@exotex.com"
+                                    placeholder="alex.sterling@ekotex.com"
                                     placeholderTextColor="#94A3B8"
                                     value={email}
                                     onChangeText={setEmail}
