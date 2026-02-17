@@ -385,6 +385,22 @@ export const SalesService = {
                     .single();
 
                 if (error) throw error;
+
+                // Automatically decrement stock after successful warranty creation
+                try {
+                    const { StockService } = require('./StockService');
+                    // Use branchId as region (or extract region from user context if available)
+                    await StockService.decrementStock(
+                        saleData.branchId, // Using branchId as region
+                        saleData.productModel,
+                        1
+                    );
+                    console.log(`✅ Stock decremented for ${saleData.productModel} in ${saleData.branchId}`);
+                } catch (stockError: any) {
+                    // Log but don't fail the warranty creation if stock update fails
+                    console.warn('Stock decrement warning:', stockError.message);
+                }
+
                 return dbToSale(data);
             } catch (error) {
                 console.error('Supabase error, falling back to local storage:', error);
