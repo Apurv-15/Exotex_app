@@ -233,7 +233,7 @@ export default function SubBranchDashboard() {
                     <body>
                         <div class="header">
                             <div>
-                                <div class="logo">EXOTEX SYSTEM</div>
+                                <div class="logo">EKOTEX SYSTEM</div>
                                 <div style="font-size: 12px; color: #666;">Modern Warranty & Complaint Management</div>
                             </div>
                             <h1 class="title">COMPLAINT REPORT</h1>
@@ -277,7 +277,7 @@ export default function SubBranchDashboard() {
                         ` : ''}
 
                         <div class="footer">
-                            <p>This is an electronically generated report from EXOTEX System.</p>
+                            <p>This is an electronically generated report from EKOTEX System.</p>
                             <p>Generated on: ${new Date().toLocaleString()}</p>
                         </div>
                     </body>
@@ -394,7 +394,7 @@ export default function SubBranchDashboard() {
                             <View style={styles.onlineBadge} />
                         </Pressable>
                         <View>
-                            <Text style={styles.subtitle}>EXOTEX System • {user?.region || 'No Region'}</Text>
+                            <Text style={styles.subtitle}>EKOTEX System • {user?.region || 'No Region'}</Text>
                             <Text style={styles.greeting}>{user?.name}</Text>
                         </View>
                     </View>
@@ -656,6 +656,77 @@ export default function SubBranchDashboard() {
                                     <Text style={styles.legendText}>Warranties Generated</Text>
                                 </View>
                             </View>
+                        </GlassPanel>
+
+                        {/* Product Sales Breakdown */}
+                        <GlassPanel style={[styles.graphCard, { marginTop: 20 }]}>
+                            <View style={styles.graphHeader}>
+                                <Text style={styles.graphTitle}>Product Sales Breakdown</Text>
+                                <MaterialCommunityIcons name="chart-bar" size={20} color="#7C3AED" />
+                            </View>
+
+                            {(() => {
+                                // Calculate product counts
+                                const productCounts: { [key: string]: number } = {};
+                                filteredSales.forEach(sale => {
+                                    const model = sale.productModel || 'Unknown';
+                                    productCounts[model] = (productCounts[model] || 0) + 1;
+                                });
+
+                                // Convert to array and sort by count
+                                const sortedProducts = Object.entries(productCounts)
+                                    .map(([model, count]) => ({ model, count }))
+                                    .sort((a, b) => b.count - a.count)
+                                    .slice(0, 5); // Top 5 products
+
+                                const totalSales = filteredSales.length;
+
+                                if (sortedProducts.length === 0) {
+                                    return (
+                                        <View style={styles.emptyProductState}>
+                                            <MaterialCommunityIcons name="package-variant" size={40} color="#9CA3AF" />
+                                            <Text style={styles.emptyProductText}>No product data available</Text>
+                                        </View>
+                                    );
+                                }
+
+                                return (
+                                    <View style={{ marginTop: 16, gap: 12 }}>
+                                        {sortedProducts.map((product, index) => {
+                                            const percentage = totalSales > 0 ? (product.count / totalSales) * 100 : 0;
+                                            return (
+                                                <View key={product.model} style={styles.productItem}>
+                                                    <View style={styles.productHeader}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                                            <View style={[styles.productRank, { backgroundColor: index === 0 ? '#7C3AED' : '#E5E7EB' }]}>
+                                                                <Text style={[styles.productRankText, { color: index === 0 ? 'white' : '#6B7280' }]}>
+                                                                    {index + 1}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={styles.productModelName} numberOfLines={1}>{product.model}</Text>
+                                                        </View>
+                                                        <View style={styles.productStats}>
+                                                            <Text style={styles.productCount}>{product.count}</Text>
+                                                            <Text style={styles.productPercentage}>{percentage.toFixed(1)}%</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={styles.productBarContainer}>
+                                                        <View
+                                                            style={[
+                                                                styles.productBar,
+                                                                {
+                                                                    width: `${percentage}%`,
+                                                                    backgroundColor: index === 0 ? '#7C3AED' : '#A78BFA'
+                                                                }
+                                                            ]}
+                                                        />
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                );
+                            })()}
                         </GlassPanel>
                     </View>
                 ) : activeTab === 'Stock' ? (
@@ -1199,6 +1270,66 @@ const styles = StyleSheet.create({
     },
     tabButtonTextActive: {
         color: THEME.colors.text,
+    },
+    // Product breakdown styles
+    emptyProductState: {
+        padding: 40,
+        alignItems: 'center',
+        gap: 12,
+    },
+    emptyProductText: {
+        color: THEME.colors.textSecondary,
+        fontSize: 14,
+        fontFamily: THEME.fonts.semiBold,
+    },
+    productItem: {
+        gap: 8,
+    },
+    productHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    productRank: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    productRankText: {
+        fontSize: 12,
+        fontFamily: THEME.fonts.bold,
+    },
+    productModelName: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
+    },
+    productStats: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    productCount: {
+        fontSize: 16,
+        fontFamily: THEME.fonts.black,
+        color: THEME.colors.text,
+    },
+    productPercentage: {
+        fontSize: 12,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.textSecondary,
+    },
+    productBarContainer: {
+        height: 6,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    productBar: {
+        height: '100%',
+        borderRadius: 3,
     },
 });
 
