@@ -115,5 +115,72 @@ export const StockService = {
         }
 
         await Storage.setItem(STORAGE_KEY, JSON.stringify(allStock));
+    },
+
+    // Decrement stock when warranty is created
+    decrementStock: async (region: string, modelName: string, quantity: number = 1): Promise<void> => {
+        if (!region || !modelName) {
+            throw new Error('Region and model name are required');
+        }
+
+        if (isSupabaseConfigured()) {
+            try {
+                // Fetch current stock
+                const { data: currentStock, error: fetchError } = await supabase
+                    .from('stock')
+                    .select('*')
+                    .ilike('region', region.trim())
+                    .ilike('model_name', modelName.trim())
+                    .single();
+
+                if (fetchError) {
+                    console.warn('Stock not found for region/model, skipping decrement:', fetchError);
+                    return; // Don't throw error, just skip if stock doesn't exist
+                }
+
+                const newQuantity = (currentStock.quantity || 0) - quantity;
+
+                if (newQuantity < 0) {
+                    throw new Error(`Insufficient stock for ${modelName} in ${region}. Available: ${currentStock.quantity}, Requested: ${quantity}`);
+                }
+
+                // Update stock
+                const { error: updateError } = await supabase
+                    .from('stock')
+                    .update({
+                        quantity: newQuantity,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', currentStock.id);
+
+                if (updateError) throw updateError;
+                return;
+            } catch (error) {
+                console.error('Supabase error decrementing stock:', error);
+                throw error; // Re-throw to handle in calling function
+            }
+        }
+
+        // Fallback to local
+        const allStock = await StockService.getAllStock();
+        const stockItem = allStock.find(s =>
+            s.region.toLowerCase().trim() === region.toLowerCase().trim() &&
+            s.modelName.toLowerCase().trim() === modelName.toLowerCase().trim()
+        );
+
+        if (!stockItem) {
+            console.warn('Stock not found locally, skipping decrement');
+            return;
+        }
+
+        const newQuantity = stockItem.quantity - quantity;
+        if (newQuantity < 0) {
+            throw new Error(`Insufficient stock for ${modelName} in ${region}`);
+        }
+
+        stockItem.quantity = newQuantity;
+        stockItem.updatedAt = new Date().toISOString();
+
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(allStock));
     }
 };

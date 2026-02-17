@@ -122,23 +122,42 @@ export const AuthService = {
                 throw authError || new Error('Registration failed');
             }
 
-            // 2. Create Public Profile
+            // 2. Create Public Profile with retry logic
             // We store profile info in the public table for easy relational queries
-            // Note: We don't store the password here anymore
-            const { error: profileError } = await supabase
-                .from('users')
-                .insert([{
-                    email,
-                    name,
-                    role,
-                    branch_id: branchId,
-                    region: region || null
-                    // Removed 'password' field as it causes schema error and isn't needed
-                }]);
+            const maxRetries = 3;
+            let profileCreated = false;
 
-            if (profileError) {
-                console.warn('Profile creation warning:', profileError);
-                // We don't throw here because the account IS created, just the profile sync might be delayed or RLS blocked
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const { error: profileError } = await supabase
+                        .from('users')
+                        .insert([{
+                            email,
+                            name,
+                            role,
+                            branch_id: branchId,
+                            region: region || null
+                        }]);
+
+                    if (!profileError) {
+                        profileCreated = true;
+                        console.log(`✅ Profile created successfully for ${email} with region: ${region}`);
+                        break;
+                    }
+
+                    if (attempt < maxRetries) {
+                        console.warn(`Profile creation attempt ${attempt} failed, retrying...`, profileError);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+                    } else {
+                        console.warn('Profile creation failed after retries:', profileError);
+                    }
+                } catch (retryError) {
+                    console.warn(`Retry ${attempt} error:`, retryError);
+                }
+            }
+
+            if (!profileCreated) {
+                console.warn('⚠️ User created in Auth but profile sync may be delayed. Region can be updated later.');
             }
 
             return {
