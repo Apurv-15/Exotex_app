@@ -521,7 +521,7 @@ export default function WarrantyCard() {
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
                 </Pressable>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerBrand}>EXOTEX</Text>
+                    <Text style={styles.headerBrand}>EKOTEX</Text>
                 </View>
                 <View style={{ width: 44 }} />
             </View>
