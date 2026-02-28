@@ -17,6 +17,7 @@ import RaiseComplaintStep2 from '../screens/complaints/RaiseComplaintStep2';
 import ComplaintSuccess from '../screens/complaints/ComplaintSuccess';
 import FieldVisitSuccess from '../screens/fieldvisit/FieldVisitSuccess';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import CreateQuotationScreen from '../screens/quotation/CreateQuotationScreen';
 import { THEME } from '../constants/config';
 
 const Stack = createNativeStackNavigator();
@@ -77,6 +78,11 @@ function AdminStack() {
                 component={ProfileScreen}
                 options={{ title: 'Profile Settings' }}
             />
+            <Stack.Screen
+                name="CreateQuotationScreen"
+                component={CreateQuotationScreen}
+                options={{ headerShown: false }}
+            />
         </Stack.Navigator>
     );
 }
@@ -132,6 +138,11 @@ function UserStack() {
                 name="Profile"
                 component={ProfileScreen}
                 options={{ headerShown: true, title: 'Profile Settings' }}
+            />
+            <Stack.Screen
+                name="CreateQuotationScreen"
+                component={CreateQuotationScreen}
+                options={{ headerShown: false }}
             />
         </Stack.Navigator>
     );

@@ -510,7 +510,7 @@ export default function SubBranchDashboard() {
                                 </Pressable>
                             </View>
 
-                            <View style={{ flexDirection: 'row' }}>
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
                                 <Pressable
                                     style={({ pressed }) => [
                                         styles.actionBtn,
@@ -523,6 +523,19 @@ export default function SubBranchDashboard() {
                                         <MaterialIcons name="report-problem" size={20} color="#EF4444" />
                                     </View>
                                     <Text style={styles.actionText}>Raise Complaint</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.actionBtn,
+                                        { flex: 1 },
+                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                                    ]}
+                                    onPress={() => navigation.navigate('CreateQuotationScreen')}
+                                >
+                                    <View style={[styles.actionIcon, { backgroundColor: '#E0F2FE' }]}>
+                                        <MaterialIcons name="receipt" size={20} color="#0EA5E9" />
+                                    </View>
+                                    <Text style={styles.actionText}>Quotation</Text>
                                 </Pressable>
                             </View>
                         </View>
