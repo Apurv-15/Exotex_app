@@ -28,9 +28,8 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
 
     const discountedRate = rate * (1 - discountPerc / 100);
     const taxableValue = discountedRate * qty;
-    const cgst = taxableValue * 0.09;
-    const sgst = taxableValue * 0.09;
-    const rawTotal = taxableValue + cgst + sgst;
+    const gst = taxableValue * 0.18;
+    const rawTotal = taxableValue + gst;
     const roundedTotal = Math.round(rawTotal);
     const roundOff = roundedTotal - rawTotal;
     const totalDiscount = (rate * qty) - taxableValue;
@@ -213,8 +212,8 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
                 </td>
                 <td class="c">${formData.qty} NOS</td>
                 <td class="r">${fmt2(taxableValue)}</td>
-                <td class="r">${fmt2(cgst + sgst)}</td>
-                <td class="r"><strong>${fmt2(taxableValue + cgst + sgst)}</strong></td>
+                <td class="r">${fmt2(gst)}</td>
+                <td class="r"><strong>${fmt2(taxableValue + gst)}</strong></td>
             </tr>
         </tbody>
     </table>
@@ -223,8 +222,7 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
     <div class="totals-wrap">
         <table class="totals">
             <tr><td>Taxable Amount</td><td><strong>INR ${fmt2(taxableValue)}</strong></td></tr>
-            <tr><td>CGST 9.0%</td><td><strong>INR ${fmt2(cgst)}</strong></td></tr>
-            <tr><td>SGST 9.0%</td><td><strong>INR ${fmt2(sgst)}</strong></td></tr>
+            <tr><td>GST 18.0%</td><td><strong>INR ${fmt2(gst)}</strong></td></tr>
             <tr><td>Round Off</td><td><strong>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</strong></td></tr>
             <tr class="total-row">
                 <td>Total</td>
@@ -257,7 +255,7 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
     <div class="terms">
         <strong style="text-decoration: underline;">Terms and Conditions:</strong><br>
         • Payment Terms - 100% Before Installation | GST - 18% At actual<br>
-        • Installation - at your end (Only Plumbing Expenses apply)<br>
+        • Installation - at your end<br>
         • Delivery - Within 2 working days<br>
         • Warranty - 10 Year's Coil Warranty & 2 Years Panel Warranty.<br>
         • (45 days warranty Return Policy applies)

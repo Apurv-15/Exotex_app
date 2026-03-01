@@ -20,23 +20,34 @@ import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 
-const MACHINE_OPTIONS = [
-  {
-    name: 'EKOGREEN G3',
-    rate: '21185.59',
-    description: 'Energy Efficient Hard Water Conditioner - G3 Series'
-  },
-  {
-    name: 'EKOGREEN G5',
-    rate: '36439.83',
-    description: 'Commercial Hard Water Conditioner - G5 Series'
-  },
-  {
-    name: 'EKOGREEN G6',
-    rate: '61863.56',
-    description: 'Industrial Hard Water Conditioner - G6 Series'
-  },
+const PRODUCT_MODELS = [
+  { name: 'EKO-GREEN G3', rate: '21185.59', description: 'Energy Efficient Hard Water Conditioner - G3 Series' },
+  { name: 'EKO-GREEN G5', rate: '36439.83', description: 'Commercial Hard Water Conditioner - G5 Series' },
+  { name: 'EKO-GREEN G6', rate: '61863.56', description: 'Industrial Hard Water Conditioner - G6 Series' },
+  { name: 'EKO-GREEN G33', rate: '0', description: 'G33 Series' },
+  { name: 'EKO-GREEN G130', rate: '0', description: 'G130 Series' },
+  { name: 'EKO-GREEN G230', rate: '0', description: 'G230 Series' },
+  { name: 'EKO-GREEN G330', rate: '0', description: 'G330 Series' },
+  { name: 'EKO-GREEN G530', rate: '0', description: 'G530 Series' },
+  { name: 'EKO-GREEN G600', rate: '0', description: 'G600 Series' },
+  { name: 'Other (Custom)', rate: '0', description: 'Custom machine or service' }
 ];
+
+// Extracted outside the main component so it does not remount and lose focus on every keystroke!
+const FormInput = ({ label, value, onChange, placeholder = '', multiline = false, kb = 'default' }: any) => (
+  <View style={styles.inputCard}>
+    <Text style={styles.inputLabel}>{label}</Text>
+    <TextInput
+      style={[styles.textInput, multiline && { minHeight: 60, textAlignVertical: 'top' }]}
+      value={value}
+      onChangeText={onChange}
+      placeholder={placeholder}
+      multiline={multiline}
+      keyboardType={kb}
+      placeholderTextColor="#94A4B8"
+    />
+  </View>
+);
 
 export default function CreateQuotationScreen() {
   const navigation = useNavigation<any>();
@@ -59,7 +70,7 @@ export default function CreateQuotationScreen() {
     billingAddress: '',
     shippingAddress: '',
 
-    itemName: 'EKOGREEN G3',
+    itemName: 'EKO-GREEN G3',
     itemDescription: 'Energy Efficient Hard Water Conditioner - G3 Series',
     rate: '21185.59',
     qty: '1',
@@ -68,7 +79,7 @@ export default function CreateQuotationScreen() {
 
   const [showMachineModal, setShowMachineModal] = useState(false);
 
-  const selectMachine = (machine: typeof MACHINE_OPTIONS[0]) => {
+  const selectMachine = (machine: typeof PRODUCT_MODELS[0]) => {
     setFormData(prev => ({
       ...prev,
       itemName: machine.name,
@@ -143,20 +154,7 @@ export default function CreateQuotationScreen() {
     }
   };
 
-  const FormInput = ({ label, value, onChange, placeholder = '', multiline = false, kb = 'default' }: any) => (
-    <View style={styles.inputCard}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        style={[styles.textInput, multiline && { minHeight: 60, textAlignVertical: 'top' }]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        multiline={multiline}
-        keyboardType={kb}
-        placeholderTextColor="#94A4B8"
-      />
-    </View>
-  );
+
 
   return (
     <MeshBackground>
@@ -257,7 +255,7 @@ export default function CreateQuotationScreen() {
                 </Pressable>
               </View>
               <FlatList
-                data={MACHINE_OPTIONS}
+                data={PRODUCT_MODELS}
                 keyExtractor={(item) => item.name}
                 renderItem={({ item }) => (
                   <Pressable
@@ -268,9 +266,11 @@ export default function CreateQuotationScreen() {
                       <Text style={styles.machineNameText}>{item.name}</Text>
                       <Text style={styles.machineDescText}>{item.description}</Text>
                     </View>
-                    <View style={styles.machinePriceBadge}>
-                      <Text style={styles.machinePriceText}>₹{parseFloat(item.rate).toLocaleString('en-IN')}</Text>
-                    </View>
+                    {item.name !== 'Other (Custom)' && (
+                      <View style={styles.machinePriceBadge}>
+                        <Text style={styles.machinePriceText}>₹{parseFloat(item.rate).toLocaleString('en-IN')}</Text>
+                      </View>
+                    )}
                   </Pressable>
                 )}
               />

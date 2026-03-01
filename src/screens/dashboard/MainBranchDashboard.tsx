@@ -258,8 +258,8 @@ export default function MainBranchDashboard() {
 
         // Apply region filter if selected
         const baseVisits = selectedRegion
-            ? allVisits.filter(v => (v as any).city === selectedRegion)
-            : allVisits;
+            ? filteredVisits.filter(v => (v as any).city === selectedRegion)
+            : filteredVisits;
 
         for (let i = 6; i >= 0; i--) {
             const date = new Date(today);
@@ -392,7 +392,7 @@ export default function MainBranchDashboard() {
         });
     }, [filteredComplaints, selectedRegion, sortOrder]);
 
-    const activeComplaintCount = allComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+    const activeComplaintCount = filteredComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
 
     const calculateDaysPassed = (date: string) => {
         const start = new Date(date);
