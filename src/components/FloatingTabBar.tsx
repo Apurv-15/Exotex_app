@@ -5,8 +5,8 @@ import { BlurView } from 'expo-blur';
 import { THEME } from '../constants/theme';
 
 interface FloatingTabBarProps {
-    activeTab: 'home' | 'create' | 'fieldvisit';
-    onTabPress: (tab: 'home' | 'create' | 'fieldvisit') => void;
+    activeTab: 'home' | 'create' | 'fieldvisit' | 'quotation';
+    onTabPress: (tab: 'home' | 'create' | 'fieldvisit' | 'quotation') => void;
 }
 
 const { width } = Dimensions.get('window');
@@ -14,21 +14,7 @@ const { width } = Dimensions.get('window');
 export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBarProps) {
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
-    const handleCenterPress = () => {
-        Animated.sequence([
-            Animated.timing(scaleAnim, {
-                toValue: 0.9,
-                duration: 100,
-                useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-                toValue: 1,
-                duration: 100,
-                useNativeDriver: true,
-            }),
-        ]).start();
-        onTabPress('create');
-    };
+
 
     const TabButton = ({
         tab,
@@ -37,7 +23,7 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
         activeIcon,
         isPlaceholder = false
     }: {
-        tab?: 'home' | 'fieldvisit' | 'create';
+        tab?: 'home' | 'fieldvisit' | 'create' | 'quotation';
         label: string;
         icon: keyof typeof MaterialCommunityIcons.glyphMap;
         activeIcon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -55,7 +41,7 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
             >
                 <MaterialCommunityIcons
                     name={isActive ? activeIcon : icon}
-                    size={26}
+                    size={22}
                     color={isActive ? '#059669' : '#94A3B8'}
                 />
                 <Animated.Text style={[
@@ -70,25 +56,10 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
 
     const TabBarContent = () => (
         <View style={styles.tabBarInner}>
-            {/* Left side: Home */}
-            <View style={styles.sideGroup}>
-                <TabButton tab="home" label="Home" icon="view-grid-outline" activeIcon="view-grid" />
-            </View>
-
-            {/* Center: Create */}
-            <View style={styles.centerButtonOuter}>
-                <Pressable onPress={handleCenterPress} style={{ alignItems: 'center' }}>
-                    <Animated.View style={[styles.centerButton, { transform: [{ scale: scaleAnim }] }]}>
-                        <MaterialCommunityIcons name="plus" size={32} color="#065F46" />
-                    </Animated.View>
-                    <Text style={styles.centerLabel}>Create</Text>
-                </Pressable>
-            </View>
-
-            {/* Right side: Field Visit */}
-            <View style={styles.sideGroup}>
-                <TabButton tab="fieldvisit" label="Visit" icon="chart-box-outline" activeIcon="chart-bar" />
-            </View>
+            <TabButton tab="home" label="Home" icon="view-grid-outline" activeIcon="view-grid" />
+            <TabButton tab="quotation" label="Quote" icon="file-document-outline" activeIcon="file-document" />
+            <TabButton tab="create" label="Create" icon="plus-box-outline" activeIcon="plus-box" />
+            <TabButton tab="fieldvisit" label="Visit" icon="chart-box-outline" activeIcon="chart-bar" />
         </View>
     );
 
@@ -110,27 +81,27 @@ export default function FloatingTabBar({ activeTab, onTabPress }: FloatingTabBar
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 30 : 20,
+        bottom: Platform.OS === 'ios' ? 15 : 10,
         left: 0,
         right: 0,
         alignItems: 'center',
         paddingHorizontal: 20,
     },
     blurContainer: {
-        borderRadius: 45,
+        borderRadius: 35,
         width: '100%',
         maxWidth: 360,
-        height: 80,
+        height: 64,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.5)',
         ...THEME.shadows.small,
     },
     androidContainer: {
         backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderRadius: 45,
+        borderRadius: 35,
         width: '100%',
         maxWidth: 360,
-        height: 75,
+        height: 60,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.1,
@@ -155,42 +126,15 @@ const styles = StyleSheet.create({
     tabButton: {
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 5,
+        padding: 2,
     },
-    centerButtonOuter: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#F7FCF8',
-        marginTop: -40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 6,
-        borderColor: '#F7FCF8',
-        ...THEME.shadows.small,
-        shadowRadius: 10,
-        shadowOpacity: 0.15,
-    },
-    centerButton: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#98D8B1',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        borderColor: 'white',
-    },
+
+
     tabLabel: {
-        fontSize: 10,
+        fontSize: 9,
         fontFamily: THEME.fonts.bold,
-        marginTop: 2,
+        marginTop: 1,
     },
-    centerLabel: {
-        fontSize: 11,
-        fontFamily: THEME.fonts.bold,
-        color: '#065F46',
-        marginTop: 2,
-    },
+
 });
 
