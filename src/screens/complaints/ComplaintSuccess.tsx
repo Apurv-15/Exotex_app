@@ -12,6 +12,8 @@ import { THEME } from '../../constants/theme';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+// @ts-ignore
+import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 
 export default function ComplaintSuccess() {
     const route = useRoute<any>();
@@ -46,11 +48,15 @@ export default function ComplaintSuccess() {
 
     const handleDownloadPDF = async () => {
         try {
+            // Resolve assets
             const logoAsset = Asset.fromModule(LogoImage);
-            await logoAsset.downloadAsync();
-            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
 
-            const html = generateComplaintPDFHTML(complaint, logoUri);
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
+
+            const html = generateComplaintPDFHTML(complaint, logoUri, signUri);
 
             if (Platform.OS === 'web') {
                 const printWindow = window.open('', '_blank');
