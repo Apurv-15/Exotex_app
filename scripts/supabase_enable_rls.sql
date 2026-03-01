@@ -116,6 +116,3 @@ USING (bucket_id IN ('warranty-images', 'complaint-images', 'warranty-templates'
 CREATE POLICY "Authenticated users can delete images" 
 ON storage.objects FOR DELETE TO authenticated 
 USING (bucket_id IN ('warranty-images', 'complaint-images', 'warranty-templates'));
-
-
-
