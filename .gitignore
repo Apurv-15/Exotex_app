@@ -43,3 +43,8 @@ coverage/
 # Temporary files
 *.log
 package-lock.json
+scripts/performance_optimization.sql
+scripts/supabase_enable_rls.sql
+scripts/supabase_set_buckets_private.sql
+scripts/supabase_enable_rls.sql
+scripts/test_connection.sql
