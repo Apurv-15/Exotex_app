@@ -1,4 +1,4 @@
-export const generateComplaintPDFHTML = (complaint: any, logoUri: string) => {
+export const generateComplaintPDFHTML = (complaint: any, logoUri: string, signStampUri?: string) => {
     const formattedDate = new Date().toLocaleDateString('en-IN', {
         day: '2-digit',
         month: '2-digit',
@@ -198,6 +198,7 @@ export const generateComplaintPDFHTML = (complaint: any, logoUri: string) => {
 
         <div class="footer">
             <div class="signature-box">
+                ${signStampUri ? `<img src="${signStampUri}" style="max-height: 80px; max-width: 100%; object-fit: contain; margin-bottom: -20px;" />` : ''}
                 <div class="signature-line">Authorized Signatory</div>
             </div>
             <div class="signature-box">

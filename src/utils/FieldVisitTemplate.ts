@@ -212,6 +212,7 @@ export const generateFieldVisitHTML = (formData: any, logoUri: string, signStamp
                 <div class="info-item"><span class="info-label">Health Concerns:</span><div class="info-value">${formatArray(formData.healthConcerns)}</div></div>
                 <div class="info-item"><span class="info-label">Appliance Issues:</span><div class="info-value">${formatArray(formData.applianceIssues)}</div></div>
                 <div class="info-item"><span class="info-label">Cleaning Concerns:</span><div class="info-value">${formatArray(formData.cleaningConcerns)}</div></div>
+                <div class="info-item full-width"><span class="info-label">Customer Remarks:</span><div class="info-value">${formData.customerRemarks || 'N/A'}</div></div>
             </div>
         </div>
         ` : `
@@ -242,6 +243,7 @@ export const generateFieldVisitHTML = (formData: any, logoUri: string, signStamp
         </div>
         `}
 
+        ${!isResidential ? `
         <div class="section">
             <div class="section-header">Technical Observations & Action Plan</div>
             <div class="info-grid">
@@ -255,10 +257,11 @@ export const generateFieldVisitHTML = (formData: any, logoUri: string, signStamp
                 <div class="info-item full-width"><span class="info-label">Customer Remarks:</span><div class="info-value">${formData.customerRemarks || 'N/A'}</div></div>
             </div>
         </div>
+        ` : ''}
 
         <div class="footer">
             <div class="signature-box">
-                <div class="stamp-area">Company Stamp</div>
+                ${signStampUri ? `<img src="${signStampUri}" style="max-height: 80px; max-width: 100%; object-fit: contain; margin-bottom: -20px;" />` : '<div class="stamp-area">Company Stamp</div>'}
                 <div class="signature-line">Authorized Signatory</div>
             </div>
             
