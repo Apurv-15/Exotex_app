@@ -14,8 +14,11 @@ import { useAuth } from '../../context/AuthContext';
 
 // Import the "Tech" (Template Utility)
 import { generateQuotationHTML } from '../../utils/QuotationTemplate';
-// Auto-generated base64 images
-import { LOGO_B64, SIGN_B64 } from './quotationImages';
+import { Asset } from 'expo-asset';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+// @ts-ignore
+import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 
 const MACHINE_OPTIONS = [
   {
@@ -102,11 +105,19 @@ export default function CreateQuotationScreen() {
     }
 
     try {
+      // Resolve assets
+      const logoAsset = Asset.fromModule(LogoImage);
+      const signAsset = Asset.fromModule(SignStampImage);
+      await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
+
+      const logoUri = logoAsset.localUri || logoAsset.uri;
+      const signUri = signAsset.localUri || signAsset.uri;
+
       // USES THE "TECH" - Calls the external template utility
       const html = generateQuotationHTML(
         formData,
-        LOGO_B64,
-        SIGN_B64,
+        logoUri,
+        signUri,
         user?.region || 'BANGLORE'
       );
 

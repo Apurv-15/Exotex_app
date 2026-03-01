@@ -1,4 +1,4 @@
-export const generateQuotationHTML = (formData: any, logoB64: string, signB64: string, userRegion: string) => {
+export const generateQuotationHTML = (formData: any, logoUri: string, signStampUri: string, userRegion: string) => {
 
     /** Convert integer to Indian words for the PDF */
     const numberToWords = (num: number): string => {
@@ -55,60 +55,60 @@ export const generateQuotationHTML = (formData: any, logoB64: string, signB64: s
         
         body {
             font-family: 'Roboto', 'Arial', sans-serif;
-            font-size: 13px;
+            font-size: 12px;
             color: #111;
             background: #fff;
-            padding: 45px 50px;
-            line-height: 1.5;
+            padding: 25px 35px;
+            line-height: 1.4;
             width: 210mm;
             min-height: 297mm;
             margin: 0 auto;
         }
 
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
         .header-left { flex: 1; }
         .header-right { text-align: right; }
 
         .quotation-label {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 400;
-            letter-spacing: 6px;
+            letter-spacing: 5px;
             color: #6ab0d4;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
         }
         .company-name {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             color: #111;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
             text-transform: uppercase;
         }
-        .company-info { font-size: 12px; line-height: 1.6; color: #111; }
-        .original-label { font-size: 11px; font-weight: 700; color: #111; letter-spacing: 0.5px; }
-        .logo { width: 160px; height: auto; margin-top: 10px; }
+        .company-info { font-size: 11px; line-height: 1.4; color: #111; }
+        .original-label { font-size: 10px; font-weight: 700; color: #111; letter-spacing: 0.5px; }
+        .logo { width: 130px; height: auto; margin-top: 5px; }
 
         /* Removed neon highlighter background-color: #FAED27; */
         .hl { font-weight: 700; display: inline-block; text-decoration: underline; }
 
-        .meta-row { display: flex; gap: 0; margin-top: 20px; margin-bottom: 15px; }
+        .meta-row { display: flex; gap: 0; margin-top: 10px; margin-bottom: 10px; }
         .meta-cell { flex: 1; font-size: 13px; }
 
-        .addr-row { display: flex; gap: 20px; margin-bottom: 25px; }
-        .addr-col { flex: 1; font-size: 12px; line-height: 1.6; }
+        .addr-row { display: flex; gap: 20px; margin-bottom: 15px; }
+        .addr-col { flex: 1; font-size: 11px; line-height: 1.4; }
         
         .divider-line { border-top: 2px solid #9EC9E0; margin: 12px 0; }
 
         table.items { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
         table.items th {
-            padding: 10px 6px;
+            padding: 6px 6px;
             text-align: left;
             font-weight: 700;
-            font-size: 12px;
+            font-size: 11px;
             border-top: 2px solid #9EC9E0;
             border-bottom: 2px solid #9EC9E0;
             background: #fff;
         }
-        table.items td { padding: 15px 6px; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
+        table.items td { padding: 8px 6px; vertical-align: top; border-bottom: 1px solid #f0f0f0; }
         .r { text-align: right; }
         .c { text-align: center; }
 
@@ -116,10 +116,10 @@ export const generateQuotationHTML = (formData: any, logoB64: string, signB64: s
         table.totals { width: 45%; border-collapse: collapse; font-size: 13px; }
         table.totals td { padding: 4px 6px; text-align: right; }
         .total-row td {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             border-top: 2px solid #111;
-            padding-top: 10px;
+            padding-top: 6px;
         }
 
         .summary-row {
@@ -127,18 +127,18 @@ export const generateQuotationHTML = (formData: any, logoB64: string, signB64: s
             justify-content: space-between;
             border-top: 2px solid #9EC9E0;
             border-bottom: 2px solid #9EC9E0;
-            padding: 10px 0;
-            font-size: 12px;
-            margin-top: 25px;
+            padding: 6px 0;
+            font-size: 11px;
+            margin-top: 15px;
         }
 
-        .bottom-section { display: flex; justify-content: space-between; margin-top: 35px; }
-        .bank-details { font-size: 12px; line-height: 1.8; }
+        .bottom-section { display: flex; justify-content: space-between; margin-top: 20px; }
+        .bank-details { font-size: 11px; line-height: 1.5; }
         .signatory-box { text-align: center; }
-        .sign-img { width: 140px; height: 90px; object-fit: contain; margin: 10px 0; }
+        .sign-img { width: 120px; height: 70px; object-fit: contain; margin: 5px 0; }
 
-        .terms { font-size: 11px; line-height: 1.7; margin-top: 35px; }
-        .page-footer { margin-top: 60px; font-size: 11px; font-weight: 700; text-align: center; color: #666; }
+        .terms { font-size: 10px; line-height: 1.5; margin-top: 20px; }
+        .page-footer { margin-top: 25px; font-size: 10px; font-weight: 700; text-align: center; color: #666; }
     </style>
 </head>
 <body>
@@ -158,7 +158,7 @@ export const generateQuotationHTML = (formData: any, logoB64: string, signB64: s
         </div>
         <div class="header-right">
             <div class="original-label">ORIGINAL FOR RECIPIENT</div>
-            <img class="logo" src="${logoB64}" />
+            <img class="logo" src="${logoUri}" />
         </div>
     </div>
 
@@ -249,7 +249,7 @@ export const generateQuotationHTML = (formData: any, logoB64: string, signB64: s
         </div>
         <div class="signatory-box">
             <div style="font-size: 12px;">For AOP ELECTRIFICIENT PRIVATE LIMITED</div>
-            <img class="sign-img" src="${signB64}" />
+            <img class="sign-img" src="${signStampUri}" />
             <div style="font-weight: bold; font-size: 12px; border-top: 1px solid #ddd; padding-top: 5px;">Authorized Signatory</div>
         </div>
     </div>
