@@ -89,17 +89,7 @@ export default function WarrantyCard() {
     });
 
     // Generate HTML for EKOTEX Warranty Card
-    const generateWarrantyHTML = () => {
-        // Resolve logo asset
-        const logoAsset = Asset.fromModule(LogoImage);
-        // For web, we can use the uri directly or a base64 string if needed.
-        // For native, Asset.fromModule might give a local URI that works in WebView/Print
-        const logoUri = logoAsset.uri;
-
-        // Resolve Sign & Stamp asset
-        const signStampAsset = Asset.fromModule(SignStampImage);
-        const signStampUri = signStampAsset.uri;
-
+    const generateWarrantyHTML = (logoUri: string, signStampUri: string) => {
         return `
 <!DOCTYPE html>
 <html lang="en">
@@ -452,7 +442,15 @@ export default function WarrantyCard() {
     const handleDownloadPDF = async () => {
         setLoading(true);
         try {
-            const html = generateWarrantyHTML();
+            // Resolve assets
+            const logoAsset = Asset.fromModule(LogoImage);
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
+
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
+
+            const html = generateWarrantyHTML(logoUri, signUri);
 
             if (Platform.OS === 'web') {
                 // For web, open print dialog

@@ -16,6 +16,8 @@ import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+// @ts-ignore
+import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 
 const CATEGORIES = ['Billing', 'Service', 'Delay', 'Technical', 'Other'];
 const STATUSES = ['Open', 'In Progress', 'Resolved', 'Closed'];
@@ -219,10 +221,13 @@ export default function RaiseComplaintStep2() {
         try {
             setLoading(true);
 
-            // Resolve logo
+            // Resolve assets
             const logoAsset = Asset.fromModule(LogoImage);
-            await logoAsset.downloadAsync();
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
+
             const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
 
             const complaintToPrint = complaintData || {
                 complaintId,
@@ -246,7 +251,7 @@ export default function RaiseComplaintStep2() {
                 city: clientData.city
             };
 
-            const html = generateComplaintPDFHTML(complaintToPrint, logoUri);
+            const html = generateComplaintPDFHTML(complaintToPrint, logoUri, signUri);
 
             if (Platform.OS === 'web') {
                 const printWindow = window.open('', '_blank');
