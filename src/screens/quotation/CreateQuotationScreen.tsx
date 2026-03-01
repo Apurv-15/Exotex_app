@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, Pressable,
-  Alert, Platform, KeyboardAvoidingView
+  Alert, Platform, KeyboardAvoidingView, Modal, FlatList
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,6 +16,24 @@ import { useAuth } from '../../context/AuthContext';
 import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 // Auto-generated base64 images
 import { LOGO_B64, SIGN_B64 } from './quotationImages';
+
+const MACHINE_OPTIONS = [
+  {
+    name: 'EKOGREEN G3',
+    rate: '21185.59',
+    description: 'Energy Efficient Hard Water Conditioner - G3 Series'
+  },
+  {
+    name: 'EKOGREEN G5',
+    rate: '36439.83',
+    description: 'Commercial Hard Water Conditioner - G5 Series'
+  },
+  {
+    name: 'EKOGREEN G6',
+    rate: '61863.56',
+    description: 'Industrial Hard Water Conditioner - G6 Series'
+  },
+];
 
 export default function CreateQuotationScreen() {
   const navigation = useNavigation<any>();
@@ -38,12 +56,24 @@ export default function CreateQuotationScreen() {
     billingAddress: '',
     shippingAddress: '',
 
-    itemName: 'EKO-GREEN- G33 Commercial',
-    itemDescription: '2 Single Coils 2.8ft, 2 Control Panels, 1 Jumbo Housing 20" Big',
-    rate: '63558.47',
+    itemName: 'EKOGREEN G3',
+    itemDescription: 'Energy Efficient Hard Water Conditioner - G3 Series',
+    rate: '21185.59',
     qty: '1',
-    discountPerc: '20',
+    discountPerc: '0',
   });
+
+  const [showMachineModal, setShowMachineModal] = useState(false);
+
+  const selectMachine = (machine: typeof MACHINE_OPTIONS[0]) => {
+    setFormData(prev => ({
+      ...prev,
+      itemName: machine.name,
+      itemDescription: machine.description,
+      rate: machine.rate,
+    }));
+    setShowMachineModal(false);
+  };
 
   const fillDummyData = () => {
     setFormData(prev => ({
@@ -163,6 +193,17 @@ export default function CreateQuotationScreen() {
 
           <Text style={styles.sectionHeader}>4. PRODUCT & PRICING</Text>
           <GlassPanel style={styles.section}>
+            <View style={styles.inputCard}>
+              <Text style={styles.inputLabel}>SELECT MACHINE</Text>
+              <Pressable
+                style={styles.dropdownBtn}
+                onPress={() => setShowMachineModal(true)}
+              >
+                <Text style={styles.dropdownText}>{formData.itemName || 'Select a Machine'}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
+              </Pressable>
+            </View>
+
             <FormInput label="ITEM NAME" value={formData.itemName} onChange={(t: string) => setFormData(p => ({ ...p, itemName: t }))} />
             <FormInput label="DESCRIPTION" value={formData.itemDescription} onChange={(t: string) => setFormData(p => ({ ...p, itemDescription: t }))} multiline />
             <View style={styles.row}>
@@ -190,6 +231,41 @@ export default function CreateQuotationScreen() {
             </LinearGradient>
           </Pressable>
         </View>
+        <Modal
+          visible={showMachineModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowMachineModal(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setShowMachineModal(false)}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Choose Machine</Text>
+                <Pressable onPress={() => setShowMachineModal(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#64748B" />
+                </Pressable>
+              </View>
+              <FlatList
+                data={MACHINE_OPTIONS}
+                keyExtractor={(item) => item.name}
+                renderItem={({ item }) => (
+                  <Pressable
+                    style={styles.machineItem}
+                    onPress={() => selectMachine(item)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.machineNameText}>{item.name}</Text>
+                      <Text style={styles.machineDescText}>{item.description}</Text>
+                    </View>
+                    <View style={styles.machinePriceBadge}>
+                      <Text style={styles.machinePriceText}>₹{parseFloat(item.rate).toLocaleString('en-IN')}</Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+            </View>
+          </Pressable>
+        </Modal>
       </KeyboardAvoidingView>
     </MeshBackground>
   );
@@ -212,5 +288,82 @@ const styles = StyleSheet.create({
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   genBtn: { borderRadius: 16, overflow: 'hidden', elevation: 4, shadowColor: '#7C3AED', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   grad: { paddingVertical: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
-  genText: { color: 'white', fontSize: 16, fontWeight: '800' }
+  genText: { color: 'white', fontSize: 16, fontWeight: '800' },
+
+  // Modal & Dropdown Styles
+  dropdownBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  dropdownText: {
+    fontSize: 15,
+    color: '#1E293B',
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    maxHeight: '60%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  machineItem: {
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  machineNameText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  machineDescText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  machinePriceBadge: {
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  machinePriceText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#7C3AED',
+  },
 });
