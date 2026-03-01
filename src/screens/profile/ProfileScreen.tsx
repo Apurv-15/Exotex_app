@@ -97,6 +97,8 @@ export default function ProfileScreen() {
                                 value={name}
                                 onChangeText={setName}
                                 placeholder="Enter your full name"
+                                textContentType="name"
+                                autoComplete="name"
                             />
                         </View>
 
@@ -139,6 +141,8 @@ export default function ProfileScreen() {
                                     onChangeText={setNewPassword}
                                     placeholder="Enter new password"
                                     secureTextEntry={!showPassword}
+                                    textContentType="newPassword"
+                                    autoComplete="password-new"
                                 />
                                 <Pressable
                                     onPress={() => setShowPassword(!showPassword)}
@@ -161,6 +165,8 @@ export default function ProfileScreen() {
                                 onChangeText={setConfirmPassword}
                                 placeholder="Confirm new password"
                                 secureTextEntry={!showPassword}
+                                textContentType="newPassword"
+                                autoComplete="password-new"
                             />
                         </View>
 

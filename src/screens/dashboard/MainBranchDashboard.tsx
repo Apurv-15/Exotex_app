@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar, Modal, TextInput } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar, Modal, TextInput, RefreshControl } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
@@ -8,6 +8,7 @@ import { StockService } from '../../services/StockService';
 import { Stock } from '../../types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { AuthService } from '../../services/AuthService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LineChart } from 'react-native-chart-kit';
 import MeshBackground from '../../components/MeshBackground';
@@ -99,6 +100,9 @@ export default function MainBranchDashboard() {
     const [isDownloadingPhotos, setIsDownloadingPhotos] = useState(false);
     const [officialRegions, setOfficialRegions] = useState<string[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [editingUser, setEditingUser] = useState<any | null>(null);
+    const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const fetchData = useCallback(async (isInitial: boolean = true) => {
         if (isInitial) setLoading(true);
@@ -143,9 +147,13 @@ export default function MainBranchDashboard() {
             setAllStock(stockData);
             setAllComplaints(complaintsData || []);
 
-            // 3. Fetch all unique regions from active sub-branch users
-            const { data: userData } = await supabase.from('users').select('*').not('region', 'is', null);
-            const uniqueRegions = Array.from(new Set(userData?.map(u => u.region) || []));
+            // 3. Fetch all users for management
+            const { data: userData } = await supabase.from('users').select('*');
+
+            // Only sub-branch users with regions should be considered "official regions" for dashboard stats
+            const officialUsers = (userData || []).filter(u => u.region);
+            const uniqueRegions = Array.from(new Set(officialUsers.map(u => u.region)));
+
             setOfficialRegions(uniqueRegions);
             setAllUsers(userData || []);
 
@@ -159,6 +167,12 @@ export default function MainBranchDashboard() {
             setLoading(false);
         }
     }, [user?.role, user?.branchId, user?.region]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchData(false);
+        setRefreshing(false);
+    }, [fetchData]);
 
     useFocusEffect(useCallback(() => {
         fetchData(true);
@@ -470,6 +484,14 @@ export default function MainBranchDashboard() {
                 ref={scrollViewRef}
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={THEME.colors.primary}
+                        colors={[THEME.colors.primary]}
+                    />
+                }
             >
                 {/* Header Section */}
                 <View style={styles.header}>
@@ -1029,9 +1051,63 @@ export default function MainBranchDashboard() {
                         setSortOrder={setSortOrder}
                     />
                 ) : activeTab === 'Users' ? (
-                    <UserTabContent allUsers={allUsers} />
+                    <UserTabContent
+                        allUsers={allUsers}
+                        currentUser={user}
+                        onDelete={(email) => {
+                            Alert.alert(
+                                'Delete User',
+                                `Are you sure you want to delete ${email}? This user will lose all database access.`,
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                        text: 'Delete',
+                                        style: 'destructive',
+                                        onPress: async () => {
+                                            try {
+                                                await AuthService.deleteUser(email);
+                                                fetchData(false);
+                                                Alert.alert('Success', 'User deleted successfully');
+                                            } catch (err) {
+                                                Alert.alert('Error', 'Failed to delete user');
+                                            }
+                                        }
+                                    }
+                                ]
+                            );
+                        }}
+                        onEdit={(u) => {
+                            setEditingUser(u);
+                        }}
+                    />
                 ) : null}
             </ScrollView>
+
+            <EditUserModal
+                visible={!!editingUser}
+                user={editingUser}
+                onClose={() => setEditingUser(null)}
+                isUpdating={isUpdatingUser}
+                officialRegions={officialRegions}
+                onSave={async (email, updates) => {
+                    setIsUpdatingUser(true);
+                    try {
+                        await AuthService.adminUpdateProfile(email, {
+                            name: updates.name,
+                            role: updates.role,
+                            branchId: updates.branch_id,
+                            region: updates.region
+                        });
+                        await fetchData(false);
+                        setEditingUser(null);
+                        Alert.alert('Success', 'User updated successfully');
+                    } catch (err) {
+                        Alert.alert('Error', 'Failed to update user');
+                    } finally {
+                        setIsUpdatingUser(false);
+                    }
+                }}
+            />
 
             {/* Fixed Floating Toolbar for Photos Selection */}
             {activeTab === 'Photos' && isSelectionMode && (
@@ -1602,7 +1678,7 @@ const SortControls = ({ sortOrder, setSortOrder }: { sortOrder: 'newest' | 'olde
     );
 };
 
-const UserTabContent = ({ allUsers }: { allUsers: any[] }) => {
+const UserTabContent = ({ allUsers, currentUser, onDelete, onEdit }: { allUsers: any[], currentUser: any, onDelete: (email: string) => void, onEdit: (user: any) => void }) => {
     return (
         <View style={{ paddingBottom: 100 }}>
             <View style={styles.sectionHeader}>
@@ -1615,38 +1691,184 @@ const UserTabContent = ({ allUsers }: { allUsers: any[] }) => {
                     <Text style={styles.emptyText}>No registered users found</Text>
                 </GlassPanel>
             ) : (
-                <GlassPanel style={{ padding: 8 }}>
+                <View style={{ gap: 12 }}>
                     {allUsers.map((u, index) => (
-                        <View
-                            key={u.id || index}
-                            style={[
-                                styles.listItem,
-                                index === allUsers.length - 1 && { borderBottomWidth: 0 }
-                            ]}
-                        >
-                            <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
-                                <MaterialCommunityIcons name="account-tie" size={24} color={THEME.colors.secondary} />
-                            </View>
-                            <View style={styles.listContent}>
-                                <Text style={styles.listTitle}>{u.name}</Text>
-                                <Text style={styles.listSub}>{u.email}</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                    <View style={[styles.tag, { backgroundColor: '#E0E7FF' }]}>
-                                        <Text style={[styles.tagText, { color: '#4338CA', fontSize: 10 }]}>{u.role}</Text>
-                                    </View>
-                                    <View style={[styles.tag, { backgroundColor: '#F3E8FF' }]}>
-                                        <Text style={[styles.tagText, { color: '#7E22CE', fontSize: 10 }]}>{u.region || u.branch_id || 'All'}</Text>
+                        <GlassPanel key={u.id || index} style={{ padding: 12 }}>
+                            <View style={[styles.listItem, { borderBottomWidth: 0, paddingHorizontal: 0 }]}>
+                                <View style={[styles.listIcon, { backgroundColor: u.role === 'Super Admin' ? THEME.colors.primary + '15' : THEME.colors.mintLight }]}>
+                                    <MaterialCommunityIcons
+                                        name={u.role === 'Super Admin' ? "account-star" : "account-tie"}
+                                        size={24}
+                                        color={u.role === 'Super Admin' ? THEME.colors.primary : THEME.colors.secondary}
+                                    />
+                                </View>
+                                <View style={styles.listContent}>
+                                    <Text style={styles.listTitle}>{u.name}</Text>
+                                    <Text style={styles.listSub}>{u.email}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                        <View style={[styles.tag, { backgroundColor: '#E0E7FF' }]}>
+                                            <Text style={[styles.tagText, { color: '#4338CA', fontSize: 10 }]}>{u.role}</Text>
+                                        </View>
+                                        <View style={[styles.tag, { backgroundColor: '#F3E8FF' }]}>
+                                            <Text style={[styles.tagText, { color: '#7E22CE', fontSize: 10 }]}>{u.region || u.branch_id || 'All'}</Text>
+                                        </View>
                                     </View>
                                 </View>
+                                {currentUser?.role === 'Super Admin' && (
+                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        <Pressable
+                                            onPress={() => onEdit(u)}
+                                            style={({ pressed }) => [
+                                                { padding: 8, backgroundColor: THEME.colors.mintLight, borderRadius: 10 },
+                                                pressed && { opacity: 0.7 }
+                                            ]}
+                                        >
+                                            <MaterialCommunityIcons name="pencil" size={18} color={THEME.colors.secondary} />
+                                        </Pressable>
+                                        {u.email !== currentUser.email && (
+                                            <Pressable
+                                                onPress={() => onDelete(u.email)}
+                                                style={({ pressed }) => [
+                                                    { padding: 8, backgroundColor: '#FED7D7', borderRadius: 10 },
+                                                    pressed && { opacity: 0.7 }
+                                                ]}
+                                            >
+                                                <MaterialCommunityIcons name="delete" size={18} color="#C53030" />
+                                            </Pressable>
+                                        )}
+                                    </View>
+                                )}
                             </View>
-                            <View style={styles.listRight}>
-                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} />
-                            </View>
-                        </View>
+                        </GlassPanel>
                     ))}
-                </GlassPanel>
+                </View>
             )}
         </View>
+    );
+};
+
+const EditUserModal = ({
+    visible,
+    user,
+    onClose,
+    onSave,
+    isUpdating,
+    officialRegions
+}: {
+    visible: boolean,
+    user: any | null,
+    onClose: () => void,
+    onSave: (email: string, updates: any) => void,
+    isUpdating: boolean,
+    officialRegions: string[]
+}) => {
+    const [name, setName] = useState('');
+    const [role, setRole] = useState<'Admin' | 'User' | 'Super Admin'>('User');
+    const [region, setRegion] = useState('');
+    const [branchId, setBranchId] = useState('');
+
+    useEffect(() => {
+        if (user) {
+            setName(user.name || '');
+            setRole(user.role || 'User');
+            setRegion(user.region || '');
+            setBranchId(user.branch_id || '');
+        }
+    }, [user]);
+
+    const handleSave = () => {
+        if (!name) {
+            Alert.alert('Error', 'Name is required');
+            return;
+        }
+        onSave(user.email, { name, role, region, branch_id: branchId });
+    };
+
+    if (!user) return null;
+
+    return (
+        <Modal visible={visible} transparent animationType="slide">
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                <View style={{ backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                        <Text style={{ fontSize: 20, fontFamily: THEME.fonts.bold, color: THEME.colors.text }}>Edit User Profile</Text>
+                        <Pressable onPress={onClose} style={{ padding: 4 }}>
+                            <MaterialCommunityIcons name="close" size={24} color={THEME.colors.textSecondary} />
+                        </Pressable>
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        <View style={{ gap: 16 }}>
+                            <View>
+                                <Text style={styles.listSub}>Full Name</Text>
+                                <TextInput
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="Enter user name"
+                                    style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingVertical: 8, fontSize: 16, color: THEME.colors.text }}
+                                />
+                            </View>
+
+                            <View>
+                                <Text style={styles.listSub}>Role</Text>
+                                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                                    {(['User', 'Admin', 'Super Admin'] as const).map(r => (
+                                        <Pressable
+                                            key={r}
+                                            onPress={() => setRole(r)}
+                                            style={[
+                                                styles.chip,
+                                                role === r && styles.chipActive,
+                                                { flex: 1, alignItems: 'center' }
+                                            ]}
+                                        >
+                                            <Text style={[styles.chipText, role === r && styles.chipTextActive]}>{r}</Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            </View>
+
+                            <View>
+                                <Text style={styles.listSub}>Region / Branch ID</Text>
+                                <TextInput
+                                    value={region || branchId}
+                                    onChangeText={(val) => {
+                                        setRegion(val);
+                                        setBranchId(val);
+                                    }}
+                                    placeholder="e.g. Mumbai, Delhi, etc."
+                                    style={{ borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingVertical: 8, fontSize: 16, color: THEME.colors.text }}
+                                />
+                                <Text style={{ fontSize: 11, color: THEME.colors.textSecondary, marginTop: 4 }}>
+                                    Available: {officialRegions.join(', ') || 'None'}
+                                </Text>
+                            </View>
+
+                            <Pressable
+                                onPress={handleSave}
+                                disabled={isUpdating}
+                                style={({ pressed }) => [
+                                    {
+                                        backgroundColor: THEME.colors.secondary,
+                                        padding: 16,
+                                        borderRadius: 16,
+                                        alignItems: 'center',
+                                        marginTop: 12,
+                                        opacity: (pressed || isUpdating) ? 0.8 : 1
+                                    }
+                                ]}
+                            >
+                                {isUpdating ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <Text style={{ color: 'white', fontFamily: THEME.fonts.bold, fontSize: 16 }}>Save Changes</Text>
+                                )}
+                            </Pressable>
+                        </View>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
     );
 };
 
