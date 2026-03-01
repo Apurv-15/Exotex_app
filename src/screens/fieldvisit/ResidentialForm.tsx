@@ -230,11 +230,6 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                 </View>
             </GlassPanel>
 
-            {/* Signature Placeholder */}
-            <View style={styles.signatureSection}>
-                <View style={styles.signatureLine} />
-                <Text style={styles.signatureText}>Customer signature</Text>
-            </View>
         </View>
     );
 }
@@ -358,19 +353,5 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#4B5563',
     },
-    signatureSection: {
-        marginTop: 40,
-        alignItems: 'center',
-    },
-    signatureLine: {
-        width: 200,
-        height: 1,
-        backgroundColor: '#374151',
-    },
-    signatureText: {
-        marginTop: 8,
-        fontSize: 12,
-        fontStyle: 'italic',
-        color: '#6B7280',
-    },
+
 });

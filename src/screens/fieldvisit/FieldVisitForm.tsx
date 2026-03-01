@@ -17,6 +17,8 @@ import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+// @ts-ignore
+import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // import { SoundManager } from '../../utils/SoundManager';
 
 const TOTAL_STEPS = 3;
@@ -134,6 +136,36 @@ export default function FieldVisitForm() {
     };
 
     const fillDummyData = () => {
+        if (formData.propertyType === 'Residential') {
+            setFormData(prev => ({
+                ...prev,
+                dateOfVisit: new Date().toISOString().split('T')[0],
+                branchName: user?.branchId || 'Mumbai Central',
+                salesEngineerName: user?.name || 'Apurv Chaudhary',
+                mobileNumber: '9123456789',
+                contactPersonName: 'Rahul Sharma',
+                siteAddress: 'Flat 402, Lotus Residency, Near MG Road',
+                industryType: 'Mumbai', // Used as City/Region
+                waterSource: ['Borewell', 'Municipal'],
+                pipeLineSize: '1 inch',
+                tankCapacity: '1000L',
+                waterHardnessPPM: '420',
+                waterTDS: '550',
+                customerRemarks: 'Severe scaling in bathroom fittings and kitchen appliances. Visible white marks on tiles.',
+                waterQualityIssues: ['Scaling', 'Appliances', 'Skin'],
+                cleaningConcerns: ['Utensils', 'Clothes'],
+                applianceIssues: ['Clogged', 'Cleaning'],
+                healthConcerns: ['DrySkin', 'HairFall'],
+                hasWaterPurifier: true,
+                waterPurifierBrand: 'Aquaguard RO',
+                hasUsedSoftener: false,
+                customerInterestLevel: 'High',
+                overallSiteAssessment: 'Good',
+                conversionProbability: '80%',
+            }));
+            return;
+        }
+
         setFormData({
             dateOfVisit: new Date().toISOString().split('T')[0],
             branchName: user?.branchId || 'Branch Alpha',
@@ -188,7 +220,7 @@ export default function FieldVisitForm() {
             overallSiteAssessment: 'Good',
             conversionProbability: 'High',
             visitedBySignature: 'Robert Green',
-            propertyType: 'Industrial',
+            propertyType: formData.propertyType || 'Industrial',
             tankCapacity: '5000L',
             waterTDS: '450',
             waterQualityIssues: ['Scaling'],
@@ -382,12 +414,15 @@ export default function FieldVisitForm() {
             setLoading(true);
             setUploadStatus('Generating report...');
 
-            // Resolve logo
+            // Resolve assets
             const logoAsset = Asset.fromModule(LogoImage);
-            await logoAsset.downloadAsync();
-            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
 
-            const html = generateFieldVisitHTML(formData, logoUri);
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
+
+            const html = generateFieldVisitHTML(formData, logoUri, signUri);
 
             if (Platform.OS === 'web') {
                 const printWindow = window.open('', '_blank');
