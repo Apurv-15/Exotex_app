@@ -214,5 +214,41 @@ export const AuthService = {
             console.error('AuthService.updatePassword error:', error);
             throw error;
         }
+    },
+
+    // Admin-only: Update any user profile fields
+    adminUpdateProfile: async (email: string, updates: { name?: string, role?: string, branchId?: string, region?: string }): Promise<void> => {
+        try {
+            const { error: profileError } = await supabase
+                .from('users')
+                .update({
+                    name: updates.name,
+                    role: updates.role,
+                    branch_id: updates.branchId,
+                    region: updates.region
+                })
+                .eq('email', email);
+
+            if (profileError) throw profileError;
+        } catch (error: any) {
+            console.error('AuthService.adminUpdateProfile error:', error);
+            throw error;
+        }
+    },
+
+    // Admin-only: Delete user from public profile table
+    // Note: Full auth deletion typically requires service_role or admin API
+    deleteUser: async (email: string): Promise<void> => {
+        try {
+            const { error: profileError } = await supabase
+                .from('users')
+                .delete()
+                .eq('email', email);
+
+            if (profileError) throw profileError;
+        } catch (error: any) {
+            console.error('AuthService.deleteUser error:', error);
+            throw error;
+        }
     }
 };

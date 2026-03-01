@@ -167,6 +167,8 @@ export default function LoginScreen() {
                                     onChangeText={setEmail}
                                     autoCapitalize="none"
                                     keyboardType="email-address"
+                                    textContentType="emailAddress"
+                                    autoComplete="email"
                                 />
                             </View>
 
@@ -186,6 +188,8 @@ export default function LoginScreen() {
                                         value={password}
                                         onChangeText={setPassword}
                                         secureTextEntry={!showPassword}
+                                        textContentType="password"
+                                        autoComplete="password"
                                     />
                                     <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 10 }}>
                                         <MaterialCommunityIcons
@@ -288,6 +292,8 @@ export default function LoginScreen() {
                                         placeholder="user@gmail.com"
                                         autoCapitalize="none"
                                         keyboardType="email-address"
+                                        textContentType="emailAddress"
+                                        autoComplete="email"
                                     />
                                 </View>
 
@@ -299,6 +305,8 @@ export default function LoginScreen() {
                                         onChangeText={setRegisterPassword}
                                         placeholder="••••••••"
                                         secureTextEntry
+                                        textContentType="newPassword"
+                                        autoComplete="password-new"
                                     />
                                 </View>
 
