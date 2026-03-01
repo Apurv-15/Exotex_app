@@ -1016,6 +1016,7 @@ export default function MainBranchDashboard() {
                         allStock={allStock}
                         onUpdate={() => fetchData(false)}
                         scrollViewRef={scrollViewRef}
+                        officialRegions={officialRegions}
                     />
                 ) : activeTab === 'Photos' ? (
                     <PhotosGalleryContent
@@ -1064,10 +1065,10 @@ export default function MainBranchDashboard() {
     );
 }
 
-const REGIONS = ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 'Pune'];
-
-const StockManagementContent = ({ allStock, onUpdate, scrollViewRef }: { allStock: Stock[], onUpdate: () => void, scrollViewRef: React.RefObject<ScrollView | null> }) => {
-    const [selectedRegion, setSelectedRegion] = useState(REGIONS[0]);
+const StockManagementContent = ({ allStock, onUpdate, scrollViewRef, officialRegions }: { allStock: Stock[], onUpdate: () => void, scrollViewRef: React.RefObject<ScrollView | null>, officialRegions: string[] }) => {
+    // Determine the regions to show (fallback to a default list if empty)
+    const regionsList = officialRegions.length > 0 ? officialRegions : ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 'Pune'];
+    const [selectedRegion, setSelectedRegion] = useState(regionsList[0]);
     const [modelName, setModelName] = useState('');
     const [quantity, setQuantity] = useState('');
     const [updating, setUpdating] = useState(false);
@@ -1107,7 +1108,7 @@ const StockManagementContent = ({ allStock, onUpdate, scrollViewRef }: { allStoc
 
                 <Text style={styles.listSub}>Select Region</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 12 }}>
-                    {REGIONS.map(r => (
+                    {regionsList.map(r => (
                         <Pressable
                             key={r}
                             onPress={() => setSelectedRegion(r)}
