@@ -14,6 +14,13 @@ import * as Sharing from 'expo-sharing';
 import { ComplaintService, Complaint } from '../../services/ComplaintService';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import { Asset } from 'expo-asset';
+import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
+import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
+// @ts-ignore
+import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+// @ts-ignore
+import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // @ts-ignore
 import FloatingTabBar from '../../components/FloatingTabBar';
 // import { SoundManager } from '../../utils/SoundManager';
@@ -47,7 +54,7 @@ export default function SubBranchDashboard() {
     const [refreshing, setRefreshing] = useState(false);
     const [period, setPeriod] = useState<'Today' | '7d' | '30d' | '1y'>('7d');
     const [branchStock, setBranchStock] = useState<Stock[]>([]);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Complaints'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Complaints' | 'FieldVisits'>('Dashboard');
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
@@ -208,84 +215,27 @@ export default function SubBranchDashboard() {
 
     const handleDownloadComplaint = async (complaint: Complaint) => {
         try {
-            const html = `
-                <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <title>Complaint Report - ${complaint.complaintId}</title>
-                        <style>
-                            body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; line-height: 1.6; padding: 40px; }
-                            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #EF4444; padding-bottom: 10px; margin-bottom: 30px; }
-                            .logo { font-size: 24px; font-weight: bold; color: #74C69D; }
-                            .title { font-size: 28px; color: #EF4444; margin: 0; }
-                            .section { margin-bottom: 25px; background: #f9fafb; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; }
-                            .section-title { font-size: 18px; font-weight: bold; color: #111; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-                            .row { display: flex; margin-bottom: 8px; }
-                            .label { width: 150px; font-weight: bold; color: #666; }
-                            .value { flex: 1; color: #111; }
-                            .badge { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
-                            .badge-open { background: #fee2e2; color: #ef4444; }
-                            .badge-resolved { background: #dcfce7; color: #16a34a; }
-                            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
-                            .description-box { background: #fff; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-top: 10px; min-height: 100px; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="header">
-                            <div>
-                                <div class="logo">EKOTEX SYSTEM</div>
-                                <div style="font-size: 12px; color: #666;">Modern Warranty & Complaint Management</div>
-                            </div>
-                            <h1 class="title">COMPLAINT REPORT</h1>
-                        </div>
+            setLoading(true);
 
-                        <div class="section">
-                            <div class="section-title">General Information</div>
-                            <div class="row"><div class="label">Complaint ID:</div><div class="value">${complaint.complaintId}</div></div>
-                            <div class="row"><div class="label">Invoice No:</div><div class="value">${complaint.invoiceNo}</div></div>
-                            <div class="row"><div class="label">Date Raised:</div><div class="value">${new Date(complaint.dateOfComplaint).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
-                            <div class="row">
-                                <div class="label">Status:</div>
-                                <div class="value">
-                                    <span class="badge ${complaint.status === 'Resolved' || complaint.status === 'Closed' ? 'badge-resolved' : 'badge-open'}">
-                                        ${complaint.status}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="row"><div class="label">Category:</div><div class="value">${complaint.category}</div></div>
-                        </div>
+            // Resolve assets
+            const logoAsset = Asset.fromModule(LogoImage);
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
 
-                        <div class="section">
-                            <div class="section-title">Customer Details</div>
-                            <div class="row"><div class="label">Name:</div><div class="value">${complaint.customerName}</div></div>
-                            <div class="row"><div class="label">Phone:</div><div class="value">${complaint.customerPhone}</div></div>
-                            <div class="row"><div class="label">Email:</div><div class="value">${complaint.customerEmail || 'N/A'}</div></div>
-                            <div class="row"><div class="label">City/Branch:</div><div class="value">${complaint.city || 'N/A'}</div></div>
-                        </div>
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
 
-                        <div class="section">
-                            <div class="section-title">Complaint Description</div>
-                            <div class="description-box">${complaint.description}</div>
-                        </div>
-
-                        ${complaint.actionTaken ? `
-                        <div class="section">
-                            <div class="section-title">Resolution / Action Taken</div>
-                            <div class="description-box" style="background: #f0fdf4;">${complaint.actionTaken}</div>
-                            ${complaint.resolvedByName ? `<p style="margin-top:10px;"><strong>Resolved By:</strong> ${complaint.resolvedByName} (${complaint.resolvedByDesignation || 'Officer'})</p>` : ''}
-                        </div>
-                        ` : ''}
-
-                        <div class="footer">
-                            <p>This is an electronically generated report from EKOTEX System.</p>
-                            <p>Generated on: ${new Date().toLocaleString()}</p>
-                        </div>
-                    </body>
-                </html>
-            `;
+            const html = generateComplaintPDFHTML(complaint, logoUri, signUri);
 
             if (Platform.OS === 'web') {
-                await Print.printAsync({ html });
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                }
             } else {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
@@ -293,6 +243,8 @@ export default function SubBranchDashboard() {
         } catch (error) {
             console.error('Download error:', error);
             Alert.alert('Error', 'Failed to generate complaint report');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -432,6 +384,12 @@ export default function SubBranchDashboard() {
                             style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
                         >
                             <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setActiveTab('FieldVisits')}
+                            style={[styles.tabButton, activeTab === 'FieldVisits' && styles.tabButtonActive]}
+                        >
+                            <Text style={[styles.tabButtonText, activeTab === 'FieldVisits' && styles.tabButtonTextActive]}>Visits</Text>
                         </Pressable>
                         <Pressable
                             onPress={() => setActiveTab('Complaints')}
@@ -744,8 +702,120 @@ export default function SubBranchDashboard() {
                     </View>
                 ) : activeTab === 'Stock' ? (
                     <StockViewContent branchStock={branchStock} userRegion={user?.region} />
+                ) : activeTab === 'FieldVisits' ? (
+                    <View style={{ paddingBottom: 80 }}>
+                        <View style={styles.recentHeader}>
+                            <Text style={styles.sectionTitle}>Field Visits</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+                            </View>
+                        </View>
+
+                        <GlassPanel style={styles.listContainer}>
+                            {sortedVisits.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <MaterialCommunityIcons name="clipboard-text-outline" size={48} color={THEME.colors.textSecondary} />
+                                    <Text style={styles.emptyText}>No field visits found</Text>
+                                </View>
+                            ) : (
+                                <>
+                                    {sortedVisits.slice(0, 4).map((visit: any, idx: number) => {
+                                        const date = new Date(visit.dateOfVisit || visit.visitDate || visit.createdAt);
+                                        const type = visit.propertyType || visit.visitType || 'Inspection';
+                                        return (
+                                            <Pressable
+                                                key={visit.id || idx}
+                                                style={[styles.listItem, idx === sortedVisits.slice(0, 4).length - 1 && sortedVisits.length <= 4 && { borderBottomWidth: 0 }]}
+                                                onPress={async () => {
+                                                    try {
+                                                        setLoading(true);
+
+                                                        // Resolve assets
+                                                        const logoAsset = Asset.fromModule(LogoImage);
+                                                        const signAsset = Asset.fromModule(SignStampImage);
+                                                        await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
+
+                                                        const logoUri = logoAsset.localUri || logoAsset.uri;
+                                                        const signUri = signAsset.localUri || signAsset.uri;
+
+                                                        const html = generateFieldVisitHTML(visit, logoUri, signUri);
+
+                                                        if (Platform.OS === 'web') {
+                                                            const printWindow = window.open('', '_blank');
+                                                            if (printWindow) {
+                                                                printWindow.document.write(html);
+                                                                printWindow.document.close();
+                                                                setTimeout(() => {
+                                                                    printWindow.print();
+                                                                }, 500);
+                                                            }
+                                                        } else {
+                                                            const { uri } = await Print.printToFileAsync({ html });
+                                                            await Sharing.shareAsync(uri, {
+                                                                mimeType: 'application/pdf',
+                                                                dialogTitle: 'Download Field Visit Report',
+                                                                UTI: 'com.adobe.pdf'
+                                                            });
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Report generation error:', error);
+                                                        Alert.alert('Error', 'Failed to generate report PDF');
+                                                    } finally {
+                                                        setLoading(false);
+                                                    }
+                                                }}
+                                            >
+                                                <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                                    <MaterialCommunityIcons
+                                                        name={type === 'Residential' ? 'home-outline' : 'factory'}
+                                                        size={20}
+                                                        color={THEME.colors.primary}
+                                                    />
+                                                </View>
+                                                <View style={styles.listInfo}>
+                                                    <Text style={styles.listTitle} numberOfLines={1}>
+                                                        {visit.clientCompanyName || visit.contactPersonName || visit.siteName || 'Unknown Site'}
+                                                    </Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Text style={styles.listSub} numberOfLines={1}>
+                                                            {visit.industryType || visit.city || 'No Location'}
+                                                        </Text>
+                                                        <View style={[styles.countdownBadge, { backgroundColor: THEME.colors.primary + '15' }]}>
+                                                            <Text style={[styles.countdownText, { color: THEME.colors.primary, fontSize: 10 }]}>
+                                                                {type}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                                <View style={styles.listAmount}>
+                                                    <Text style={[styles.amountText, { fontSize: 13 }]}>{visit.id?.slice(0, 8)}</Text>
+                                                    <Text style={styles.dateText}>{date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+                                                </View>
+                                                <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
+                                            </Pressable>
+                                        );
+                                    })}
+
+                                    {sortedVisits.length > 4 && (
+                                        <Pressable
+                                            style={styles.viewMoreListBtn}
+                                            onPress={() => {
+                                                // If we had a dedicated list screen, we'd navigate there.
+                                                // For now, let's show an alert or just expand the list if desired.
+                                                // Based on requirements, I'll just show an alert or navigate to a hypothetical list screen.
+                                                Alert.alert('View All Visits', `Showing only latest 4. Total visits: ${sortedVisits.length}`);
+                                            }}
+                                        >
+                                            <Text style={styles.viewMoreListText}>View {sortedVisits.length - 4} More Visits</Text>
+                                            <MaterialCommunityIcons name="arrow-right" size={16} color={THEME.colors.secondary} />
+                                        </Pressable>
+                                    )}
+                                </>
+                            )}
+                        </GlassPanel>
+                    </View>
                 ) : (
-                    <View style={{ paddingBottom: 100 }}>
+                    <View style={{ paddingBottom: 80 }}>
                         <View style={styles.recentHeader}>
                             <Pressable
                                 onPress={() => setActiveTab('Dashboard')}
@@ -815,11 +885,12 @@ export default function SubBranchDashboard() {
                 )}
             </ScrollView>
 
-            <FloatingTabBar activeTab="home" onTabPress={(tab: string) => {
+            <FloatingTabBar activeTab="home" onTabPress={(tab: any) => {
                 if (tab === 'stock') setActiveTab('Stock');
                 else if (tab === 'home') setActiveTab('Dashboard');
                 else if (tab === 'create') navigation.navigate('CreateSaleStep1');
                 else if (tab === 'fieldvisit') navigation.navigate('FieldVisitForm');
+                else if (tab === 'quotation') navigation.navigate('CreateQuotationScreen');
             }} />
         </MeshBackground>
     );
@@ -880,7 +951,7 @@ const styles = StyleSheet.create({
     content: {
         padding: 16,
         paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 20 : 60,
-        paddingBottom: 100,
+        paddingBottom: 80,
     },
     header: {
         flexDirection: 'row',
@@ -1343,6 +1414,40 @@ const styles = StyleSheet.create({
     productBar: {
         height: '100%',
         borderRadius: 3,
+    },
+    addVisitTinyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: THEME.colors.secondary,
+        shadowColor: THEME.colors.secondary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    addVisitTinyText: {
+        fontSize: 12,
+        fontFamily: THEME.fonts.bold,
+        color: 'white',
+    },
+    viewMoreListBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.05)',
+        marginTop: 8,
+    },
+    viewMoreListText: {
+        fontSize: 14,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.secondary,
     },
 });
 

@@ -18,8 +18,14 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { Alert } from 'react-native';
 import { ComplaintService, Complaint } from '../../services/ComplaintService';
+import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
+import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
+import { Asset } from 'expo-asset';
+import { supabase } from '../../config/supabase';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
+// @ts-ignore
+import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // import { SoundManager } from '../../utils/SoundManager';
 
 const screenWidth = Dimensions.get('window').width;
@@ -80,7 +86,7 @@ export default function MainBranchDashboard() {
     const [allSales, setAllSales] = useState<Sale[]>([]);
     const [allVisits, setAllVisits] = useState<any[]>([]);
     const [showAllSales, setShowAllSales] = useState(false);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Complaints' | 'Visits' | 'Analytics' | 'Stock' | 'Photos'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Complaints' | 'Visits' | 'Analytics' | 'Stock' | 'Photos' | 'Users'>('Dashboard');
     const [allStock, setAllStock] = useState<Stock[]>([]);
     const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
     const [complaintLoading, setComplaintLoading] = useState(false);
@@ -91,6 +97,8 @@ export default function MainBranchDashboard() {
     const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isDownloadingPhotos, setIsDownloadingPhotos] = useState(false);
+    const [officialRegions, setOfficialRegions] = useState<string[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
 
     const fetchData = useCallback(async (isInitial: boolean = true) => {
         if (isInitial) setLoading(true);
@@ -135,6 +143,12 @@ export default function MainBranchDashboard() {
             setAllStock(stockData);
             setAllComplaints(complaintsData || []);
 
+            // 3. Fetch all unique regions from active sub-branch users
+            const { data: userData } = await supabase.from('users').select('*').not('region', 'is', null);
+            const uniqueRegions = Array.from(new Set(userData?.map(u => u.region) || []));
+            setOfficialRegions(uniqueRegions);
+            setAllUsers(userData || []);
+
             // Set initial display sales
             setSales(salesData);
             setFieldVisits(visitsData.slice(0, 5));
@@ -158,6 +172,10 @@ export default function MainBranchDashboard() {
     const filteredSales = useMemo(() => {
         const now = new Date();
         return allSales.filter(s => {
+            // Only include sales from regions that exist in our official user list
+            const isOfficial = officialRegions.includes(s.city);
+            if (!isOfficial && officialRegions.length > 0) return false;
+
             if (filter === 'All') return true;
             const date = new Date(s.saleDate);
             if (filter === 'Today') return date.toDateString() === now.toDateString();
@@ -165,11 +183,15 @@ export default function MainBranchDashboard() {
             if (filter === 'Year') return date.getFullYear() === now.getFullYear();
             return true;
         });
-    }, [allSales, filter]);
+    }, [allSales, filter, officialRegions]);
 
     const filteredVisits = useMemo(() => {
         const now = new Date();
         return allVisits.filter(v => {
+            // Only include visits from official regions
+            const isOfficial = officialRegions.includes((v as any).city);
+            if (!isOfficial && officialRegions.length > 0) return false;
+
             const visitDate = new Date(v.visitDate);
             if (filter === 'All') return true;
             if (filter === 'Today') return visitDate.toDateString() === now.toDateString();
@@ -177,7 +199,7 @@ export default function MainBranchDashboard() {
             if (filter === 'Year') return visitDate.getFullYear() === now.getFullYear();
             return true;
         });
-    }, [allVisits, filter]);
+    }, [allVisits, filter, officialRegions]);
 
     // Display sales (filtered by region if selected)
     const displaySales = useMemo(() => {
@@ -269,34 +291,48 @@ export default function MainBranchDashboard() {
     // Region stats from filtered data
     const regionStats = useMemo(() => {
         const grouped: Record<string, { region: string; total: number; approved: number; pending: number }> = {};
+
+        // Initialize all official regions with 0
+        officialRegions.forEach(r => {
+            grouped[r] = { region: r, total: 0, approved: 0, pending: 0 };
+        });
+
         filteredSales.forEach(item => {
-            const region = item.city || 'Unknown';
-            if (!grouped[region]) {
-                grouped[region] = { region, total: 0, approved: 0, pending: 0 };
-            }
+            const region = item.city;
+            if (!region || !grouped[region]) return; // Skip non-official regions (random data)
+
             grouped[region].total++;
             if (item.status === 'approved') grouped[region].approved++;
             if (item.status === 'pending') grouped[region].pending++;
         });
         return Object.values(grouped).sort((a, b) => b.total - a.total);
-    }, [filteredSales]);
+    }, [filteredSales, officialRegions]);
 
     const visitRegionStats = useMemo(() => {
         const grouped: Record<string, { region: string; total: number; completed: number; pending: number }> = {};
+
+        // Initialize all official regions with 0
+        officialRegions.forEach(r => {
+            grouped[r] = { region: r, total: 0, completed: 0, pending: 0 };
+        });
+
         filteredVisits.forEach(item => {
-            const region = item.city || 'Unknown';
-            if (!grouped[region]) {
-                grouped[region] = { region, total: 0, completed: 0, pending: 0 };
-            }
+            const region = (item as any).city;
+            if (!region || !grouped[region]) return; // Skip non-official
+
             grouped[region].total++;
             if (item.status === 'completed') grouped[region].completed++;
             if (item.status === 'pending') grouped[region].pending++;
         });
         return Object.values(grouped).sort((a, b) => b.total - a.total);
-    }, [filteredVisits]);
+    }, [filteredVisits, officialRegions]);
     const filteredComplaints = useMemo(() => {
         const now = new Date();
         return allComplaints.filter(c => {
+            // Only include complaints from official regions
+            const isOfficial = officialRegions.includes((c as any).city);
+            if (!isOfficial && officialRegions.length > 0) return false;
+
             if (filter === 'All') return true;
             const date = new Date(c.dateOfComplaint);
             if (filter === 'Today') return date.toDateString() === now.toDateString();
@@ -304,15 +340,20 @@ export default function MainBranchDashboard() {
             if (filter === 'Year') return date.getFullYear() === now.getFullYear();
             return true;
         });
-    }, [allComplaints, filter]);
+    }, [allComplaints, filter, officialRegions]);
 
     const complaintRegionStats = useMemo(() => {
         const grouped: Record<string, { region: string; total: number; resolved: number; unresolved: number }> = {};
+
+        // Initialize all official regions with 0
+        officialRegions.forEach(r => {
+            grouped[r] = { region: r, total: 0, resolved: 0, unresolved: 0 };
+        });
+
         filteredComplaints.forEach(item => {
-            const region = item.city || 'Unknown';
-            if (!grouped[region]) {
-                grouped[region] = { region, total: 0, resolved: 0, unresolved: 0 };
-            }
+            const region = (item as any).city;
+            if (!region || !grouped[region]) return; // Skip non-official
+
             grouped[region].total++;
             if (item.status === 'Resolved' || item.status === 'Closed') {
                 grouped[region].resolved++;
@@ -321,7 +362,7 @@ export default function MainBranchDashboard() {
             }
         });
         return Object.values(grouped).sort((a, b) => b.total - a.total);
-    }, [filteredComplaints]);
+    }, [filteredComplaints, officialRegions]);
 
     // Display complaints (filtered by region if selected)
     const displayComplaints = useMemo(() => {
@@ -351,81 +392,15 @@ export default function MainBranchDashboard() {
 
     const handleDownloadComplaint = async (complaint: Complaint) => {
         try {
-            const html = `
-                <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <title>Complaint Report - ${complaint.complaintId}</title>
-                        <style>
-                            body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; line-height: 1.6; padding: 40px; }
-                            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #EF4444; padding-bottom: 10px; margin-bottom: 30px; }
-                            .logo { font-size: 24px; font-weight: bold; color: #74C69D; }
-                            .title { font-size: 28px; color: #EF4444; margin: 0; }
-                            .section { margin-bottom: 25px; background: #f9fafb; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; }
-                            .section-title { font-size: 18px; font-weight: bold; color: #111; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-                            .row { display: flex; margin-bottom: 8px; }
-                            .label { width: 150px; font-weight: bold; color: #666; }
-                            .value { flex: 1; color: #111; }
-                            .badge { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
-                            .badge-open { background: #fee2e2; color: #ef4444; }
-                            .badge-resolved { background: #dcfce7; color: #16a34a; }
-                            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
-                            .description-box { background: #fff; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-top: 10px; min-height: 100px; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="header">
-                            <div>
-                                <div class="logo">EKOTEX SYSTEM</div>
-                                <div style="font-size: 12px; color: #666;">Admin Dashboard - Official Report</div>
-                            </div>
-                            <h1 class="title">COMPLAINT REPORT</h1>
-                        </div>
+            // Resolve assets
+            const logoAsset = Asset.fromModule(LogoImage);
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
 
-                        <div class="section">
-                            <div class="section-title">General Information</div>
-                            <div class="row"><div class="label">Complaint ID:</div><div class="value">${complaint.complaintId}</div></div>
-                            <div class="row"><div class="label">Invoice No:</div><div class="value">${complaint.invoiceNo}</div></div>
-                            <div class="row"><div class="label">Date Raised:</div><div class="value">${new Date(complaint.dateOfComplaint).toLocaleDateString(undefined, { dateStyle: 'long' })}</div></div>
-                            <div class="row">
-                                <div class="label">Status:</div>
-                                <div class="value">
-                                    <span class="badge ${complaint.status === 'Resolved' || complaint.status === 'Closed' ? 'badge-resolved' : 'badge-open'}">
-                                        ${complaint.status}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="row"><div class="label">Category:</div><div class="value">${complaint.category}</div></div>
-                        </div>
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
 
-                        <div class="section">
-                            <div class="section-title">Customer Details</div>
-                            <div class="row"><div class="label">Name:</div><div class="value">${complaint.customerName}</div></div>
-                            <div class="row"><div class="label">Phone:</div><div class="value">${complaint.customerPhone}</div></div>
-                            <div class="row"><div class="label">Email:</div><div class="value">${complaint.customerEmail || 'N/A'}</div></div>
-                            <div class="row"><div class="label">City/Region:</div><div class="value">${complaint.city || 'N/A'}</div></div>
-                        </div>
-
-                        <div class="section">
-                            <div class="section-title">Complaint Description</div>
-                            <div class="description-box">${complaint.description}</div>
-                        </div>
-
-                        ${complaint.actionTaken ? `
-                        <div class="section">
-                            <div class="section-title">Resolution Details</div>
-                            <div class="description-box" style="background: #f0fdf4;">${complaint.actionTaken}</div>
-                            ${complaint.resolvedByName ? `<p style="margin-top:10px;"><strong>Resolved By:</strong> ${complaint.resolvedByName} (${complaint.resolvedByDesignation || 'Officer'})</p>` : ''}
-                        </div>
-                        ` : ''}
-
-                        <div class="footer">
-                            <p>This is an official document generated by EKOTEX Admin System.</p>
-                            <p>Generated on: ${new Date().toLocaleString()}</p>
-                        </div>
-                    </body>
-                </html>
-            `;
+            const html = generateComplaintPDFHTML(complaint, logoUri, signUri);
 
             if (Platform.OS === 'web') {
                 await Print.printAsync({ html });
@@ -441,61 +416,15 @@ export default function MainBranchDashboard() {
 
     const handleDownloadVisit = async (visit: any) => {
         try {
-            const html = `
-                <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <title>Field Visit Report - ${visit.id || 'Visit'}</title>
-                        <style>
-                            body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; line-height: 1.6; padding: 40px; }
-                            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; padding-bottom: 10px; margin-bottom: 30px; }
-                            .logo { font-size: 24px; font-weight: bold; color: #74C69D; }
-                            .title { font-size: 28px; color: #059669; margin: 0; }
-                            .section { margin-bottom: 25px; background: #f0fdf4; padding: 20px; border-radius: 12px; border: 1px solid #dcfce7; }
-                            .section-title { font-size: 18px; font-weight: bold; color: #065f46; margin-bottom: 15px; border-bottom: 1px solid #a7f3d0; padding-bottom: 5px; }
-                            .row { display: flex; margin-bottom: 8px; }
-                            .label { width: 150px; font-weight: bold; color: #065f46; }
-                            .value { flex: 1; color: #111; }
-                            .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
-                            .notes-box { background: #fff; border: 1px solid #d1fae5; padding: 15px; border-radius: 8px; min-height: 80px; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="header">
-                            <div>
-                                <div class="logo">EKOTEX SYSTEM</div>
-                                <div style="font-size: 12px; color: #666;">Field Service Department</div>
-                            </div>
-                            <h1 class="title">FIELD VISIT REPORT</h1>
-                        </div>
+            // Resolve assets
+            const logoAsset = Asset.fromModule(LogoImage);
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
 
-                        <div class="section">
-                            <div class="section-title">Visit Information</div>
-                            <div class="row"><div class="label">Visit ID:</div><div class="value">${visit.id || 'N/A'}</div></div>
-                            <div class="row"><div class="label">Visit Date:</div><div class="value">${visit.visitDate || visit.dateOfVisit || 'N/A'}</div></div>
-                            <div class="row"><div class="label">Status:</div><div class="value"><strong style="color:#059669;">${visit.status || 'N/A'}</strong></div></div>
-                        </div>
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
 
-                        <div class="section">
-                            <div class="section-title">Customer & Property</div>
-                            <div class="row"><div class="label">Customer Name:</div><div class="value">${visit.customerName}</div></div>
-                            <div class="row"><div class="label">Phone:</div><div class="value">${visit.customerPhone}</div></div>
-                            <div class="row"><div class="label">City/Region:</div><div class="value">${visit.city || 'N/A'}</div></div>
-                            <div class="row"><div class="label">Property Type:</div><div class="value">${visit.propertyType || 'N/A'}</div></div>
-                        </div>
-
-                        <div class="section">
-                            <div class="section-title">Technician Notes / Remarks</div>
-                            <div class="notes-box">${visit.notes || visit.remarks || 'No remarks provided.'}</div>
-                        </div>
-
-                        <div class="footer">
-                            <p>This report serves as an official record of the field service provided.</p>
-                            <p>Generated on: ${new Date().toLocaleString()}</p>
-                        </div>
-                    </body>
-                </html>
-            `;
+            const html = generateFieldVisitHTML(visit, logoUri, signUri);
 
             if (Platform.OS === 'web') {
                 await Print.printAsync({ html });
@@ -595,6 +524,15 @@ export default function MainBranchDashboard() {
                         >
                             <Text style={[styles.tabButtonText, activeTab === 'Photos' && styles.tabButtonTextActive]}>Photos</Text>
                         </Pressable>
+
+                        {user?.role === 'Super Admin' && (
+                            <Pressable
+                                onPress={() => setActiveTab('Users')}
+                                style={[styles.tabButton, activeTab === 'Users' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Users' && styles.tabButtonTextActive]}>Users</Text>
+                            </Pressable>
+                        )}
                     </GlassPanel>
                 </View>
 
@@ -1079,7 +1017,7 @@ export default function MainBranchDashboard() {
                         onUpdate={() => fetchData(false)}
                         scrollViewRef={scrollViewRef}
                     />
-                ) : (
+                ) : activeTab === 'Photos' ? (
                     <PhotosGalleryContent
                         allSales={allSales}
                         selectedPhotos={selectedPhotos}
@@ -1089,7 +1027,9 @@ export default function MainBranchDashboard() {
                         sortOrder={sortOrder}
                         setSortOrder={setSortOrder}
                     />
-                )}
+                ) : activeTab === 'Users' ? (
+                    <UserTabContent allUsers={allUsers} />
+                ) : null}
             </ScrollView>
 
             {/* Fixed Floating Toolbar for Photos Selection */}
@@ -1657,6 +1597,54 @@ const SortControls = ({ sortOrder, setSortOrder }: { sortOrder: 'newest' | 'olde
                 />
                 <Text style={[styles.sortChipText, sortOrder === 'oldest' && styles.sortChipTextActive]}>Oldest First</Text>
             </Pressable>
+        </View>
+    );
+};
+
+const UserTabContent = ({ allUsers }: { allUsers: any[] }) => {
+    return (
+        <View style={{ paddingBottom: 100 }}>
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Employee Directory ({allUsers.length})</Text>
+            </View>
+
+            {allUsers.length === 0 ? (
+                <GlassPanel style={styles.emptyState}>
+                    <MaterialCommunityIcons name="account-off-outline" size={48} color={THEME.colors.textSecondary} />
+                    <Text style={styles.emptyText}>No registered users found</Text>
+                </GlassPanel>
+            ) : (
+                <GlassPanel style={{ padding: 8 }}>
+                    {allUsers.map((u, index) => (
+                        <View
+                            key={u.id || index}
+                            style={[
+                                styles.listItem,
+                                index === allUsers.length - 1 && { borderBottomWidth: 0 }
+                            ]}
+                        >
+                            <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                <MaterialCommunityIcons name="account-tie" size={24} color={THEME.colors.secondary} />
+                            </View>
+                            <View style={styles.listContent}>
+                                <Text style={styles.listTitle}>{u.name}</Text>
+                                <Text style={styles.listSub}>{u.email}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                    <View style={[styles.tag, { backgroundColor: '#E0E7FF' }]}>
+                                        <Text style={[styles.tagText, { color: '#4338CA', fontSize: 10 }]}>{u.role}</Text>
+                                    </View>
+                                    <View style={[styles.tag, { backgroundColor: '#F3E8FF' }]}>
+                                        <Text style={[styles.tagText, { color: '#7E22CE', fontSize: 10 }]}>{u.region || u.branch_id || 'All'}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                            <View style={styles.listRight}>
+                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} />
+                            </View>
+                        </View>
+                    ))}
+                </GlassPanel>
+            )}
         </View>
     );
 };
