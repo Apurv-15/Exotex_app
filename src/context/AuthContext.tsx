@@ -40,13 +40,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log('Auth State Changed:', event);
-            if (session?.user) {
-                const profile = await AuthService.getUser();
-                setUser(profile);
-            } else {
+            try {
+                if (session?.user) {
+                    const profile = await AuthService.getUser();
+                    setUser(profile);
+                } else {
+                    setUser(null);
+                }
+            } catch (err) {
+                console.error('Auth state change handler error:', err);
                 setUser(null);
+            } finally {
+                setIsLoadingStorage(false);
             }
-            setIsLoadingStorage(false);
         });
 
         initAuth();
@@ -70,7 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const response = await AuthService.login(email, pass);
             await AuthService.saveAuth(response);
             setUser(response.user);
-        } catch (error) {
+        } catch (error: any) {
+            console.error('Login error:', error?.message || error);
             throw error;
         } finally {
             setLoading(false);

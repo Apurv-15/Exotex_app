@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 // @ts-ignore
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 
 // Keys that MUST be stored securely
 const SECURE_KEYS = ['auth_token', 'supabase.auth.token', 'supabase-auth-token'];
@@ -9,7 +9,9 @@ const SECURE_KEYS = ['auth_token', 'supabase.auth.token', 'supabase-auth-token']
 // Helper to get safe filename
 const getFileUri = (key: string) => {
     const safeKey = key.replace(/[^a-z0-9]/gi, '_');
-    return `${(FileSystem as any).documentDirectory}storage_${safeKey}.json`;
+    const directory = (FileSystem as any).documentDirectory;
+    if (!directory) return null;
+    return `${directory}storage_${safeKey}.json`;
 };
 
 // Cross-platform storage that works on both native and web
@@ -27,8 +29,9 @@ export const Storage = {
         // 2. For other keys, try FileSystem first (new preferred location)
         try {
             const fileUri = getFileUri(key);
-            const info = await FileSystem.getInfoAsync(fileUri);
+            if (!fileUri) return null;
 
+            const info = await FileSystem.getInfoAsync(fileUri);
             if (info.exists) {
                 return await FileSystem.readAsStringAsync(fileUri);
             }
@@ -66,13 +69,16 @@ export const Storage = {
         // 2. For other keys, use FileSystem
         try {
             const fileUri = getFileUri(key);
+            if (!fileUri) {
+                // Fallback to SecureStore if FS is not available
+                await SecureStore.setItemAsync(key, value);
+                return;
+            }
             await FileSystem.writeAsStringAsync(fileUri, value);
-
-            // Optional: Clean up old SecureStore entry if it exists to free up space
-            // await SecureStore.deleteItemAsync(key).catch(() => {});
         } catch (e) {
             console.error(`Storage: Failed to write ${key} to FS`, e);
-            throw e; // Propagate error so app knows save failed
+            // Fallback
+            await SecureStore.setItemAsync(key, value).catch(() => { });
         }
     },
 
@@ -90,7 +96,9 @@ export const Storage = {
         // Try deleting from both locations to be thorough
         try {
             const fileUri = getFileUri(key);
-            await FileSystem.deleteAsync(fileUri, { idempotent: true });
+            if (fileUri) {
+                await FileSystem.deleteAsync(fileUri, { idempotent: true });
+            }
         } catch (e) {
             // Check SecureStore fallback
             await SecureStore.deleteItemAsync(key).catch(() => { });
