@@ -12,8 +12,8 @@ import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 import { useAuth } from '../../context/AuthContext';
 
-// Import the "Tech" (Template Utility)
 import { generateQuotationHTML } from '../../utils/QuotationTemplate';
+import { QuotationService } from '../../services/QuotationService';
 import { Asset } from 'expo-asset';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -123,6 +123,16 @@ export default function CreateQuotationScreen() {
 
       const logoUri = logoAsset.localUri || logoAsset.uri;
       const signUri = signAsset.localUri || signAsset.uri;
+
+      try {
+        await QuotationService.createQuotation({
+          ...formData,
+          region: user?.region || 'BANGLORE',
+          branchId: user?.branchId || '',
+        });
+      } catch (saveError) {
+        console.error('Error saving quotation to DB:', saveError);
+      }
 
       // USES THE "TECH" - Calls the external template utility
       const html = generateQuotationHTML(

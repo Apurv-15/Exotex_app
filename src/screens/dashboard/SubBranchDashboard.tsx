@@ -291,7 +291,14 @@ export default function SubBranchDashboard() {
             );
 
             if (Platform.OS === 'web') {
-                await Print.printAsync({ html });
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                }
             } else {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
@@ -935,10 +942,12 @@ export default function SubBranchDashboard() {
                                     return (
                                         <Pressable
                                             key={q.id || idx}
-                                            style={[styles.listItem, idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }]}
-                                            onPress={() => {
-                                                // Optional: navigate to quotation details
-                                            }}
+                                            style={({ pressed }) => [
+                                                styles.listItem,
+                                                pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
+                                                idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }
+                                            ]}
+                                            onPress={() => handleDownloadQuotation(q)}
                                         >
                                             <View style={[styles.listIcon, { backgroundColor: '#E0F2FE' }]}>
                                                 <MaterialCommunityIcons
@@ -962,9 +971,10 @@ export default function SubBranchDashboard() {
                                                 <View style={{ alignItems: 'flex-end' }}>
                                                     <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]}>₹{parseFloat(q.rate || '0').toLocaleString('en-IN')}</Text>
                                                 </View>
-                                                <Pressable onPress={() => handleDownloadQuotation(q)} style={{ padding: 4 }}>
+                                                <View style={{ padding: 4 }}>
                                                     <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
-                                                </Pressable>
+                                                </View>
+                                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 4 }} />
                                             </View>
                                         </Pressable>
                                     );

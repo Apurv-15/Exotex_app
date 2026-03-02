@@ -544,7 +544,14 @@ export default function MainBranchDashboard() {
             );
 
             if (Platform.OS === 'web') {
-                await Print.printAsync({ html });
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                }
             } else {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
@@ -1198,7 +1205,15 @@ export default function MainBranchDashboard() {
 
                                 <GlassPanel style={{ padding: 8 }}>
                                     {displayQuotations.map((q, idx) => (
-                                        <View key={q.id || idx} style={[styles.listItem, idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }]}>
+                                        <Pressable
+                                            key={q.id || idx}
+                                            style={({ pressed }) => [
+                                                styles.listItem,
+                                                pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
+                                                idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }
+                                            ]}
+                                            onPress={() => handleDownloadQuotation(q)}
+                                        >
                                             <View style={[styles.listIcon, { backgroundColor: '#E0F2FE' }]}>
                                                 <MaterialCommunityIcons name="receipt" size={20} color="#0EA5E9" />
                                             </View>
@@ -1216,11 +1231,12 @@ export default function MainBranchDashboard() {
                                                     <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }}>₹{parseFloat(q.rate).toLocaleString('en-IN')}</Text>
                                                     <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>{q.itemName}</Text>
                                                 </View>
-                                                <Pressable onPress={() => handleDownloadQuotation(q)} style={styles.downloadIconBtn}>
+                                                <View style={styles.downloadIconBtn}>
                                                     <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
-                                                </Pressable>
+                                                </View>
+                                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 4 }} />
                                             </View>
-                                        </View>
+                                        </Pressable>
                                     ))}
                                 </GlassPanel>
                             </>
