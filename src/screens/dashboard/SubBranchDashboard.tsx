@@ -427,9 +427,14 @@ export default function SubBranchDashboard() {
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    Platform.OS !== 'web' ? (
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.colors.primary} />
-                    ) : undefined
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => {
+                            setRefreshing(true);
+                            fetchSales();
+                        }}
+                        tintColor={THEME.colors.primary}
+                    />
                 }
             >
                 {/* Header */}
@@ -969,7 +974,16 @@ export default function SubBranchDashboard() {
                                             </View>
                                             <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12, marginLeft: 12 }}>
                                                 <View style={{ alignItems: 'flex-end' }}>
-                                                    <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]}>₹{parseFloat(q.rate || '0').toLocaleString('en-IN')}</Text>
+                                                    <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]}>
+                                                        ₹{(() => {
+                                                            const rate = parseFloat(q.rate || '0') || 0;
+                                                            const qty = parseFloat(q.qty || '0') || 0;
+                                                            const disc = parseFloat(q.discountPerc || '0') || 0;
+                                                            const discounted = rate * (1 - disc / 100);
+                                                            const total = Math.round((discounted * qty) * 1.18);
+                                                            return total.toLocaleString('en-IN');
+                                                        })()}
+                                                    </Text>
                                                 </View>
                                                 <View style={{ padding: 4 }}>
                                                     <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />

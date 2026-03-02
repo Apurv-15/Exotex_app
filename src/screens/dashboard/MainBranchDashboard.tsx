@@ -1228,7 +1228,16 @@ export default function MainBranchDashboard() {
                                             </View>
                                             <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12 }}>
                                                 <View style={{ alignItems: 'flex-end' }}>
-                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }}>₹{parseFloat(q.rate).toLocaleString('en-IN')}</Text>
+                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }}>
+                                                        ₹{(() => {
+                                                            const rate = parseFloat(q.rate) || 0;
+                                                            const qty = parseFloat(q.qty) || 0;
+                                                            const disc = parseFloat(q.discountPerc) || 0;
+                                                            const discounted = rate * (1 - disc / 100);
+                                                            const total = Math.round((discounted * qty) * 1.18);
+                                                            return total.toLocaleString('en-IN');
+                                                        })()}
+                                                    </Text>
                                                     <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>{q.itemName}</Text>
                                                 </View>
                                                 <View style={styles.downloadIconBtn}>
