@@ -17,6 +17,7 @@ import GlassPanel from '../../components/GlassPanel';
 import { Asset } from 'expo-asset';
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
+import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 import { QuotationService, Quotation } from '../../services/QuotationService';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -243,6 +244,65 @@ export default function SubBranchDashboard() {
 
     const chartData = getChartData();
 
+    const handleDownloadVisit = async (visit: any) => {
+        try {
+            setLoading(true);
+
+            // Resolve assets
+            const logoAsset = Asset.fromModule(LogoImage);
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
+
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
+
+            const html = generateFieldVisitHTML(visit, logoUri, signUri);
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to generate field visit report');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDownloadQuotation = async (q: Quotation) => {
+        try {
+            setLoading(true);
+            // Resolve assets
+            const logoAsset = Asset.fromModule(LogoImage);
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
+
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
+
+            const html = generateQuotationHTML(
+                q,
+                logoUri,
+                signUri,
+                user?.region || 'BANGLORE'
+            );
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to generate quotation PDF');
+        } finally {
+            setLoading(false);
+        }
+    };
     const handleDownloadComplaint = async (complaint: Complaint) => {
         try {
             setLoading(true);
@@ -431,12 +491,6 @@ export default function SubBranchDashboard() {
                                 style={[styles.tabButton, activeTab === 'Quotations' && styles.tabButtonActive]}
                             >
                                 <Text style={[styles.tabButtonText, activeTab === 'Quotations' && styles.tabButtonTextActive]}>Quotations</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setActiveTab('Complaints')}
-                                style={[styles.tabButton, activeTab === 'Complaints' && styles.tabButtonActive]}
-                            >
-                                <Text style={[styles.tabButtonText, activeTab === 'Complaints' && styles.tabButtonTextActive]}>Hub</Text>
                             </Pressable>
                         </GlassPanel>
                     </ScrollView>
@@ -904,8 +958,13 @@ export default function SubBranchDashboard() {
                                                     <Text style={styles.dateText}>{new Date(q.createdAt || q.quotationDate).toLocaleDateString()}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
-                                                <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]}>₹{parseFloat(q.rate || '0').toLocaleString('en-IN')}</Text>
+                                            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12, marginLeft: 12 }}>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]}>₹{parseFloat(q.rate || '0').toLocaleString('en-IN')}</Text>
+                                                </View>
+                                                <Pressable onPress={() => handleDownloadQuotation(q)} style={{ padding: 4 }}>
+                                                    <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
+                                                </Pressable>
                                             </View>
                                         </Pressable>
                                     );

@@ -22,6 +22,7 @@ import { ComplaintService, Complaint } from '../../services/ComplaintService';
 import { QuotationService, Quotation } from '../../services/QuotationService';
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
+import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 import { Asset } from 'expo-asset';
 import { supabase } from '../../config/supabase';
 // @ts-ignore
@@ -522,6 +523,35 @@ export default function MainBranchDashboard() {
         } catch (error) {
             console.error('Download error:', error);
             Alert.alert('Error', 'Failed to generate field visit report');
+        }
+    };
+
+    const handleDownloadQuotation = async (q: Quotation) => {
+        try {
+            // Resolve assets
+            const logoAsset = Asset.fromModule(LogoImage);
+            const signAsset = Asset.fromModule(SignStampImage);
+            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
+
+            const logoUri = logoAsset.localUri || logoAsset.uri;
+            const signUri = signAsset.localUri || signAsset.uri;
+
+            const html = generateQuotationHTML(
+                q,
+                logoUri,
+                signUri,
+                q.region || 'BANGLORE'
+            );
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            Alert.alert('Error', 'Failed to generate quotation PDF');
         }
     };
     const handleDownloadPhotos = async () => {
@@ -1181,9 +1211,14 @@ export default function MainBranchDashboard() {
                                                     <Text style={styles.listSub}>{q.region}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }}>₹{parseFloat(q.rate).toLocaleString('en-IN')}</Text>
-                                                <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>{q.itemName}</Text>
+                                            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12 }}>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }}>₹{parseFloat(q.rate).toLocaleString('en-IN')}</Text>
+                                                    <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>{q.itemName}</Text>
+                                                </View>
+                                                <Pressable onPress={() => handleDownloadQuotation(q)} style={styles.downloadIconBtn}>
+                                                    <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
+                                                </Pressable>
                                             </View>
                                         </View>
                                     ))}
