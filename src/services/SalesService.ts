@@ -120,7 +120,7 @@ export const SalesService = {
             let fileBody: any;
             try {
                 // Use legacy API for expo-file-system v54+
-                const FileSystem = require('expo-file-system/legacy');
+                const FileSystem = require('expo-file-system');
 
                 // Read file as Base64
                 const base64 = await FileSystem.readAsStringAsync(uri, {
@@ -179,7 +179,7 @@ export const SalesService = {
     saveImageLocally: async (uri: string, warrantyId: string, index: number): Promise<string> => {
         try {
             // Use legacy API for expo-file-system v54+
-            const FileSystem = require('expo-file-system/legacy');
+            const FileSystem = require('expo-file-system');
             const fileName = `${warrantyId}_${index}_${Date.now()}.jpg`;
             const localDir = `${FileSystem.documentDirectory}warranty-images/`;
 

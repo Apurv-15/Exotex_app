@@ -16,6 +16,9 @@ export const AuthService = {
 
             if (authError || !authData.user) {
                 console.error('Supabase Auth Login error:', authError);
+                if (authError?.message?.includes('Aborted')) {
+                    throw new Error('Login request aborted. Please check your internet connection or if the Supabase project is active.');
+                }
                 throw authError || new Error('No user data returned');
             }
 
@@ -41,7 +44,13 @@ export const AuthService = {
                 user
             };
         } catch (error: any) {
-            console.error('AuthService.login error:', error);
+            console.error('AuthService.login error FULL DETAILS:', {
+                message: error.message,
+                name: error.name,
+                status: error.status,
+                code: error.code,
+                details: error.details
+            });
             throw error;
         }
     },
