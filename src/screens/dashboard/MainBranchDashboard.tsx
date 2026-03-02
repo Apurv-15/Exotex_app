@@ -14,11 +14,12 @@ import { LineChart } from 'react-native-chart-kit';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 import DetailedAnalyticsContent from '../../components/DetailedAnalyticsContent';
-const FileSystem = require('expo-file-system/legacy');
+const FileSystem = require('expo-file-system');
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { Alert } from 'react-native';
 import { ComplaintService, Complaint } from '../../services/ComplaintService';
+import { QuotationService, Quotation } from '../../services/QuotationService';
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
 import { Asset } from 'expo-asset';
@@ -87,9 +88,10 @@ export default function MainBranchDashboard() {
     const [allSales, setAllSales] = useState<Sale[]>([]);
     const [allVisits, setAllVisits] = useState<any[]>([]);
     const [showAllSales, setShowAllSales] = useState(false);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Complaints' | 'Visits' | 'Analytics' | 'Stock' | 'Photos' | 'Users'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Complaints' | 'Visits' | 'Quotations' | 'Analytics' | 'Stock' | 'Photos' | 'Users'>('Dashboard');
     const [allStock, setAllStock] = useState<Stock[]>([]);
     const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
+    const [allQuotations, setAllQuotations] = useState<Quotation[]>([]);
     const [complaintLoading, setComplaintLoading] = useState(false);
     const [stockLoading, setStockLoading] = useState(false);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -112,57 +114,85 @@ export default function MainBranchDashboard() {
             let visitsData: any[] = [];
             let stockData: Stock[] = [];
             let complaintsData: Complaint[] = [];
+            let quotationsData: Quotation[] = [];
 
-            // If Super Admin, get everything. Otherwise filter by branch/region.
-            if (user?.role === 'Super Admin') {
-                const [s, v, st, c] = await Promise.all([
+            // If Super Admin or Admin, get everything. Otherwise filter by branch/region.
+            if (user?.role === 'Super Admin' || user?.role === 'Admin') {
+                const [s, v, st, c, q] = await Promise.all([
                     SalesService.getAllSales(),
                     FieldVisitService.getFieldVisits(),
                     StockService.getAllStock(),
-                    ComplaintService.getComplaints()
+                    ComplaintService.getComplaints(),
+                    QuotationService.getAllQuotations()
                 ]);
                 salesData = s;
                 visitsData = v;
                 stockData = st;
                 complaintsData = c;
+                quotationsData = q;
             } else {
-                // Admin/User restricted to their branch or region
+                // User restricted to their branch or region
                 const userBranch = user?.branchId;
                 const userRegion = user?.region;
 
-                const [s, v, st, c] = await Promise.all([
+                const [s, v, st, c, q] = await Promise.all([
                     userBranch ? SalesService.getSalesByBranch(userBranch) : SalesService.getAllSales(),
                     userBranch ? FieldVisitService.getFieldVisitsByBranch(userBranch) : FieldVisitService.getFieldVisits(),
                     userRegion ? StockService.getStockByRegion(userRegion) : StockService.getAllStock(),
-                    userBranch ? ComplaintService.getComplaints(userBranch) : ComplaintService.getComplaints()
+                    userBranch ? ComplaintService.getComplaints(userBranch) : ComplaintService.getComplaints(),
+                    userBranch ? QuotationService.getQuotationsByBranch(userBranch) : QuotationService.getAllQuotations()
                 ]);
                 salesData = s;
                 visitsData = v;
                 stockData = st;
                 complaintsData = c;
+                quotationsData = q;
             }
 
             setAllSales(salesData);
             setAllVisits(visitsData);
             setAllStock(stockData);
             setAllComplaints(complaintsData || []);
+            setAllQuotations(quotationsData || []);
 
             // 3. Fetch all users for management
             const { data: userData } = await supabase.from('users').select('*');
 
-            // Only sub-branch users with regions should be considered "official regions" for dashboard stats
-            const officialUsers = (userData || []).filter(u => u.region);
-            const uniqueRegions = Array.from(new Set(officialUsers.map(u => u.region)));
+            // 3. Build the list of Branches to show on dashboard cards
+            // Use branchId instead of name/city for unique identification
+            const BLACKLIST = ['sub1', 'Xrxr', 'Dvd', 'Ss', 'd', '400604', 'test', 'garbage'];
 
-            setOfficialRegions(uniqueRegions);
+            const userBranches = (userData || [])
+                .filter((u: any) => u.branch_id && u.branch_id.trim() !== '')
+                .map((u: any) => u.branch_id as string);
+
+            const saleBranches = salesData
+                .map(s => s.branchId)
+                .filter((b): b is string => !!b && b.trim() !== '');
+
+            const visitBranches = visitsData
+                .map((v: any) => v.branchId)
+                .filter((b: any): b is string => !!b && typeof b === 'string' && b.trim() !== '');
+
+            const complaintBranches = (complaintsData || [])
+                .map((c: any) => (c as any).branchId)
+                .filter((b: any): b is string => !!b && typeof b === 'string' && b.trim() !== '');
+
+            // All unique branch IDs merged, excluding the ones marked as fake
+            const allBranches = Array.from(
+                new Set([...userBranches, ...saleBranches, ...visitBranches, ...complaintBranches])
+            ).filter(r => !BLACKLIST.includes(r));
+
+            setOfficialRegions(allBranches);
             setAllUsers(userData || []);
 
             // Set initial display sales
             setSales(salesData);
             setFieldVisits(visitsData.slice(0, 5));
 
-        } catch (error) {
-            console.error(error);
+        } catch (error: any) {
+            console.error('FetchData Error:', error);
+            Alert.alert('Error', `Failed to fetch data: ${error.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
@@ -183,12 +213,13 @@ export default function MainBranchDashboard() {
     };
 
     // Filter by time
+    // Filter sales — only show data from official regions (users with assigned regions).
+    // This prevents test/garbage data from polluting the dashboard.
     const filteredSales = useMemo(() => {
         const now = new Date();
         return allSales.filter(s => {
-            // Only include sales from regions that exist in our official user list
-            const isOfficial = officialRegions.includes(s.city);
-            if (!isOfficial && officialRegions.length > 0) return false;
+            // Skip if branch is not in the official list
+            if (officialRegions.length > 0 && !officialRegions.includes(s.branchId)) return false;
 
             if (filter === 'All') return true;
             const date = new Date(s.saleDate);
@@ -202,9 +233,8 @@ export default function MainBranchDashboard() {
     const filteredVisits = useMemo(() => {
         const now = new Date();
         return allVisits.filter(v => {
-            // Only include visits from official regions
-            const isOfficial = officialRegions.includes((v as any).city);
-            if (!isOfficial && officialRegions.length > 0) return false;
+            // Skip visits from non-official branches
+            if (officialRegions.length > 0 && !officialRegions.includes((v as any).branchId)) return false;
 
             const visitDate = new Date(v.visitDate);
             if (filter === 'All') return true;
@@ -219,7 +249,7 @@ export default function MainBranchDashboard() {
     const displaySales = useMemo(() => {
         let list = filteredSales;
         if (selectedRegion) {
-            list = list.filter(s => s.city === selectedRegion);
+            list = list.filter(s => s.branchId === selectedRegion);
         }
 
         return [...list].sort((a, b) => {
@@ -233,7 +263,7 @@ export default function MainBranchDashboard() {
     const displayVisits = useMemo(() => {
         let list = filteredVisits;
         if (selectedRegion) {
-            list = list.filter(v => (v as any).city === selectedRegion);
+            list = list.filter(v => (v as any).branchId === selectedRegion);
         }
 
         return [...list].sort((a, b) => {
@@ -258,7 +288,7 @@ export default function MainBranchDashboard() {
 
         // Apply region filter if selected
         const baseVisits = selectedRegion
-            ? filteredVisits.filter(v => (v as any).city === selectedRegion)
+            ? filteredVisits.filter(v => (v as any).branchId === selectedRegion)
             : filteredVisits;
 
         for (let i = 6; i >= 0; i--) {
@@ -306,15 +336,14 @@ export default function MainBranchDashboard() {
     const regionStats = useMemo(() => {
         const grouped: Record<string, { region: string; total: number; approved: number; pending: number }> = {};
 
-        // Initialize all official regions with 0
+        // Initialize only with official regions (from registered branch users)
         officialRegions.forEach(r => {
             grouped[r] = { region: r, total: 0, approved: 0, pending: 0 };
         });
 
         filteredSales.forEach(item => {
-            const region = item.city;
-            if (!region || !grouped[region]) return; // Skip non-official regions (random data)
-
+            const region = item.branchId;
+            if (!region || !grouped[region]) return; // Only count official regions
             grouped[region].total++;
             if (item.status === 'approved') grouped[region].approved++;
             if (item.status === 'pending') grouped[region].pending++;
@@ -325,15 +354,13 @@ export default function MainBranchDashboard() {
     const visitRegionStats = useMemo(() => {
         const grouped: Record<string, { region: string; total: number; completed: number; pending: number }> = {};
 
-        // Initialize all official regions with 0
         officialRegions.forEach(r => {
             grouped[r] = { region: r, total: 0, completed: 0, pending: 0 };
         });
 
         filteredVisits.forEach(item => {
-            const region = (item as any).city;
-            if (!region || !grouped[region]) return; // Skip non-official
-
+            const region = (item as any).branchId;
+            if (!region || !grouped[region]) return; // Only count official regions
             grouped[region].total++;
             if (item.status === 'completed') grouped[region].completed++;
             if (item.status === 'pending') grouped[region].pending++;
@@ -343,9 +370,8 @@ export default function MainBranchDashboard() {
     const filteredComplaints = useMemo(() => {
         const now = new Date();
         return allComplaints.filter(c => {
-            // Only include complaints from official regions
-            const isOfficial = officialRegions.includes((c as any).city);
-            if (!isOfficial && officialRegions.length > 0) return false;
+            // Skip complaints from non-official branches
+            if (officialRegions.length > 0 && !officialRegions.includes((c as any).branchId)) return false;
 
             if (filter === 'All') return true;
             const date = new Date(c.dateOfComplaint);
@@ -359,15 +385,13 @@ export default function MainBranchDashboard() {
     const complaintRegionStats = useMemo(() => {
         const grouped: Record<string, { region: string; total: number; resolved: number; unresolved: number }> = {};
 
-        // Initialize all official regions with 0
         officialRegions.forEach(r => {
             grouped[r] = { region: r, total: 0, resolved: 0, unresolved: 0 };
         });
 
         filteredComplaints.forEach(item => {
-            const region = (item as any).city;
-            if (!region || !grouped[region]) return; // Skip non-official
-
+            const region = (item as any).branchId;
+            if (!region || !grouped[region]) return; // Only count official regions
             grouped[region].total++;
             if (item.status === 'Resolved' || item.status === 'Closed') {
                 grouped[region].resolved++;
@@ -378,11 +402,10 @@ export default function MainBranchDashboard() {
         return Object.values(grouped).sort((a, b) => b.total - a.total);
     }, [filteredComplaints, officialRegions]);
 
-    // Display complaints (filtered by region if selected)
     const displayComplaints = useMemo(() => {
         let list = filteredComplaints;
         if (selectedRegion) {
-            list = list.filter(c => (c as any).city === selectedRegion);
+            list = list.filter(c => (c as any).branchId === selectedRegion);
         }
 
         return [...list].sort((a, b) => {
@@ -391,6 +414,56 @@ export default function MainBranchDashboard() {
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
         });
     }, [filteredComplaints, selectedRegion, sortOrder]);
+
+    const filteredQuotations = useMemo(() => {
+        const now = new Date();
+        return allQuotations.filter(q => {
+            // Only show quotations from official branches
+            if (officialRegions.length > 0 && !officialRegions.includes((q as any).branchId)) return false;
+
+            if (filter === 'All') return true;
+            const qDate = q.createdAt || q.quotationDate;
+            if (!qDate) return true;
+            const date = new Date(qDate);
+            if (filter === 'Today') return date.toDateString() === now.toDateString();
+            if (filter === 'Month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            if (filter === 'Year') return date.getFullYear() === now.getFullYear();
+            return true;
+        });
+    }, [allQuotations, filter, officialRegions]);
+
+    const quotationRegionStats = useMemo(() => {
+        const grouped: Record<string, { region: string; total: number }> = {};
+
+        // Initialize with official branches but with 0
+        officialRegions.forEach(r => {
+            grouped[r] = { region: r, total: 0 };
+        });
+
+        filteredQuotations.forEach(item => {
+            const region = (item as any).branchId || 'Other';
+            if (!grouped[region]) {
+                grouped[region] = { region, total: 0 };
+            }
+            grouped[region].total++;
+        });
+
+        // Only return branches that actually have data OR are official
+        return Object.values(grouped).filter(g => g.total > 0 || officialRegions.includes(g.region)).sort((a, b) => b.total - a.total);
+    }, [filteredQuotations, officialRegions]);
+
+    const displayQuotations = useMemo(() => {
+        let list = filteredQuotations;
+        if (selectedRegion) {
+            list = list.filter(q => (q as any).branchId === selectedRegion);
+        }
+
+        return [...list].sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.quotationDate).getTime();
+            const dateB = new Date(b.createdAt || b.quotationDate).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [filteredQuotations, selectedRegion, sortOrder]);
 
     const activeComplaintCount = filteredComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
 
@@ -518,44 +591,55 @@ export default function MainBranchDashboard() {
                     </View>
                 </View>
 
-                {/* Tab Switcher */}
                 <View style={styles.tabContainer}>
-                    <GlassPanel style={styles.tabSwitcher} intensity={30}>
-                        <Pressable
-                            onPress={() => setActiveTab('Dashboard')}
-                            style={[styles.tabButton, activeTab === 'Dashboard' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
-                        </Pressable>
-
-                        <Pressable
-                            onPress={() => setActiveTab('Analytics')}
-                            style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => setActiveTab('Stock')}
-                            style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => setActiveTab('Photos')}
-                            style={[styles.tabButton, activeTab === 'Photos' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Photos' && styles.tabButtonTextActive]}>Photos</Text>
-                        </Pressable>
-
-                        {user?.role === 'Super Admin' && (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.tabScrollContent}
+                    >
+                        <GlassPanel style={styles.tabSwitcher} intensity={30}>
                             <Pressable
-                                onPress={() => setActiveTab('Users')}
-                                style={[styles.tabButton, activeTab === 'Users' && styles.tabButtonActive]}
+                                onPress={() => setActiveTab('Dashboard')}
+                                style={[styles.tabButton, activeTab === 'Dashboard' && styles.tabButtonActive]}
                             >
-                                <Text style={[styles.tabButtonText, activeTab === 'Users' && styles.tabButtonTextActive]}>Users</Text>
+                                <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
                             </Pressable>
-                        )}
-                    </GlassPanel>
+
+                            <Pressable
+                                onPress={() => setActiveTab('Analytics')}
+                                style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('Stock')}
+                                style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('Quotations')}
+                                style={[styles.tabButton, activeTab === 'Quotations' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Quotations' && styles.tabButtonTextActive]}>Quotations</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('Photos')}
+                                style={[styles.tabButton, activeTab === 'Photos' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Photos' && styles.tabButtonTextActive]}>Photos</Text>
+                            </Pressable>
+
+                            {user?.role === 'Super Admin' && (
+                                <Pressable
+                                    onPress={() => setActiveTab('Users')}
+                                    style={[styles.tabButton, activeTab === 'Users' && styles.tabButtonActive]}
+                                >
+                                    <Text style={[styles.tabButtonText, activeTab === 'Users' && styles.tabButtonTextActive]}>Users</Text>
+                                </Pressable>
+                            )}
+                        </GlassPanel>
+                    </ScrollView>
                 </View>
 
                 {loading ? (
@@ -804,7 +888,7 @@ export default function MainBranchDashboard() {
                                             </View>
                                             <View style={styles.listRight}>
                                                 <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                                <Text style={styles.listCity} numberOfLines={1}>{s.city}</Text>
+                                                <Text style={styles.listCity} numberOfLines={1}>{s.branchId || s.city}</Text>
                                             </View>
                                             <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
                                         </Pressable>
@@ -907,7 +991,7 @@ export default function MainBranchDashboard() {
                                                         customerName: comp.customerName,
                                                         phone: comp.customerPhone,
                                                         email: comp.customerEmail,
-                                                        city: comp.city
+                                                        branchId: (comp as any).branchId || comp.city
                                                     }
                                                 })}
                                             >
@@ -1018,7 +1102,7 @@ export default function MainBranchDashboard() {
                                                                 {isDone ? 'Completed' : 'Pending'}
                                                             </Text>
                                                         </View>
-                                                        <Text style={styles.listSub}>{visit.city}</Text>
+                                                        <Text style={styles.listSub}>{(visit as any).branchId || visit.city}</Text>
                                                     </View>
                                                 </View>
                                                 <Pressable onPress={() => handleDownloadVisit(visit)} style={styles.downloadIconBtn}>
@@ -1027,6 +1111,82 @@ export default function MainBranchDashboard() {
                                             </View>
                                         );
                                     })}
+                                </GlassPanel>
+                            </>
+                        )}
+                    </View>
+                ) : activeTab === 'Quotations' ? (
+                    <View style={{ paddingHorizontal: 4, marginBottom: 24 }}>
+                        <View style={styles.sectionHeader}>
+                            <Pressable
+                                onPress={() => setActiveTab('Dashboard')}
+                                style={({ pressed }) => [
+                                    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+                                    pressed && { opacity: 0.7 }
+                                ]}
+                            >
+                                <MaterialCommunityIcons name="arrow-left" size={24} color={THEME.colors.text} />
+                                <Text style={styles.sectionTitle}>Back to Dashboard</Text>
+                            </Pressable>
+                        </View>
+                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+
+                        {quotationRegionStats.length === 0 ? (
+                            <GlassPanel style={styles.emptyState}>
+                                <MaterialCommunityIcons name="map-marker-off" size={48} color={THEME.colors.textSecondary} />
+                                <Text style={styles.emptyText}>No quotations found.</Text>
+                            </GlassPanel>
+                        ) : (
+                            <>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    style={[styles.regionScroll, { marginBottom: 16 }]}
+                                    contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                                >
+                                    {quotationRegionStats.map(({ region, total }) => {
+                                        const colors = getRegionColor(region);
+                                        const isSelected = selectedRegion === region;
+                                        return (
+                                            <Pressable key={region} onPress={() => setSelectedRegion(isSelected ? null : region)}>
+                                                <GlassPanel
+                                                    style={[
+                                                        styles.regionCard,
+                                                        isSelected && styles.regionCardSelected
+                                                    ]}
+                                                >
+                                                    <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
+                                                        <MaterialCommunityIcons name={colors.icon as any} size={20} color={colors.text} />
+                                                    </View>
+                                                    <Text style={styles.regionName} numberOfLines={1}>{region}</Text>
+                                                    <Text style={styles.regionTotal} numberOfLines={1}>{total} Quotations</Text>
+                                                </GlassPanel>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </ScrollView>
+
+                                <GlassPanel style={{ padding: 8 }}>
+                                    {displayQuotations.map((q, idx) => (
+                                        <View key={q.id || idx} style={[styles.listItem, idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }]}>
+                                            <View style={[styles.listIcon, { backgroundColor: '#E0F2FE' }]}>
+                                                <MaterialCommunityIcons name="receipt" size={20} color="#0EA5E9" />
+                                            </View>
+                                            <View style={styles.listContent}>
+                                                <Text style={styles.listTitle} numberOfLines={1}>{q.customerName}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <View style={[styles.tag, { backgroundColor: '#E0F2FE' }]}>
+                                                        <Text style={[styles.tagText, { color: '#0EA5E9' }]}>{q.quotationNo}</Text>
+                                                    </View>
+                                                    <Text style={styles.listSub}>{q.region}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }}>₹{parseFloat(q.rate).toLocaleString('en-IN')}</Text>
+                                                <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>{q.itemName}</Text>
+                                            </View>
+                                        </View>
+                                    ))}
                                 </GlassPanel>
                             </>
                         )}
@@ -2055,22 +2215,23 @@ const styles = StyleSheet.create({
         color: THEME.colors.text
     },
     tabContainer: {
-        alignItems: 'center',
         marginBottom: 24,
+    },
+    tabScrollContent: {
+        paddingHorizontal: 20,
     },
     tabSwitcher: {
         flexDirection: 'row',
         padding: 4,
         borderRadius: 100,
         backgroundColor: 'rgba(255, 255, 255, 0.4)',
-        width: '100%',
-        maxWidth: 400,
     },
     tabButton: {
-        flex: 1,
         paddingVertical: 12,
+        paddingHorizontal: 16,
         alignItems: 'center',
         borderRadius: 100,
+        minWidth: 100,
     },
     tabButtonActive: {
         backgroundColor: '#FFFFFF',

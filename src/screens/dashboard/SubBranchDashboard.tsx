@@ -17,6 +17,7 @@ import GlassPanel from '../../components/GlassPanel';
 import { Asset } from 'expo-asset';
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
+import { QuotationService, Quotation } from '../../services/QuotationService';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // @ts-ignore
@@ -54,8 +55,9 @@ export default function SubBranchDashboard() {
     const [refreshing, setRefreshing] = useState(false);
     const [period, setPeriod] = useState<'Today' | '7d' | '30d' | '1y'>('7d');
     const [branchStock, setBranchStock] = useState<Stock[]>([]);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Complaints' | 'FieldVisits'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Analytics' | 'Stock' | 'Complaints' | 'FieldVisits' | 'Quotations'>('Dashboard');
     const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [quotations, setQuotations] = useState<Quotation[]>([]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
     const fetchSales = useCallback(async () => {
@@ -80,6 +82,10 @@ export default function SubBranchDashboard() {
             // Fetch branch complaints
             const branchComplaints = await ComplaintService.getComplaints(activeUser?.branchId || '');
             setComplaints(branchComplaints);
+
+            // Fetch quotations for this branch
+            const branchQuotations = await QuotationService.getQuotationsByBranch(activeUser?.branchId || '');
+            setQuotations(branchQuotations);
         } catch (error) {
             console.error(error);
         } finally {
@@ -133,6 +139,30 @@ export default function SubBranchDashboard() {
             return true;
         });
     }, [fieldVisits, period]);
+
+    const filteredQuotations = useMemo(() => {
+        const now = new Date();
+        return quotations.filter(q => {
+            const date = new Date(q.createdAt || q.quotationDate);
+            if (period === '7d') {
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(now.getDate() - 7);
+                return date >= sevenDaysAgo;
+            }
+            if (period === 'Today') return date.toDateString() === now.toDateString();
+            if (period === '30d') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+            if (period === '1y') return date.getFullYear() === now.getFullYear();
+            return true;
+        });
+    }, [quotations, period]);
+
+    const displayQuotations = useMemo(() => {
+        return [...filteredQuotations].sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.quotationDate).getTime();
+            const dateB = new Date(b.createdAt || b.quotationDate).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [filteredQuotations, sortOrder]);
 
     const warrantiesGenerated = filteredSales.filter(s => s.warrantyId).length;
     const fieldVisitsCompleted = filteredVisits.length;
@@ -366,38 +396,50 @@ export default function SubBranchDashboard() {
 
                 {/* Tab Switcher */}
                 <View style={[styles.tabContainer, { marginBottom: 20 }]}>
-                    <GlassPanel style={styles.tabSwitcher} intensity={30}>
-                        <Pressable
-                            onPress={() => setActiveTab('Dashboard')}
-                            style={[styles.tabButton, activeTab === 'Dashboard' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => setActiveTab('Analytics')}
-                            style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => setActiveTab('Stock')}
-                            style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => setActiveTab('FieldVisits')}
-                            style={[styles.tabButton, activeTab === 'FieldVisits' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'FieldVisits' && styles.tabButtonTextActive]}>Visits</Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={() => setActiveTab('Complaints')}
-                            style={[styles.tabButton, activeTab === 'Complaints' && styles.tabButtonActive]}
-                        >
-                            <Text style={[styles.tabButtonText, activeTab === 'Complaints' && styles.tabButtonTextActive]}>Hub</Text>
-                        </Pressable>
-                    </GlassPanel>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.tabScrollContent}
+                    >
+                        <GlassPanel style={styles.tabSwitcher} intensity={30}>
+                            <Pressable
+                                onPress={() => setActiveTab('Dashboard')}
+                                style={[styles.tabButton, activeTab === 'Dashboard' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('Analytics')}
+                                style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('Stock')}
+                                style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('FieldVisits')}
+                                style={[styles.tabButton, activeTab === 'FieldVisits' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'FieldVisits' && styles.tabButtonTextActive]}>Visits</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('Quotations')}
+                                style={[styles.tabButton, activeTab === 'Quotations' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Quotations' && styles.tabButtonTextActive]}>Quotations</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setActiveTab('Complaints')}
+                                style={[styles.tabButton, activeTab === 'Complaints' && styles.tabButtonActive]}
+                            >
+                                <Text style={[styles.tabButtonText, activeTab === 'Complaints' && styles.tabButtonTextActive]}>Hub</Text>
+                            </Pressable>
+                        </GlassPanel>
+                    </ScrollView>
                 </View>
 
                 {loading ? (
@@ -814,6 +856,63 @@ export default function SubBranchDashboard() {
                             )}
                         </GlassPanel>
                     </View>
+                ) : activeTab === 'Quotations' ? (
+                    <View style={{ paddingBottom: 80 }}>
+                        <View style={styles.recentHeader}>
+                            <Pressable
+                                onPress={() => setActiveTab('Dashboard')}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                            >
+                                <MaterialIcons name="arrow-back" size={24} color={THEME.colors.text} />
+                                <Text style={styles.sectionTitle}>Quotations</Text>
+                            </Pressable>
+                        </View>
+
+                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
+
+                        <GlassPanel style={{ padding: 8 }}>
+                            {displayQuotations.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <MaterialCommunityIcons name="receipt" size={48} color={THEME.colors.textSecondary} />
+                                    <Text style={styles.emptyText}>No quotations found</Text>
+                                </View>
+                            ) : (
+                                displayQuotations.map((q: any, idx: number) => {
+                                    return (
+                                        <Pressable
+                                            key={q.id || idx}
+                                            style={[styles.listItem, idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }]}
+                                            onPress={() => {
+                                                // Optional: navigate to quotation details
+                                            }}
+                                        >
+                                            <View style={[styles.listIcon, { backgroundColor: '#E0F2FE' }]}>
+                                                <MaterialCommunityIcons
+                                                    name="receipt"
+                                                    size={20}
+                                                    color="#0EA5E9"
+                                                />
+                                            </View>
+                                            <View style={styles.listInfo}>
+                                                <Text style={styles.listTitle}>{q.customerName}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <View style={[styles.countdownBadge, { backgroundColor: '#E0F2FE' }]}>
+                                                        <Text style={[styles.countdownText, { color: '#0EA5E9' }]}>
+                                                            {q.quotationNo || q.id?.slice(0, 8)}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={styles.dateText}>{new Date(q.createdAt || q.quotationDate).toLocaleDateString()}</Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                                                <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]}>₹{parseFloat(q.rate || '0').toLocaleString('en-IN')}</Text>
+                                            </View>
+                                        </Pressable>
+                                    );
+                                })
+                            )}
+                        </GlassPanel>
+                    </View>
                 ) : (
                     <View style={{ paddingBottom: 80 }}>
                         <View style={styles.recentHeader}>
@@ -890,7 +989,7 @@ export default function SubBranchDashboard() {
                 else if (tab === 'home') setActiveTab('Dashboard');
                 else if (tab === 'create') navigation.navigate('CreateSaleStep1');
                 else if (tab === 'fieldvisit') navigation.navigate('FieldVisitForm');
-                else if (tab === 'quotation') navigation.navigate('CreateQuotationScreen');
+                else if (tab === 'quotation') setActiveTab('Quotations');
             }} />
         </MeshBackground>
     );
@@ -1326,22 +1425,23 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     tabContainer: {
-        alignItems: 'center',
         marginBottom: 24,
+    },
+    tabScrollContent: {
+        paddingHorizontal: 16,
     },
     tabSwitcher: {
         flexDirection: 'row',
         padding: 4,
         borderRadius: 100,
         backgroundColor: 'rgba(255, 255, 255, 0.4)',
-        width: '100%',
-        maxWidth: 360,
     },
     tabButton: {
-        flex: 1,
-        paddingVertical: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
         alignItems: 'center',
         borderRadius: 100,
+        minWidth: 90,
     },
     tabButtonActive: {
         backgroundColor: '#FFFFFF',
