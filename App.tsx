@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { View, Text, ActivityIndicator, LogBox } from 'react-native';
+import { View, Text, ActivityIndicator, LogBox, Alert } from 'react-native';
 
 // Ignore specific deprecation warnings from dependencies
 LogBox.ignoreLogs(['TouchableMixin is deprecated']);
@@ -31,7 +31,24 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Wait for fonts
+        // 1. Check for OTA Updates (Over-The-Air)
+        if (!__DEV__) {
+          const Updates = require('expo-updates');
+          const update = await Updates.checkForUpdateAsync();
+          if (update.isAvailable) {
+            await Updates.fetchUpdateAsync();
+            Alert.alert(
+              'Update Available',
+              'A new version of EKOTEX is available. Restart now to apply updates?',
+              [
+                { text: 'Later' },
+                { text: 'Restart Now', onPress: () => Updates.reloadAsync() }
+              ]
+            );
+          }
+        }
+
+        // 2. Wait for fonts
         if (fontsLoaded || fontError) {
           await SplashScreen.hideAsync();
           setAppReady(true);
