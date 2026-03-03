@@ -25,6 +25,14 @@ import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // @ts-ignore
 import FloatingTabBar from '../../components/FloatingTabBar';
+// @ts-ignore
+import TrainingManualPdf from '../../assets/Training pdf/Training_manual.pdf';
+// @ts-ignore
+import TrainingBookletPdf from '../../assets/Training pdf/TRAINING BOOKLET.pdf';
+// @ts-ignore
+import ProductCataloguePdf from '../../assets/Training pdf/PRODUCT CATLOGUE.pdf';
+// @ts-ignore
+import FlowRateChartPdf from '../../assets/Training pdf/Flow Rate chart.pdf';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
 
 const { width } = Dimensions.get('window');
@@ -663,6 +671,77 @@ export default function SubBranchDashboard() {
                                 })
                             )}
                         </GlassPanel>
+
+                        {/* Resources Section */}
+                        <View style={{ marginTop: 10, marginBottom: 20 }}>
+                            <Text style={styles.sectionTitle}>Resources</Text>
+                            <View style={{ gap: 12 }}>
+                                {[
+                                    {
+                                        title: 'Training Manual',
+                                        subtitle: 'Learn how to use the EKOTEX icons and features correctly.',
+                                        asset: TrainingManualPdf,
+                                    },
+                                    {
+                                        title: 'Training Booklet',
+                                        subtitle: 'Comprehensive guide for technical training and operations.',
+                                        asset: TrainingBookletPdf,
+                                    },
+                                    {
+                                        title: 'Product Catalogue',
+                                        subtitle: 'Browse through our full range of EKOTEX machines and tools.',
+                                        asset: ProductCataloguePdf,
+                                    },
+                                    {
+                                        title: 'Flow Rate Chart',
+                                        subtitle: 'Reference chart for machine output and flow optimization.',
+                                        asset: FlowRateChartPdf,
+                                    }
+                                ].map((item, index) => (
+                                    <GlassPanel key={index} style={styles.trainingCard}>
+                                        <View style={styles.trainingIconWrapper}>
+                                            <MaterialCommunityIcons
+                                                name={item.title.includes('Chart') ? 'chart-box-outline' : 'file-pdf-box'}
+                                                size={32}
+                                                color={item.title.includes('Chart') ? '#0EA5E9' : '#FF5252'}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 16 }}>
+                                            <Text style={styles.trainingTitle}>{item.title}</Text>
+                                            <Text style={styles.trainingSubtitle}>{item.subtitle}</Text>
+                                        </View>
+                                        <Pressable
+                                            style={({ pressed }) => [styles.viewManualBtn, pressed && { opacity: 0.7 }]}
+                                            onPress={async () => {
+                                                try {
+                                                    setLoading(true);
+                                                    const asset = Asset.fromModule(item.asset);
+                                                    await asset.downloadAsync();
+                                                    const uri = asset.localUri || asset.uri;
+
+                                                    if (Platform.OS === 'web') {
+                                                        window.open(uri, '_blank');
+                                                    } else {
+                                                        await Sharing.shareAsync(uri, {
+                                                            mimeType: 'application/pdf',
+                                                            dialogTitle: `EKOTEX ${item.title}`,
+                                                            UTI: 'com.adobe.pdf'
+                                                        });
+                                                    }
+                                                } catch (error) {
+                                                    Alert.alert('Error', `Failed to open ${item.title.toLowerCase()}`);
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                        >
+                                            <MaterialCommunityIcons name="eye-outline" size={18} color="white" />
+                                            <Text style={styles.viewManualText}>VIEW</Text>
+                                        </Pressable>
+                                    </GlassPanel>
+                                ))}
+                            </View>
+                        </View>
 
                         <View style={{ height: 100 }} />
                     </>
@@ -1641,6 +1720,46 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: THEME.fonts.bold,
         color: THEME.colors.secondary,
+    },
+    trainingCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    },
+    trainingIconWrapper: {
+        width: 54,
+        height: 54,
+        borderRadius: 15,
+        backgroundColor: '#FFEBEE',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    trainingTitle: {
+        fontSize: 15,
+        fontFamily: THEME.fonts.bold,
+        color: THEME.colors.text,
+    },
+    trainingSubtitle: {
+        fontSize: 11,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.textSecondary,
+        marginTop: 2,
+    },
+    viewManualBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
+        backgroundColor: THEME.colors.secondary,
+    },
+    viewManualText: {
+        fontSize: 11,
+        fontFamily: THEME.fonts.bold,
+        color: 'white',
     },
 });
 
