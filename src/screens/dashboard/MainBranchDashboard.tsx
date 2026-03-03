@@ -25,6 +25,7 @@ import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
 import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 import { Asset } from 'expo-asset';
 import { supabase } from '../../config/supabase';
+import { useTabletLayout } from '../../hooks/useTabletLayout';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // @ts-ignore
@@ -588,11 +589,21 @@ export default function MainBranchDashboard() {
         }
     };
 
+    const { isTablet, contentMaxWidth, horizontalPadding } = useTabletLayout();
+
     return (
         <MeshBackground>
             <ScrollView
                 ref={scrollViewRef}
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[
+                    styles.content,
+                    isTablet && {
+                        alignSelf: 'center',
+                        width: '100%',
+                        maxWidth: contentMaxWidth,
+                        paddingHorizontal: horizontalPadding,
+                    }
+                ]}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl

@@ -25,7 +25,7 @@ import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // @ts-ignore
 import FloatingTabBar from '../../components/FloatingTabBar';
-// import { SoundManager } from '../../utils/SoundManager';
+import { useTabletLayout } from '../../hooks/useTabletLayout';
 
 const { width } = Dimensions.get('window');
 
@@ -105,6 +105,8 @@ export default function SubBranchDashboard() {
         setRefreshing(true);
         fetchSales();
     }, [fetchSales]);
+
+    const { isTablet, contentMaxWidth, horizontalPadding } = useTabletLayout();
 
     const filteredSales = useMemo(() => {
         const now = new Date();
@@ -424,7 +426,15 @@ export default function SubBranchDashboard() {
     return (
         <MeshBackground>
             <ScrollView
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[
+                    styles.content,
+                    isTablet && {
+                        alignSelf: 'center',
+                        width: '100%',
+                        maxWidth: contentMaxWidth,
+                        paddingHorizontal: horizontalPadding,
+                    }
+                ]}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
