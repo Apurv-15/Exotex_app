@@ -276,7 +276,7 @@ export default function SubBranchDashboard() {
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to generate field visit report');
+            Alert.alert("Failed to Update", 'Failed to generate field visit report' + "\nPlease try again.");
         } finally {
             setLoading(false);
         }
@@ -315,7 +315,7 @@ export default function SubBranchDashboard() {
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to generate quotation PDF');
+            Alert.alert("Failed to Update", 'Failed to generate quotation PDF' + "\nPlease try again.");
         } finally {
             setLoading(false);
         }
@@ -349,7 +349,7 @@ export default function SubBranchDashboard() {
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to generate complaint report');
+            Alert.alert("Failed to Update", 'Failed to generate complaint report' + "\nPlease try again.");
         } finally {
             setLoading(false);
         }
@@ -729,7 +729,7 @@ export default function SubBranchDashboard() {
                                                         });
                                                     }
                                                 } catch (error) {
-                                                    Alert.alert('Error', `Failed to open ${item.title.toLowerCase()}`);
+                                                    Alert.alert("Failed to Update", `Failed to open ${item.title.toLowerCase( + "\nPlease try again.")}`);
                                                 } finally {
                                                     setLoading(false);
                                                 }
@@ -956,7 +956,7 @@ export default function SubBranchDashboard() {
                                                         }
                                                     } catch (error) {
                                                         console.error('Report generation error:', error);
-                                                        Alert.alert('Error', 'Failed to generate report PDF');
+                                                        Alert.alert("Failed to Update", 'Failed to generate report PDF' + "\nPlease try again.");
                                                     } finally {
                                                         setLoading(false);
                                                     }

@@ -435,7 +435,7 @@ export default function WarrantyCard() {
 
         } catch (error: any) {
             console.error('ZIP Generation Error:', error);
-            Alert.alert('Error', 'Failed to create ZIP bundle: ' + error.message);
+            Alert.alert("Failed to Update", 'Failed to create ZIP bundle: ' + error.message + "\nPlease try again.");
         }
     };
 
@@ -476,7 +476,7 @@ export default function WarrantyCard() {
             if (Platform.OS === 'web') {
                 window.alert('Could not generate PDF. Please try again.');
             } else {
-                Alert.alert('Error', 'Could not generate PDF. Please try again.');
+                Alert.alert("Failed to Update", 'Could not generate PDF. Please try again.' + "\nPlease try again.");
             }
         } finally {
             setLoading(false);
@@ -500,7 +500,7 @@ export default function WarrantyCard() {
                             handleGoHome();
                         } catch (error) {
                             console.error('Delete error:', error);
-                            Alert.alert('Error', 'Could not delete warranty');
+                            Alert.alert("Failed to Update", 'Could not delete warranty' + "\nPlease try again.");
                         } finally {
                             setLoading(true);
                         }

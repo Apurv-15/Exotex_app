@@ -91,7 +91,7 @@ export default function RaiseComplaintStep2() {
             }
         } catch (error) {
             console.error('Camera error:', error);
-            Alert.alert('Error', 'Failed to open camera.');
+            Alert.alert("Failed to Update", 'Failed to open camera.' + "\nPlease try again.");
         }
     };
 
@@ -114,7 +114,7 @@ export default function RaiseComplaintStep2() {
             }
         } catch (error) {
             console.error('Gallery error:', error);
-            Alert.alert('Error', 'Failed to open gallery.');
+            Alert.alert("Failed to Update", 'Failed to open gallery.' + "\nPlease try again.");
         }
     };
 
@@ -210,7 +210,7 @@ export default function RaiseComplaintStep2() {
             }
         } catch (error) {
             console.error('Submit error:', error);
-            Alert.alert('Error', 'Failed to save complaint.');
+            Alert.alert("Failed to Update", 'Failed to save complaint.' + "\nPlease try again.");
         } finally {
             setLoading(false);
             setUploading(false);
@@ -272,7 +272,7 @@ export default function RaiseComplaintStep2() {
             }
         } catch (error) {
             console.error('Report generation error:', error);
-            Alert.alert('Error', 'Failed to generate report PDF');
+            Alert.alert("Failed to Update", 'Failed to generate report PDF' + "\nPlease try again.");
         } finally {
             setLoading(false);
         }

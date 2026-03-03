@@ -52,7 +52,7 @@ const RaiseComplaintStep1 = () => {
             }
         } catch (error) {
             console.error('Search error:', error);
-            Alert.alert('Error', 'Something went wrong while searching.');
+            Alert.alert("Failed to Update", 'Something went wrong while searching.' + "\nPlease try again.");
         } finally {
             setLoading(false);
         }

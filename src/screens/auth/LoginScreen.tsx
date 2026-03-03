@@ -62,7 +62,7 @@ export default function LoginScreen() {
 
     const handleRegister = async () => {
         if (!registerEmail || !registerPassword || !registerName || !registerBranch) {
-            Alert.alert('Error', 'Please fill all required fields for registration');
+            Alert.alert("Failed to Update", 'Please fill all required fields for registration' + "\nPlease try again.");
             return;
         }
 
@@ -96,7 +96,7 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (!email || !password) {
             const msg = 'Please enter both email and password';
-            Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+            Platform.OS === 'web' ? window.alert(msg) : Alert.alert("Failed to Update", msg + "\nPlease try again.");
             return;
         }
 

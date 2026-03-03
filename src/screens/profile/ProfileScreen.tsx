@@ -32,7 +32,7 @@ export default function ProfileScreen() {
 
     const handleUpdateProfile = async () => {
         if (!name.trim()) {
-            Alert.alert('Error', 'Name cannot be empty');
+            Alert.alert("Failed to Update", 'Name cannot be empty' + "\nPlease try again.");
             return;
         }
 
@@ -40,18 +40,18 @@ export default function ProfileScreen() {
             await updateProfile({ name, region });
             Alert.alert('Success', 'Profile updated successfully');
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to update profile');
+            Alert.alert("Failed to Update", error.message || 'Failed to update profile' + "\nPlease try again.");
         }
     };
 
     const handleUpdatePassword = async () => {
         if (newPassword.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
+            Alert.alert("Failed to Update", 'Password must be at least 6 characters' + "\nPlease try again.");
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            Alert.alert("Failed to Update", 'Passwords do not match' + "\nPlease try again.");
             return;
         }
 
@@ -61,7 +61,7 @@ export default function ProfileScreen() {
             setConfirmPassword('');
             Alert.alert('Success', 'Password updated successfully');
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to update password');
+            Alert.alert("Failed to Update", error.message || 'Failed to update password' + "\nPlease try again.");
         }
     };
 

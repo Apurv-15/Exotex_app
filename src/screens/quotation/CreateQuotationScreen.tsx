@@ -163,7 +163,7 @@ export default function CreateQuotationScreen() {
     } catch (error) {
       console.error(error);
       if (Platform.OS === 'web') window.alert('Could not generate PDF.');
-      else Alert.alert('Error', 'Could not generate PDF.');
+      else Alert.alert("Failed to Update", 'Could not generate PDF.' + "\nPlease try again.");
     }
   };
 

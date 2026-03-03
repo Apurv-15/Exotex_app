@@ -194,7 +194,7 @@ export default function MainBranchDashboard() {
 
         } catch (error: any) {
             console.error('FetchData Error:', error);
-            Alert.alert('Error', `Failed to fetch data: ${error.message || 'Unknown error'}`);
+            Alert.alert("Failed to Update", `Failed to fetch data: ${error.message || 'Unknown error'}` + "\nPlease try again.");
         } finally {
             setLoading(false);
         }
@@ -499,7 +499,7 @@ export default function MainBranchDashboard() {
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to generate complaint report');
+            Alert.alert("Failed to Update", 'Failed to generate complaint report' + "\nPlease try again.");
         }
     };
 
@@ -523,7 +523,7 @@ export default function MainBranchDashboard() {
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to generate field visit report');
+            Alert.alert("Failed to Update", 'Failed to generate field visit report' + "\nPlease try again.");
         }
     };
 
@@ -559,7 +559,7 @@ export default function MainBranchDashboard() {
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to generate quotation PDF');
+            Alert.alert("Failed to Update", 'Failed to generate quotation PDF' + "\nPlease try again.");
         }
     };
     const handleDownloadPhotos = async () => {
@@ -583,7 +583,7 @@ export default function MainBranchDashboard() {
             Alert.alert('Success', 'Photos processed successfully');
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to process photos');
+            Alert.alert("Failed to Update", 'Failed to process photos' + "\nPlease try again.");
         } finally {
             setIsDownloadingPhotos(false);
         }
@@ -1300,7 +1300,7 @@ export default function MainBranchDashboard() {
                                                 fetchData(false);
                                                 Alert.alert('Success', 'User deleted successfully');
                                             } catch (err) {
-                                                Alert.alert('Error', 'Failed to delete user');
+                                                Alert.alert("Failed to Update", 'Failed to delete user' + "\nPlease try again.");
                                             }
                                         }
                                     }
@@ -1333,7 +1333,7 @@ export default function MainBranchDashboard() {
                         setEditingUser(null);
                         Alert.alert('Success', 'User updated successfully');
                     } catch (err) {
-                        Alert.alert('Error', 'Failed to update user');
+                        Alert.alert("Failed to Update", 'Failed to update user' + "\nPlease try again.");
                     } finally {
                         setIsUpdatingUser(false);
                     }
@@ -1734,7 +1734,7 @@ const PhotosGalleryContent = ({
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to download photo');
+            Alert.alert("Failed to Update", 'Failed to download photo' + "\nPlease try again.");
         } finally {
             setIsDownloading(false);
         }
@@ -2009,7 +2009,7 @@ const EditUserModal = ({
 
     const handleSave = () => {
         if (!name) {
-            Alert.alert('Error', 'Name is required');
+            Alert.alert("Failed to Update", 'Name is required' + "\nPlease try again.");
             return;
         }
         onSave(user.email, { name, role, region, branch_id: branchId });

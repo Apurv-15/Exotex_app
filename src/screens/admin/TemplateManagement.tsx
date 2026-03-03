@@ -48,7 +48,7 @@ export default function TemplateManagement() {
             uploadTemplate(asset.uri, asset.name);
         } catch (error) {
             console.error('Picker error:', error);
-            Alert.alert('Error', 'Failed to pick document');
+            Alert.alert("Failed to Update", 'Failed to pick document' + "\nPlease try again.");
         }
     };
 
