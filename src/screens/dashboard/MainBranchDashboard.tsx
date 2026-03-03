@@ -162,7 +162,7 @@ export default function MainBranchDashboard() {
 
             // 3. Build the list of Branches to show on dashboard cards
             // Use branchId instead of name/city for unique identification
-            const BLACKLIST = ['sub1', 'Xrxr', 'Dvd', 'Ss', 'd', '400604', 'test', 'garbage'];
+            const BLACKLIST = ['main', 'sub1', 'Xrxr', 'Dvd', 'Ss', 'd', '400604', 'test', 'garbage'];
 
             const userBranches = (userData || [])
                 .filter((u: any) => u.branch_id && u.branch_id.trim() !== '')
