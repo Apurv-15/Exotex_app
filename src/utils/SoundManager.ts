@@ -1,71 +1,39 @@
-import { Platform, Vibration } from 'react-native';
+import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 
-// Minimal SoundManager - only vibration, no sound dependencies
-class SoundManagerClass {
-    // Light vibration for taps on cards/buttons
-    async vibrateTap() {
-        if (Platform.OS === 'web') return;
-        try {
-            Vibration.vibrate(10);
-        } catch (error) {
-            // Silent fail
-        }
-    }
+// @ts-ignore
+const NotifySound = require('../assets/sounds/notify_sound.mp3');
 
-    // Medium vibration for next step / navigation
-    async vibrateNext() {
-        if (Platform.OS === 'web') return;
-        try {
-            Vibration.vibrate(20);
-        } catch (error) {
-            // Silent fail
-        }
-    }
+/**
+ * Plays the notify_sound.mp3 on successful form submission.
+ * Safe to call on web (no-op) and auto-releases memory after playback.
+ */
+export async function playNotifySound(): Promise<void> {
+    // Web playback is handled differently — skip for now to avoid errors
+    if (Platform.OS === 'web') return;
 
-    // Success vibration pattern
-    async vibrateSuccess() {
-        if (Platform.OS === 'web') return;
-        try {
-            Vibration.vibrate([0, 50, 100, 50]);
-        } catch (error) {
-            // Silent fail
-        }
-    }
+    let sound: Audio.Sound | null = null;
+    try {
+        await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true, // Play even when ringer is off on iOS
+            staysActiveInBackground: false,
+        });
 
-    // Error vibration pattern
-    async vibrateError() {
-        if (Platform.OS === 'web') return;
-        try {
-            Vibration.vibrate([0, 100, 50, 100]);
-        } catch (error) {
-            // Silent fail
-        }
-    }
+        const { sound: loadedSound } = await Audio.Sound.createAsync(NotifySound, {
+            shouldPlay: true,
+            volume: 0.8,
+        });
+        sound = loadedSound;
 
-    // Combined methods for backward compatibility
-    async init() {
-        // No-op - kept for compatibility
-    }
-
-    async playTap() {
-        // Disabled
-    }
-
-    async playNext() {
-        // Disabled
-    }
-
-    async playSuccess() {
-        // Disabled
-    }
-
-    async playError() {
-        // Disabled
-    }
-
-    async playWhoosh() {
-        // Disabled
+        // Auto-release after playback finishes
+        sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+                sound?.unloadAsync().catch(() => { });
+            }
+        });
+    } catch (error) {
+        // Never crash the app over a missing sound
+        console.warn('[SoundManager] Could not play notify sound:', error);
     }
 }
-
-export const SoundManager = new SoundManagerClass();

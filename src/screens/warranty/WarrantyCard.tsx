@@ -20,6 +20,7 @@ import { Buffer } from 'buffer';
 
 // @ts-ignore
 import UserManualPdf from '../../assets/User_manual.pdf';
+import { playNotifySound } from '../../utils/SoundManager';
 
 export default function WarrantyCard() {
     const route = useRoute<any>();
@@ -425,7 +426,8 @@ export default function WarrantyCard() {
             if (Platform.OS === 'web') {
                 window.alert('✅ Warranty bundle downloaded successfully!');
             } else {
-                // Show beautiful success modal
+                // Play success sound and show beautiful success modal
+                playNotifySound();
                 setShowSuccessModal(true);
                 setTimeout(() => setShowSuccessModal(false), 2500);
             }

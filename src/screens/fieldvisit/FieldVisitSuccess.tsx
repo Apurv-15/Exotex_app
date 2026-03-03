@@ -9,6 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 import { THEME } from '../../constants/theme';
+import { playNotifySound } from '../../utils/SoundManager';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -25,6 +26,9 @@ export default function FieldVisitSuccess() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        // Play success sound
+        playNotifySound();
+
         Animated.sequence([
             Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
             Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),

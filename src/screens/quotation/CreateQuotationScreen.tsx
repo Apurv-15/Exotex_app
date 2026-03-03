@@ -19,6 +19,7 @@ import { Asset } from 'expo-asset';
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
+import { playNotifySound } from '../../utils/SoundManager';
 
 const PRODUCT_MODELS = [
   { name: 'EKO-GREEN G3', rate: '21185.59', description: 'Energy Efficient Hard Water Conditioner - G3 Series' },
@@ -130,6 +131,8 @@ export default function CreateQuotationScreen() {
           region: user?.region || 'BANGLORE',
           branchId: user?.branchId || '',
         });
+        // Play success sound after saving
+        playNotifySound();
       } catch (saveError) {
         console.error('Error saving quotation to DB:', saveError);
       }
