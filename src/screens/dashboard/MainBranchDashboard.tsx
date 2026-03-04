@@ -861,7 +861,8 @@ export default function MainBranchDashboard() {
                                             <GlassPanel
                                                 style={[
                                                     styles.regionCard,
-                                                    isSelected && styles.regionCardSelected
+                                                    isSelected && styles.regionCardSelected,
+                                                    { width: screenWidth < 380 ? 140 : 160 }
                                                 ]}
                                             >
                                                 <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
@@ -923,9 +924,9 @@ export default function MainBranchDashboard() {
                                                     />
                                                 </View>
                                             </View>
-                                            <View style={styles.listContent}>
+                                            <View style={[styles.listContent, { marginRight: 8 }]}>
                                                 <Text style={styles.listTitle} numberOfLines={1}>{s.customerName}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                     <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">{s.productModel}</Text>
                                                     <View style={[styles.countdownBadge, { backgroundColor: countdown.color + '20' }]}>
                                                         <Text style={[styles.countdownText, { color: countdown.color }]}>
@@ -934,7 +935,7 @@ export default function MainBranchDashboard() {
                                                     </View>
                                                 </View>
                                             </View>
-                                            <View style={styles.listRight}>
+                                            <View style={[styles.listRight, { minWidth: 60 }]}>
                                                 <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
                                                 <Text style={styles.listCity} numberOfLines={1}>{s.branchId || s.city}</Text>
                                             </View>
@@ -1002,7 +1003,8 @@ export default function MainBranchDashboard() {
                                                 <GlassPanel
                                                     style={[
                                                         styles.regionCard,
-                                                        isSelected && styles.regionCardSelected
+                                                        isSelected && styles.regionCardSelected,
+                                                        { width: screenWidth < 380 ? 140 : 160 }
                                                     ]}
                                                 >
                                                     <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
@@ -1050,7 +1052,7 @@ export default function MainBranchDashboard() {
                                                         color={isResolved ? THEME.colors.success : THEME.colors.error}
                                                     />
                                                 </View>
-                                                <View style={styles.listContent}>
+                                                <View style={[styles.listContent, { marginRight: 8 }]}>
                                                     <Text style={styles.listTitle} numberOfLines={1}>{comp.customerName}</Text>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                         <View style={[styles.tag, { backgroundColor: isResolved ? THEME.colors.success + '20' : THEME.colors.error + '20' }]}>
@@ -1058,7 +1060,7 @@ export default function MainBranchDashboard() {
                                                                 {isResolved ? 'Resolved' : 'Unresolved'}
                                                             </Text>
                                                         </View>
-                                                        <Text style={styles.listSub}>{daysPassed} days passed</Text>
+                                                        <Text style={styles.listSub} numberOfLines={1} ellipsizeMode="tail">{daysPassed} days passed</Text>
                                                     </View>
                                                 </View>
                                                 <Pressable onPress={() => handleDownloadComplaint(comp)} style={styles.downloadIconBtn}>
@@ -1108,7 +1110,8 @@ export default function MainBranchDashboard() {
                                                 <GlassPanel
                                                     style={[
                                                         styles.regionCard,
-                                                        isSelected && styles.regionCardSelected
+                                                        isSelected && styles.regionCardSelected,
+                                                        { width: screenWidth < 380 ? 140 : 160 }
                                                     ]}
                                                 >
                                                     <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
@@ -1142,7 +1145,7 @@ export default function MainBranchDashboard() {
                                                         color={isDone ? THEME.colors.success : THEME.colors.warning}
                                                     />
                                                 </View>
-                                                <View style={styles.listContent}>
+                                                <View style={[styles.listContent, { marginRight: 8 }]}>
                                                     <Text style={styles.listTitle} numberOfLines={1}>{visit.customerName}</Text>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                         <View style={[styles.tag, { backgroundColor: isDone ? THEME.colors.success + '20' : THEME.colors.warning + '20' }]}>
@@ -1150,7 +1153,7 @@ export default function MainBranchDashboard() {
                                                                 {isDone ? 'Completed' : 'Pending'}
                                                             </Text>
                                                         </View>
-                                                        <Text style={styles.listSub}>{(visit as any).branchId || visit.city}</Text>
+                                                        <Text style={styles.listSub} numberOfLines={1} ellipsizeMode="tail">{(visit as any).branchId || visit.city}</Text>
                                                     </View>
                                                 </View>
                                                 <Pressable onPress={() => handleDownloadVisit(visit)} style={styles.downloadIconBtn}>
@@ -1200,7 +1203,8 @@ export default function MainBranchDashboard() {
                                                 <GlassPanel
                                                     style={[
                                                         styles.regionCard,
-                                                        isSelected && styles.regionCardSelected
+                                                        isSelected && styles.regionCardSelected,
+                                                        { width: screenWidth < 380 ? 140 : 160 }
                                                     ]}
                                                 >
                                                     <View style={[styles.regionIcon, { backgroundColor: colors.bg }]}>
@@ -1228,18 +1232,18 @@ export default function MainBranchDashboard() {
                                             <View style={[styles.listIcon, { backgroundColor: '#E0F2FE' }]}>
                                                 <MaterialCommunityIcons name="receipt" size={20} color="#0EA5E9" />
                                             </View>
-                                            <View style={styles.listContent}>
+                                            <View style={[styles.listContent, { marginRight: 8 }]}>
                                                 <Text style={styles.listTitle} numberOfLines={1}>{q.customerName}</Text>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                     <View style={[styles.tag, { backgroundColor: '#E0F2FE' }]}>
                                                         <Text style={[styles.tagText, { color: '#0EA5E9' }]}>{q.quotationNo}</Text>
                                                     </View>
-                                                    <Text style={styles.listSub}>{q.region}</Text>
+                                                    <Text style={styles.listSub} numberOfLines={1}>{q.region}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12 }}>
-                                                <View style={{ alignItems: 'flex-end' }}>
-                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }}>
+                                            <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
+                                                <View style={{ alignItems: 'flex-end', minWidth: 70 }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }} numberOfLines={1}>
                                                         ₹{(() => {
                                                             const rate = parseFloat(q.rate) || 0;
                                                             const qty = parseFloat(q.qty) || 0;
@@ -1249,12 +1253,12 @@ export default function MainBranchDashboard() {
                                                             return total.toLocaleString('en-IN');
                                                         })()}
                                                     </Text>
-                                                    <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>{q.itemName}</Text>
+                                                    <Text style={{ fontSize: 10, color: THEME.colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{q.itemName}</Text>
                                                 </View>
-                                                <View style={styles.downloadIconBtn}>
-                                                    <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
+                                                <View style={[styles.downloadIconBtn, { width: 32, height: 32 }]}>
+                                                    <MaterialCommunityIcons name="file-download-outline" size={18} color={THEME.colors.primary} />
                                                 </View>
-                                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 4 }} />
+                                                <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
                                             </View>
                                         </Pressable>
                                     ))}
@@ -1581,9 +1585,9 @@ const StockManagementContent = ({ allStock, onUpdate, scrollViewRef, officialReg
                             <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
                                 <MaterialCommunityIcons name="package-variant" size={24} color={THEME.colors.secondary} />
                             </View>
-                            <View style={styles.listContent}>
-                                <Text style={styles.listTitle}>{s.modelName}</Text>
-                                <Text style={styles.listSub}>Last updated: {new Date(s.updatedAt).toLocaleDateString()}</Text>
+                            <View style={[styles.listContent, { marginRight: 12 }]}>
+                                <Text style={styles.listTitle} numberOfLines={1}>{s.modelName}</Text>
+                                <Text style={styles.listSub} numberOfLines={1}>Last updated: {new Date(s.updatedAt).toLocaleDateString()}</Text>
                             </View>
                             <View style={[styles.listRight, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
                                 <View style={{ alignItems: 'flex-end' }}>
@@ -2189,7 +2193,7 @@ const styles = StyleSheet.create({
     seeAllText: { fontSize: 13, color: THEME.colors.secondary, fontFamily: THEME.fonts.bold },
 
     regionScroll: { marginBottom: 32 },
-    regionCard: { width: 150, padding: 16, borderRadius: 20, marginRight: 0 },
+    regionCard: { width: 160, padding: 16, borderRadius: 20, marginRight: 0 },
     regionCardSelected: { borderColor: THEME.colors.secondary, borderWidth: 2 },
     regionIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
     regionName: { fontSize: 15, fontFamily: THEME.fonts.bold, color: THEME.colors.text, marginBottom: 2 },

@@ -417,8 +417,8 @@ export default function SubBranchDashboard() {
                     />
                 </View>
                 <View style={styles.saleInfo}>
-                    <Text style={styles.productName}>{item.productModel}</Text>
-                    <Text style={styles.customerName}>{item.customerName}</Text>
+                    <Text style={styles.productName} numberOfLines={1}>{item.productModel}</Text>
+                    <Text style={styles.customerName} numberOfLines={1}>{item.customerName}</Text>
                 </View>
                 <View style={styles.saleMeta}>
                     <Text style={styles.date}>{item.saleDate}</Text>
@@ -729,7 +729,7 @@ export default function SubBranchDashboard() {
                                                         });
                                                     }
                                                 } catch (error) {
-                                                    Alert.alert("Failed to Update", `Failed to open ${item.title.toLowerCase( + "\nPlease try again.")}`);
+                                                    Alert.alert("Failed to Update", `Failed to open ${item.title.toLowerCase(+ "\nPlease try again.")}`);
                                                 } finally {
                                                     setLoading(false);
                                                 }
@@ -969,12 +969,12 @@ export default function SubBranchDashboard() {
                                                         color={THEME.colors.primary}
                                                     />
                                                 </View>
-                                                <View style={styles.listInfo}>
+                                                <View style={[styles.listInfo, { flex: 1, marginRight: 8 }]}>
                                                     <Text style={styles.listTitle} numberOfLines={1}>
                                                         {visit.clientCompanyName || visit.contactPersonName || visit.siteName || 'Unknown Site'}
                                                     </Text>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                        <Text style={styles.listSub} numberOfLines={1}>
+                                                        <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
                                                             {visit.industryType || visit.city || 'No Location'}
                                                         </Text>
                                                         <View style={[styles.countdownBadge, { backgroundColor: THEME.colors.primary + '15' }]}>
@@ -984,8 +984,8 @@ export default function SubBranchDashboard() {
                                                         </View>
                                                     </View>
                                                 </View>
-                                                <View style={styles.listAmount}>
-                                                    <Text style={[styles.amountText, { fontSize: 13 }]}>{visit.id?.slice(0, 8)}</Text>
+                                                <View style={[styles.listAmount, { minWidth: 70 }]}>
+                                                    <Text style={[styles.amountText, { fontSize: 13 }]} numberOfLines={1}>{visit.id?.slice(0, 8)}</Text>
                                                     <Text style={styles.dateText}>{date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
                                                 </View>
                                                 <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
@@ -1050,20 +1050,20 @@ export default function SubBranchDashboard() {
                                                     color="#0EA5E9"
                                                 />
                                             </View>
-                                            <View style={styles.listInfo}>
-                                                <Text style={styles.listTitle}>{q.customerName}</Text>
+                                            <View style={[styles.listInfo, { flex: 1, marginRight: 8 }]}>
+                                                <Text style={styles.listTitle} numberOfLines={1}>{q.customerName}</Text>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                     <View style={[styles.countdownBadge, { backgroundColor: '#E0F2FE' }]}>
-                                                        <Text style={[styles.countdownText, { color: '#0EA5E9' }]}>
+                                                        <Text style={[styles.countdownText, { color: '#0EA5E9' }]} numberOfLines={1}>
                                                             {q.quotationNo || q.id?.slice(0, 8)}
                                                         </Text>
                                                     </View>
                                                     <Text style={styles.dateText}>{new Date(q.createdAt || q.quotationDate).toLocaleDateString()}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12, marginLeft: 12 }}>
-                                                <View style={{ alignItems: 'flex-end' }}>
-                                                    <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]}>
+                                            <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
+                                                <View style={{ alignItems: 'flex-end', minWidth: 60 }}>
+                                                    <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]} numberOfLines={1}>
                                                         ₹{(() => {
                                                             const rate = parseFloat(q.rate || '0') || 0;
                                                             const qty = parseFloat(q.qty || '0') || 0;
@@ -1075,9 +1075,9 @@ export default function SubBranchDashboard() {
                                                     </Text>
                                                 </View>
                                                 <View style={{ padding: 4 }}>
-                                                    <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
+                                                    <MaterialCommunityIcons name="file-download-outline" size={20} color={THEME.colors.primary} />
                                                 </View>
-                                                <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 4 }} />
+                                                <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
                                             </View>
                                         </Pressable>
                                     );
@@ -1130,11 +1130,11 @@ export default function SubBranchDashboard() {
                                                     color={isResolved ? THEME.colors.success : '#EF4444'}
                                                 />
                                             </View>
-                                            <View style={styles.listInfo}>
-                                                <Text style={styles.listTitle}>{comp.customerName}</Text>
+                                            <View style={[styles.listInfo, { flex: 1, marginRight: 8 }]}>
+                                                <Text style={styles.listTitle} numberOfLines={1}>{comp.customerName}</Text>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                     <View style={[styles.countdownBadge, { backgroundColor: isResolved ? THEME.colors.success + '20' : '#EF444420' }]}>
-                                                        <Text style={[styles.countdownText, { color: isResolved ? THEME.colors.success : '#EF4444' }]}>
+                                                        <Text style={[styles.countdownText, { color: isResolved ? THEME.colors.success : '#EF4444' }]} numberOfLines={1}>
                                                             {comp.status}
                                                         </Text>
                                                     </View>
@@ -1788,9 +1788,9 @@ const StockViewContent = ({ branchStock, userRegion }: { branchStock: Stock[], u
                             <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
                                 <MaterialCommunityIcons name="package-variant" size={24} color={THEME.colors.secondary} />
                             </View>
-                            <View style={styles.listInfo}>
-                                <Text style={styles.listTitle}>{s.modelName}</Text>
-                                <Text style={styles.listSub}>Last updated: {new Date(s.updatedAt).toLocaleDateString()}</Text>
+                            <View style={[styles.listInfo, { flex: 1, marginRight: 12 }]}>
+                                <Text style={styles.listTitle} numberOfLines={1}>{s.modelName}</Text>
+                                <Text style={styles.listSub} numberOfLines={1}>Last updated: {new Date(s.updatedAt).toLocaleDateString()}</Text>
                             </View>
                             <View style={styles.listAmount}>
                                 <Text style={[styles.amountText, { fontSize: 24, color: THEME.colors.text }]}>{s.quantity}</Text>
