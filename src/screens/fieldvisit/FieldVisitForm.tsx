@@ -401,7 +401,7 @@ export default function FieldVisitForm() {
             navigation.navigate('FieldVisitSuccess', { formData });
         } catch (error: any) {
             console.error('Submit error:', error);
-            showAlert('Failed to Update', 'error.message || 'Failed to save field visit');
+            showAlert('Failed to Update', error.message || 'Failed to save field visit');
             setUploadStatus('');
         } finally {
             setLoading(false);
