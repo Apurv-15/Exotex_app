@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, BackHandler, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/auth/LoginScreen';
 import MainBranchDashboard from '../screens/dashboard/MainBranchDashboard';
@@ -149,6 +149,30 @@ function UserStack() {
 }
 
 export default function RootNavigator() {
+
+    const navigationRef = React.useRef(null);
+
+    React.useEffect(() => {
+        const backAction = () => {
+            if (navigationRef.current && navigationRef.current.canGoBack()) {
+                navigationRef.current.goBack();
+            } else {
+                Alert.alert("Hold on!", "Are you sure you want to go exit?", [
+                    { text: "Cancel", onPress: () => null, style: "cancel" },
+                    { text: "YES", onPress: () => BackHandler.exitApp() }
+                ]);
+            }
+            return true;
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            "hardwareBackPress",
+            backAction
+        );
+
+        return () => backHandler.remove();
+    }, []);
+
     const { user, isLoadingStorage } = useAuth();
 
     if (isLoadingStorage) {
@@ -160,7 +184,7 @@ export default function RootNavigator() {
     }
 
     return (
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
             {user ? (
                 (user.role === 'Admin' || user.role === 'Super Admin') ? <AdminStack /> : <UserStack />
             ) : (

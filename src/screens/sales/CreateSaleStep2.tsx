@@ -66,7 +66,7 @@ export default function CreateSaleStep2() {
             }
         } catch (error) {
             console.error('Image picker error:', error);
-            showAlert('Error', 'Failed to pick images');
+            showAlert("Failed to Update", "Failed to pick images.\nPlease try again.");
         }
     };
 
@@ -106,7 +106,7 @@ export default function CreateSaleStep2() {
             console.error('Submit error:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
             setUploadStatus('');
-            showAlert('Submission Failed', `Error: ${errorMessage}`);
+            showAlert('Failed to Update', 'Please try again.\n' + errorMessage);
         } finally {
             setSubmitting(false);
             setUploadProgress(0);

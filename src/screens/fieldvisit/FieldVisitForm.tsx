@@ -401,7 +401,7 @@ export default function FieldVisitForm() {
             navigation.navigate('FieldVisitSuccess', { formData });
         } catch (error: any) {
             console.error('Submit error:', error);
-            showAlert('Error', error.message || 'Failed to save field visit');
+            showAlert('Failed to Update', 'error.message || 'Failed to save field visit');
             setUploadStatus('');
         } finally {
             setLoading(false);
@@ -443,7 +443,7 @@ export default function FieldVisitForm() {
             }
         } catch (error) {
             console.error('Report generation error:', error);
-            showAlert('Error', 'Failed to generate report PDF');
+            showAlert("Failed to Update", "Failed to generate report PDF.\nPlease try again.");
         } finally {
             setLoading(false);
             setUploadStatus('');
