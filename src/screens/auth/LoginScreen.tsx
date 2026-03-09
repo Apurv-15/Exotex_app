@@ -235,31 +235,6 @@ export default function LoginScreen() {
                         </Text>
                     </View>
 
-                    {/* Quick Access (Preserved) */}
-                    <View style={[styles.quickAccessSection, { marginTop: 24 }]}>
-                        <Text style={styles.quickAccessTitle}>QUICK ACCESS</Text>
-                        <View style={[styles.quickAccessRow, { gap: 8 }]}>
-                            <Pressable
-                                style={styles.quickChip}
-                                onPress={() => login('admin@gmail.com', 'admin@123')}
-                            >
-                                <View style={[styles.quickIconCircle, { backgroundColor: '#EEF2FF' }]}>
-                                    <MaterialCommunityIcons name="shield-account" size={16} color="#4F46E5" />
-                                </View>
-                                <Text style={styles.quickChipText}>Admin</Text>
-                            </Pressable>
-
-                            <Pressable
-                                style={styles.quickChip}
-                                onPress={() => login('bom@gmail.com', 'asdfgh@123')}
-                            >
-                                <View style={[styles.quickIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                                    <MaterialCommunityIcons name="account" size={16} color="#059669" />
-                                </View>
-                                <Text style={styles.quickChipText}>User</Text>
-                            </Pressable>
-                        </View>
-                    </View>
 
                     {/* Version Footer */}
                     <View style={styles.footer}>
@@ -592,44 +567,6 @@ const styles = StyleSheet.create({
     supportLink: {
         color: '#059669',
         textDecorationLine: 'underline',
-    },
-    quickAccessSection: {
-        marginTop: 40,
-        alignItems: 'center',
-    },
-    quickAccessTitle: {
-        fontSize: 10,
-        fontFamily: THEME.fonts.black,
-        color: '#94A3B8',
-        marginBottom: 16,
-        letterSpacing: 1.5,
-    },
-    quickAccessRow: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    quickChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.5)',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 100,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
-    },
-    quickIconCircle: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
-    },
-    quickChipText: {
-        fontSize: 12,
-        fontFamily: THEME.fonts.bold,
-        color: '#4B5563',
     },
     footer: {
         marginTop: 40,
