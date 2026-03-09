@@ -45,26 +45,6 @@ export default function CreateSaleStep1() {
         paymentConfirmed: false
     });
 
-    const fillDummyData = () => {
-        setFormData({
-            customerName: 'John Doe',
-            phone: '9876543210',
-            email: 'john.doe@example.com',
-            address: '123 Test Street, Sample Area',
-            city: 'Mumbai',
-            date: new Date().toISOString().split('T')[0],
-            invoiceNumber: 'INV' + Math.floor(Math.random() * 100000).toString(),
-            waterTestingBefore: '150',
-            waterTestingAfter: '50',
-            executiveName: 'Alex Smith',
-            designation: 'Sales Executive',
-            plumberName: 'Mike Ross',
-            productModel: 'EKO-GREEN G130',
-            serialNumber: 'SN' + Math.floor(Math.random() * 1000000).toString(),
-            productDetailsConfirmed: true,
-            paymentConfirmed: true
-        });
-    };
 
     const isStep1Valid = () => {
         return (
@@ -140,16 +120,6 @@ export default function CreateSaleStep1() {
                                 <MaterialCommunityIcons name="account-outline" size={20} color="#7C3AED" />
                                 <Text style={styles.sectionTitle}>Customer Information</Text>
                             </View>
-                            <Pressable
-                                onPress={fillDummyData}
-                                style={({ pressed }) => [
-                                    styles.dummyFillBtn,
-                                    pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
-                                ]}
-                            >
-                                <MaterialCommunityIcons name="auto-fix" size={18} color="#7C3AED" />
-                                <Text style={styles.dummyFillText}>Quick Fill</Text>
-                            </Pressable>
                         </View>
                         <GlassPanel style={styles.card}>
                             <View style={styles.inputContainer}>
@@ -555,22 +525,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 12,
         paddingHorizontal: 4,
-    },
-    dummyFillBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 20,
-        backgroundColor: 'rgba(124, 58, 237, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(124, 58, 237, 0.2)',
-    },
-    dummyFillText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#7C3AED',
     },
     sectionTitle: {
         fontSize: 16,

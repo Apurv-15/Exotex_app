@@ -135,103 +135,6 @@ export default function FieldVisitForm() {
         }
     };
 
-    const fillDummyData = () => {
-        if (formData.propertyType === 'Residential') {
-            setFormData(prev => ({
-                ...prev,
-                dateOfVisit: new Date().toISOString().split('T')[0],
-                branchName: user?.branchId || 'Mumbai Central',
-                salesEngineerName: user?.name || 'Apurv Chaudhary',
-                mobileNumber: '9123456789',
-                contactPersonName: 'Rahul Sharma',
-                siteAddress: 'Flat 402, Lotus Residency, Near MG Road',
-                industryType: 'Mumbai', // Used as City/Region
-                waterSource: ['Borewell', 'Municipal'],
-                pipeLineSize: '1 inch',
-                tankCapacity: '1000L',
-                waterHardnessPPM: '420',
-                waterTDS: '550',
-                customerRemarks: 'Severe scaling in bathroom fittings and kitchen appliances. Visible white marks on tiles.',
-                waterQualityIssues: ['Scaling', 'Appliances', 'Skin'],
-                cleaningConcerns: ['Utensils', 'Clothes'],
-                applianceIssues: ['Clogged', 'Cleaning'],
-                healthConcerns: ['DrySkin', 'HairFall'],
-                hasWaterPurifier: true,
-                waterPurifierBrand: 'Aquaguard RO',
-                hasUsedSoftener: false,
-                customerInterestLevel: 'High',
-                overallSiteAssessment: 'Good',
-                conversionProbability: '80%',
-            }));
-            return;
-        }
-
-        setFormData({
-            dateOfVisit: new Date().toISOString().split('T')[0],
-            branchName: user?.branchId || 'Branch Alpha',
-            salesEngineerName: user?.name || 'Engineer X',
-            clientCompanyName: 'Industrial Solutions Ltd',
-            siteAddress: 'Industrial Area Phase 2, Plot 45',
-            industryType: 'Manufacturing',
-            contactPersonName: 'Mr. Robert Green',
-            designation: 'Plant Manager',
-            mobileNumber: '9988776655',
-            emailId: 'robert.green@industrialsolutions.com',
-            waterSource: ['Borewell', 'Tank'],
-            waterSourceOther: '',
-            dailyWaterConsumption: '5000 Liters',
-            purposeOfWaterUsage: ['Process', 'Cooling'],
-            purposeOther: '',
-            waterHardnessPPM: '450',
-            scalingIssueObserved: 'Yes',
-            scalingDescription: 'Heavy scaling observed in the main boiler lines.',
-            existingWaterTreatment: 'No',
-            existingSystemDetails: 'Currently using manual chemical dosing only.',
-            problemsFaced: ['Scaling', 'High Maintenance Cost'],
-            problemsOther: '',
-            maintenanceFrequency: 'Monthly',
-            customerExpectations: 'Reduce maintenance downtime and chemical costs.',
-            applicationArea: ['Boiler', 'Cooling Tower'],
-            applicationOther: '',
-            pipeLineSize: '4 Inches',
-            operatingPressure: '6 Bar',
-            operatingTemperature: '85 C',
-            ekotexInstallationFeasible: 'Yes',
-            recommendedEkotexModel: 'Ekotex Ultra 500',
-            quantityRequired: '1',
-            siteConstraints: 'Limited space near the inlet pump.',
-            accessoriesRequired: 'Wall mounting brackets and 4-inch flanges.',
-            customerInterestLevel: 'High',
-            budgetDiscussed: 'Yes',
-            expectedDecisionTimeline: 'Next 10 days',
-            decisionMakerIdentified: 'Yes',
-            existingCompetitorSolution: 'None',
-            competitorPriceRange: 'N/A',
-            customerRemarks: 'Client is frustrated with current breakdown frequency.',
-            sitePhotographsTaken: true,
-            existingSystemPhotographs: true,
-            problemAreaPhotographs: true,
-            drawingsCollected: true,
-            nextActionRequired: ['Quotation', 'Technical Discussion'],
-            nextActionOther: '',
-            responsiblePerson: user?.name || 'Engineer X',
-            expectedFollowUpDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-            salesEngineerRemarks: 'Site visit was successful. Client is ready for a technical demo.',
-            overallSiteAssessment: 'Good',
-            conversionProbability: 'High',
-            visitedBySignature: 'Robert Green',
-            propertyType: formData.propertyType || 'Industrial',
-            tankCapacity: '5000L',
-            waterTDS: '450',
-            waterQualityIssues: ['Scaling'],
-            cleaningConcerns: [],
-            applianceIssues: [],
-            healthConcerns: [],
-            hasWaterPurifier: true,
-            waterPurifierBrand: 'Kent',
-            hasUsedSoftener: false,
-        });
-    };
 
     const [images, setImages] = useState<string[]>([]);
 
@@ -1289,16 +1192,6 @@ export default function FieldVisitForm() {
                             <Text style={styles.title}>Field Visit</Text>
                             <Text style={styles.subtitle}>Site Inspection Report</Text>
                         </View>
-                        <Pressable
-                            onPress={fillDummyData}
-                            style={({ pressed }) => [
-                                styles.dummyFillBtn,
-                                pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
-                            ]}
-                        >
-                            <MaterialCommunityIcons name="auto-fix" size={18} color="#7C3AED" />
-                            <Text style={styles.dummyFillText}>Quick Fill</Text>
-                        </Pressable>
                     </View>
                 </View>
 
@@ -1408,22 +1301,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-    },
-    dummyFillBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        backgroundColor: 'rgba(124, 58, 237, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(124, 58, 237, 0.2)',
-    },
-    dummyFillText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#7C3AED',
     },
     downloadReportBtn: {
         width: 54,

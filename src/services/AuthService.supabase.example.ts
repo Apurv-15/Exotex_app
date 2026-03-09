@@ -9,22 +9,6 @@ export const AuthService = {
     // Login with Supabase
     login: async (email: string, password: string): Promise<AuthResponse> => {
         try {
-            // For development: Keep mock login for demo accounts
-            if (email === 'admin@mainbranch.com' && password === 'admin') {
-                const mockResponse: AuthResponse = {
-                    token: 'mock_admin_token',
-                    user: { id: '1', name: 'Main Admin', email, role: 'Admin', branchId: 'main' },
-                };
-                await AuthService.saveAuth(mockResponse);
-                return mockResponse;
-            } else if (email === 'user@subbranch.com' && password === 'user') {
-                const mockResponse: AuthResponse = {
-                    token: 'mock_user_token',
-                    user: { id: '2', name: 'Sub User', email, role: 'User', branchId: 'sub1' },
-                };
-                await AuthService.saveAuth(mockResponse);
-                return mockResponse;
-            }
 
             // Real Supabase authentication
             const { data, error } = await supabase.auth.signInWithPassword({

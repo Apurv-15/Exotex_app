@@ -90,19 +90,6 @@ export default function CreateQuotationScreen() {
     setShowMachineModal(false);
   };
 
-  const fillDummyData = () => {
-    setFormData(prev => ({
-      ...prev,
-      customerName: 'Dr-Syed Moin',
-      companyName: 'Tanisq Lodging',
-      phone: '9890168216',
-      email: 'syedmoinuddin@gmail.com',
-      billingAddress:
-        'Opposite Central Bus stand\nAurangabad\nAurangabad(Maharashtra), MAHARASHTRA, 431003',
-      shippingAddress:
-        'Opposite Central Bus stand\nAurangabad\nAurangabad(Maharashtra), MAHARASHTRA, 431003',
-    }));
-  };
 
   const isFormValid = () =>
     formData.customerName.trim() !== '' &&
@@ -181,10 +168,6 @@ export default function CreateQuotationScreen() {
             <Text style={styles.appTitle}>Quotation Builder</Text>
             <Text style={styles.appSub}>Using Warranty Card Tech</Text>
           </View>
-          <Pressable onPress={fillDummyData} style={styles.magicBtn}>
-            <MaterialCommunityIcons name="auto-fix" size={20} color="#7C3AED" />
-            <Text style={styles.magicText}>Fast Fill</Text>
-          </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -300,8 +283,6 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 4 },
   appTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
   appSub: { fontSize: 13, color: '#64748B' },
-  magicBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F5F3FF', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#DDD6FE' },
-  magicText: { fontSize: 12, fontWeight: '700', color: '#7C3AED' },
   scroll: { padding: 16 },
   sectionHeader: { fontSize: 12, fontWeight: '700', color: '#94A3B8', marginBottom: 8, marginTop: 16, letterSpacing: 1 },
   section: { padding: 16, borderRadius: 16, marginBottom: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#F1F5F9' },
