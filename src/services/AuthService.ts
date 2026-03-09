@@ -183,6 +183,26 @@ export const AuthService = {
         }
     },
 
+    // Check if an email exists in the public users table
+    checkEmailExists: async (email: string): Promise<boolean> => {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('email')
+                .eq('email', email.toLowerCase().trim())
+                .maybeSingle();
+
+            if (error) {
+                console.error('Check email error:', error);
+                return false;
+            }
+            return !!data;
+        } catch (error) {
+            console.error('Check email exception:', error);
+            return false;
+        }
+    },
+
     updateProfile: async (userId: string, email: string, updates: { name?: string, region?: string }): Promise<void> => {
         try {
             // 1. Update Auth Metadata

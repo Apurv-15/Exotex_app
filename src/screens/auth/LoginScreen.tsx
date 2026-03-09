@@ -76,7 +76,16 @@ export default function LoginScreen() {
                 registerBranch,
                 registerRegion || undefined
             );
-            Alert.alert('Success', 'Access created successfully. You can now login.');
+
+            // Backend Verification Check
+            const isVerified = await AuthService.checkEmailExists(registerEmail);
+
+            if (isVerified) {
+                Alert.alert('Success ✅', `Account created & verified for ${registerEmail}. You can now login.`);
+            } else {
+                Alert.alert('Account Created', 'Auth credentials set, but profile sync is taking longer than expected. You should still be able to login.');
+            }
+
             setShowRegister(false);
             // Preset the login email
             setEmail(registerEmail);
@@ -284,7 +293,19 @@ export default function LoginScreen() {
                                 </View>
 
                                 <View style={styles.modalInputGroup}>
-                                    <Text style={styles.modalLabel}>GMAIL ADDRESS</Text>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={styles.modalLabel}>GMAIL ADDRESS</Text>
+                                        <Pressable
+                                            onPress={async () => {
+                                                if (!registerEmail) return Alert.alert('Check', 'Enter email first');
+                                                const exists = await AuthService.checkEmailExists(registerEmail);
+                                                Alert.alert('Database Check', exists ? `✅ ${registerEmail} ALREADY EXISTS` : `🔍 ${registerEmail} is NOT in database yet`);
+                                            }}
+                                            style={{ paddingHorizontal: 8, paddingVertical: 2, backgroundColor: '#EFF6FF', borderRadius: 4 }}
+                                        >
+                                            <Text style={{ fontSize: 9, color: '#2563EB', fontFamily: THEME.fonts.bold }}>VERIFY BACKEND</Text>
+                                        </Pressable>
+                                    </View>
                                     <TextInput
                                         style={styles.modalInput}
                                         value={registerEmail}
