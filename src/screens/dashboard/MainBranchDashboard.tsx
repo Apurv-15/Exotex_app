@@ -107,6 +107,7 @@ export default function MainBranchDashboard() {
     const [editingUser, setEditingUser] = useState<any | null>(null);
     const [isUpdatingUser, setIsUpdatingUser] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [usersSubTab, setUsersSubTab] = useState<'Directory' | 'Pending'>('Directory');
 
     const fetchData = useCallback(async (isInitial: boolean = true) => {
         if (isInitial) setLoading(true);
@@ -468,6 +469,35 @@ export default function MainBranchDashboard() {
     }, [filteredQuotations, selectedRegion, sortOrder]);
 
     const activeComplaintCount = filteredComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+
+    const pendingApprovalSales = useMemo(() => {
+        return allSales.filter(s => !s.warrantyGenerated);
+    }, [allSales]);
+
+    const handleApproveWarranty = async (sale: Sale) => {
+        Alert.alert(
+            'Approve Warranty',
+            `Are you sure you want to approve the warranty for ${sale.customerName}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Approve',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await SalesService.updatePaymentStatus(sale.id, true);
+                            await fetchData(false);
+                            Alert.alert('Success', 'Warranty approved successfully');
+                        } catch (err) {
+                            Alert.alert('Error', 'Failed to approve warranty');
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const calculateDaysPassed = (date: string) => {
         const start = new Date(date);
@@ -1289,6 +1319,10 @@ export default function MainBranchDashboard() {
                     <UserTabContent
                         allUsers={allUsers}
                         currentUser={user}
+                        subTab={usersSubTab}
+                        setSubTab={setUsersSubTab}
+                        pendingSales={pendingApprovalSales}
+                        onApprove={handleApproveWarranty}
                         onDelete={(email) => {
                             Alert.alert(
                                 'Delete User',
@@ -1913,70 +1947,170 @@ const SortControls = ({ sortOrder, setSortOrder }: { sortOrder: 'newest' | 'olde
     );
 };
 
-const UserTabContent = ({ allUsers, currentUser, onDelete, onEdit }: { allUsers: any[], currentUser: any, onDelete: (email: string) => void, onEdit: (user: any) => void }) => {
+const UserTabContent = ({ 
+    allUsers, 
+    currentUser, 
+    onDelete, 
+    onEdit,
+    subTab,
+    setSubTab,
+    pendingSales,
+    onApprove
+}: { 
+    allUsers: any[], 
+    currentUser: any, 
+    onDelete: (email: string) => void, 
+    onEdit: (user: any) => void,
+    subTab: 'Directory' | 'Pending',
+    setSubTab: (tab: 'Directory' | 'Pending') => void,
+    pendingSales: Sale[],
+    onApprove: (sale: Sale) => void
+}) => {
     return (
         <View style={{ paddingBottom: 100 }}>
             <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Employee Directory ({allUsers.length})</Text>
+                <Text style={styles.sectionTitle}>User Management</Text>
             </View>
 
-            {allUsers.length === 0 ? (
-                <GlassPanel style={styles.emptyState}>
-                    <MaterialCommunityIcons name="account-off-outline" size={48} color={THEME.colors.textSecondary} />
-                    <Text style={styles.emptyText}>No registered users found</Text>
-                </GlassPanel>
-            ) : (
-                <View style={{ gap: 12 }}>
-                    {allUsers.map((u, index) => (
-                        <GlassPanel key={u.id || index} style={{ padding: 12 }}>
-                            <View style={[styles.listItem, { borderBottomWidth: 0, paddingHorizontal: 0 }]}>
-                                <View style={[styles.listIcon, { backgroundColor: u.role === 'Super Admin' ? THEME.colors.primary + '15' : THEME.colors.mintLight }]}>
-                                    <MaterialCommunityIcons
-                                        name={u.role === 'Super Admin' ? "account-star" : "account-tie"}
-                                        size={24}
-                                        color={u.role === 'Super Admin' ? THEME.colors.primary : THEME.colors.secondary}
-                                    />
-                                </View>
-                                <View style={styles.listContent}>
-                                    <Text style={styles.listTitle}>{u.name}</Text>
-                                    <Text style={styles.listSub}>{u.email}</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                        <View style={[styles.tag, { backgroundColor: '#E0E7FF' }]}>
-                                            <Text style={[styles.tagText, { color: '#4338CA', fontSize: 10 }]}>{u.role}</Text>
+            {/* Sub-tab Switcher */}
+            <View style={[styles.tabSwitcher, { marginBottom: 20, alignSelf: 'flex-start' }]}>
+                <Pressable
+                    onPress={() => setSubTab('Directory')}
+                    style={[styles.tabButton, subTab === 'Directory' && styles.tabButtonActive, { minWidth: 140 }]}
+                >
+                    <Text style={[styles.tabButtonText, subTab === 'Directory' && styles.tabButtonTextActive]}>Employee Directory</Text>
+                </Pressable>
+                <Pressable
+                    onPress={() => setSubTab('Pending')}
+                    style={[styles.tabButton, subTab === 'Pending' && styles.tabButtonActive, { minWidth: 140 }]}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.tabButtonText, subTab === 'Pending' && styles.tabButtonTextActive]}>Pending Approvals</Text>
+                        {pendingSales.length > 0 && (
+                            <View style={{ backgroundColor: THEME.colors.error, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                                <Text style={{ color: 'white', fontSize: 10, fontFamily: THEME.fonts.bold }}>{pendingSales.length}</Text>
+                            </View>
+                        )}
+                    </View>
+                </Pressable>
+            </View>
+
+            {subTab === 'Directory' ? (
+                <>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.listSub}>Employee Directory ({allUsers.length})</Text>
+                    </View>
+                    {allUsers.length === 0 ? (
+                        <GlassPanel style={styles.emptyState}>
+                            <MaterialCommunityIcons name="account-off-outline" size={48} color={THEME.colors.textSecondary} />
+                            <Text style={styles.emptyText}>No registered users found</Text>
+                        </GlassPanel>
+                    ) : (
+                        <View style={{ gap: 12 }}>
+                            {allUsers.map((u, index) => (
+                                <GlassPanel key={u.id || index} style={{ padding: 12 }}>
+                                    <View style={[styles.listItem, { borderBottomWidth: 0, paddingHorizontal: 0 }]}>
+                                        <View style={[styles.listIcon, { backgroundColor: u.role === 'Super Admin' ? THEME.colors.primary + '15' : THEME.colors.mintLight }]}>
+                                            <MaterialCommunityIcons
+                                                name={u.role === 'Super Admin' ? "account-star" : "account-tie"}
+                                                size={24}
+                                                color={u.role === 'Super Admin' ? THEME.colors.primary : THEME.colors.secondary}
+                                            />
                                         </View>
-                                        <View style={[styles.tag, { backgroundColor: '#F3E8FF' }]}>
-                                            <Text style={[styles.tagText, { color: '#7E22CE', fontSize: 10 }]}>{u.region || u.branch_id || 'All'}</Text>
+                                        <View style={styles.listContent}>
+                                            <Text style={styles.listTitle}>{u.name}</Text>
+                                            <Text style={styles.listSub}>{u.email}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                                <View style={[styles.tag, { backgroundColor: '#E0E7FF' }]}>
+                                                    <Text style={[styles.tagText, { color: '#4338CA', fontSize: 10 }]}>{u.role}</Text>
+                                                </View>
+                                                <View style={[styles.tag, { backgroundColor: '#F3E8FF' }]}>
+                                                    <Text style={[styles.tagText, { color: '#7E22CE', fontSize: 10 }]}>{u.region || u.branch_id || 'All'}</Text>
+                                                </View>
+                                            </View>
                                         </View>
+                                        {currentUser?.role === 'Super Admin' && (
+                                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                                <Pressable
+                                                    onPress={() => onEdit(u)}
+                                                    style={({ pressed }) => [
+                                                        { padding: 8, backgroundColor: THEME.colors.mintLight, borderRadius: 10 },
+                                                        pressed && { opacity: 0.7 }
+                                                    ]}
+                                                >
+                                                    <MaterialCommunityIcons name="pencil" size={18} color={THEME.colors.secondary} />
+                                                </Pressable>
+                                                {u.email !== currentUser.email && (
+                                                    <Pressable
+                                                        onPress={() => onDelete(u.email)}
+                                                        style={({ pressed }) => [
+                                                            { padding: 8, backgroundColor: '#FED7D7', borderRadius: 10 },
+                                                            pressed && { opacity: 0.7 }
+                                                        ]}
+                                                    >
+                                                        <MaterialCommunityIcons name="delete" size={18} color="#C53030" />
+                                                    </Pressable>
+                                                )}
+                                            </View>
+                                        )}
                                     </View>
-                                </View>
-                                {currentUser?.role === 'Super Admin' && (
-                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                </GlassPanel>
+                            ))}
+                        </View>
+                    )}
+                </>
+            ) : (
+                <>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.listSub}>Pending Approvals ({pendingSales.length})</Text>
+                    </View>
+                    {pendingSales.length === 0 ? (
+                        <GlassPanel style={styles.emptyState}>
+                            <MaterialCommunityIcons name="check-decagram-outline" size={48} color={THEME.colors.success} />
+                            <Text style={styles.emptyText}>No pending warranties to approve</Text>
+                        </GlassPanel>
+                    ) : (
+                        <View style={{ gap: 12 }}>
+                            {pendingSales.map((s, index) => (
+                                <GlassPanel key={s.id || index} style={{ padding: 12 }}>
+                                    <View style={[styles.listItem, { borderBottomWidth: 0, paddingHorizontal: 0 }]}>
+                                        <View style={[styles.listIcon, { backgroundColor: '#FFFBEB' }]}>
+                                            <MaterialCommunityIcons name="clock-outline" size={24} color={THEME.colors.warning} />
+                                        </View>
+                                        <View style={styles.listContent}>
+                                            <Text style={styles.listTitle}>{s.customerName}</Text>
+                                            <Text style={styles.listSub}>{s.productModel} | {s.invoiceNumber}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                                <View style={[styles.tag, { backgroundColor: '#F3F4F6' }]}>
+                                                    <Text style={[styles.tagText, { color: '#374151', fontSize: 10 }]}>{s.branchId}</Text>
+                                                </View>
+                                                <Text style={{ fontSize: 10, color: THEME.colors.textSecondary }}>{new Date(s.saleDate).toLocaleDateString()}</Text>
+                                            </View>
+                                        </View>
                                         <Pressable
-                                            onPress={() => onEdit(u)}
+                                            onPress={() => onApprove(s)}
                                             style={({ pressed }) => [
-                                                { padding: 8, backgroundColor: THEME.colors.mintLight, borderRadius: 10 },
+                                                { 
+                                                    paddingHorizontal: 12, 
+                                                    paddingVertical: 8, 
+                                                    backgroundColor: THEME.colors.secondary, 
+                                                    borderRadius: 10,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 4
+                                                },
                                                 pressed && { opacity: 0.7 }
                                             ]}
                                         >
-                                            <MaterialCommunityIcons name="pencil" size={18} color={THEME.colors.secondary} />
+                                            <MaterialCommunityIcons name="check-circle-outline" size={16} color="white" />
+                                            <Text style={{ color: 'white', fontFamily: THEME.fonts.bold, fontSize: 12 }}>Approve</Text>
                                         </Pressable>
-                                        {u.email !== currentUser.email && (
-                                            <Pressable
-                                                onPress={() => onDelete(u.email)}
-                                                style={({ pressed }) => [
-                                                    { padding: 8, backgroundColor: '#FED7D7', borderRadius: 10 },
-                                                    pressed && { opacity: 0.7 }
-                                                ]}
-                                            >
-                                                <MaterialCommunityIcons name="delete" size={18} color="#C53030" />
-                                            </Pressable>
-                                        )}
                                     </View>
-                                )}
-                            </View>
-                        </GlassPanel>
-                    ))}
-                </View>
+                                </GlassPanel>
+                            ))}
+                        </View>
+                    )}
+                </>
             )}
         </View>
     );
