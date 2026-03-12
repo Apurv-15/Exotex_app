@@ -55,8 +55,7 @@ export default function CreateSaleStep1() {
             formData.invoiceNumber.trim() !== '' &&
             formData.productModel.trim() !== '' &&
             formData.serialNumber.trim() !== '' &&
-            formData.productDetailsConfirmed &&
-            formData.paymentConfirmed
+            formData.productDetailsConfirmed
         );
     };
 
@@ -415,7 +414,7 @@ export default function CreateSaleStep1() {
                                 />
                                 <View style={styles.paymentTextContainer}>
                                     <Text style={styles.paymentTitle}>Payment Received?</Text>
-                                    <Text style={styles.paymentSubtitle}>Confirm before proceeding</Text>
+                                    <Text style={styles.paymentSubtitle}>Warranty will only be generated if ticked</Text>
                                 </View>
                             </View>
                             <Pressable

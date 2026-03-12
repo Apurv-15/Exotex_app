@@ -101,7 +101,16 @@ export default function CreateSaleStep2() {
             );
 
             setUploadStatus('Success!');
-            navigation.replace('WarrantyCard', { sale: newSale });
+            if (newSale.paymentReceived) {
+                navigation.replace('WarrantyCard', { sale: newSale });
+            } else {
+                showAlert('Sale Registered', 'This sale has been registered as pending. You can generate the warranty card after 45 days or once payment is confirmed.');
+                if (user?.role === 'User') {
+                    navigation.navigate('SubDashboard');
+                } else {
+                    navigation.navigate('MainDashboard');
+                }
+            }
         } catch (error) {
             console.error('Submit error:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -247,8 +256,10 @@ export default function CreateSaleStep2() {
                                 <ActivityIndicator color="white" />
                             ) : (
                                 <>
-                                    <MaterialCommunityIcons name="shield-check" size={20} color="white" />
-                                    <Text style={styles.submitButtonText}>Generate Warranty</Text>
+                                    <MaterialCommunityIcons name={formData?.paymentConfirmed ? "shield-check" : "content-save-check"} size={20} color="white" />
+                                    <Text style={styles.submitButtonText}>
+                                        {formData?.paymentConfirmed ? 'Generate Warranty' : 'Register Pending Sale'}
+                                    </Text>
                                 </>
                             )}
                         </LinearGradient>
