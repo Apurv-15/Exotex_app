@@ -1,5 +1,7 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
+import { Platform } from 'react-native';
+
 
 export interface Sale {
     id: string;
@@ -23,6 +25,8 @@ export interface Sale {
     warrantyId: string;
     status: 'pending' | 'approved' | 'rejected';
     imageUrls?: string[]; // URLs to images in Supabase Storage
+    paymentReceived: boolean;
+    warrantyGenerated: boolean;
 }
 
 const STORAGE_KEY = 'WARRANTY_PRO_SALES';
@@ -57,6 +61,8 @@ const dbToSale = (row: any): Sale => ({
     warrantyId: row.warranty_id,
     status: row.status,
     imageUrls: row.image_urls || [],
+    paymentReceived: row.payment_received || false,
+    warrantyGenerated: row.warranty_generated || false,
 });
 
 // Helper to convert Sale object to DB row
@@ -81,6 +87,8 @@ const saleToDb = (sale: Partial<Sale>) => ({
     warranty_id: sale.warrantyId,
     status: sale.status,
     image_urls: sale.imageUrls || [],
+    payment_received: sale.paymentReceived || false,
+    warranty_generated: sale.warrantyGenerated || false,
 });
 
 export const SalesService = {
@@ -115,30 +123,38 @@ export const SalesService = {
             const filePath = `sales-images/${fileName}`;
 
             // ---------------------------------------------------------
-            // ROBUST FILE READING FOR ANDROID/IOS
+            // ROBUST FILE READING FOR WEB/ANDROID/IOS
             // ---------------------------------------------------------
             let fileBody: any;
-            try {
-                // Use legacy API for expo-file-system v54+
-                const FileSystem = require('expo-file-system');
-
-                // Read file as Base64
-                const base64 = await FileSystem.readAsStringAsync(uri, {
-                    encoding: FileSystem.EncodingType.Base64,
-                });
-
-                onProgress?.(30); // File read complete
-
-                // Convert Base64 to ArrayBuffer (Uint8Array)
-                // This is the most reliable way to upload on React Native Android with Supabase
-                const { Buffer } = require('buffer');
-                const buffer = Buffer.from(base64, 'base64');
-                fileBody = buffer;
-            } catch (readError) {
-                console.warn('FileSystem read failed, trying fetch blob fallback...', readError);
-                // Fallback to fetch blob (works well on iOS, sometimes flaky on Android)
+            
+            if (Platform.OS === 'web') {
+                // On web, fetch works perfectly for both blob: and data: URLs
                 const response = await fetch(uri);
                 fileBody = await response.blob();
+                onProgress?.(30);
+            } else {
+                try {
+                    // Use legacy API for expo-file-system v54+
+                    const FileSystem = require('expo-file-system');
+                    const encoding = FileSystem.EncodingType?.Base64 || 'base64';
+
+                    // Read file as Base64
+                    const base64 = await FileSystem.readAsStringAsync(uri, {
+                        encoding: encoding,
+                    });
+
+                    onProgress?.(30); // File read complete
+
+                    // Convert Base64 to ArrayBuffer (Uint8Array)
+                    // This is the most reliable way to upload on React Native Android with Supabase
+                    const { Buffer } = require('buffer');
+                    fileBody = Buffer.from(base64, 'base64');
+                } catch (readError) {
+                    console.warn('FileSystem read failed, trying fetch blob fallback...', readError);
+                    // Fallback to fetch blob (works well on iOS, sometimes flaky on Android)
+                    const response = await fetch(uri);
+                    fileBody = await response.blob();
+                }
             }
 
             onProgress?.(50); // Uploading to server
@@ -177,6 +193,9 @@ export const SalesService = {
 
     // Save image locally as fallback
     saveImageLocally: async (uri: string, warrantyId: string, index: number): Promise<string> => {
+        if (Platform.OS === 'web') {
+            return uri; // Just return original URI on web
+        }
         try {
             // Use legacy API for expo-file-system v54+
             const FileSystem = require('expo-file-system');
@@ -371,11 +390,15 @@ export const SalesService = {
 
         if (isSupabaseConfigured()) {
             try {
+                const status = saleData.paymentReceived ? 'approved' : 'pending';
+                const warrantyGenerated = saleData.paymentReceived;
+
                 const dbData = saleToDb({
                     ...saleData,
                     warrantyId,
-                    status: 'approved',
+                    status,
                     imageUrls,
+                    warrantyGenerated,
                 });
 
                 const { data, error } = await supabase
@@ -409,17 +432,54 @@ export const SalesService = {
 
         // Fallback to local storage
         const sales = await SalesService.getSales();
+        const status = saleData.paymentReceived ? 'approved' : 'pending';
+        const warrantyGenerated = saleData.paymentReceived;
+
         const newSale: Sale = {
             ...saleData,
             id: Math.random().toString(36).substr(2, 9),
             warrantyId,
-            status: 'approved',
+            status,
             imageUrls,
+            warrantyGenerated,
         };
 
         const updatedSales = [newSale, ...sales];
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
         return newSale;
+    },
+
+    // Update payment status and generate warranty
+    updatePaymentStatus: async (saleId: string, received: boolean): Promise<void> => {
+        const updateData = {
+            payment_received: received,
+            status: received ? 'approved' : 'pending',
+            warranty_generated: received
+        };
+
+        if (isSupabaseConfigured()) {
+            try {
+                const { error } = await supabase
+                    .from('sales')
+                    .update(updateData)
+                    .eq('id', saleId);
+
+                if (error) throw error;
+                return;
+            } catch (error) {
+                console.error('Supabase updatePaymentStatus error:', error);
+            }
+        }
+
+        // Fallback to local storage
+        const sales = await SalesService.getSales();
+        const updatedSales = sales.map(s => s.id === saleId ? {
+            ...s,
+            paymentReceived: received,
+            status: received ? 'approved' : 'pending' as any,
+            warrantyGenerated: received
+        } : s);
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
     },
 
     // Update sale status
