@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS public.sales (
     warranty_id TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
     image_urls TEXT[] DEFAULT '{}',
+    payment_received BOOLEAN DEFAULT FALSE,
+    warranty_generated BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
