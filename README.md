@@ -1,73 +1,66 @@
-# Warranty & Service Management App — Master Documentation
+# Ekotex Warranty & Service Manager 🚀
 
-## 🚀 Overview
-This application is a comprehensive tool for managing product warranties, field visits, stock, complaints, and quotations. It is built using **React Native (Expo)** with **Supabase** as the backend.
-
----
-
-## 🛠️ Backend Setup (Supabase)
-
-### 1. Database Schema
-To recreate the database and storage structure, run the SQL script found in:
-`[MASTER_DATABASE_SETUP.sql](./MASTER_DATABASE_SETUP.sql)`
-
-This script handles:
-- **Tables**: `users`, `sales`, `stock`, `field_visits`, `complaints`, `quotations`.
-- **Storage**: Buckets for `warranty-images` and `complaint-images`.
-- **Security**: Row Level Security (RLS) policies for authenticated access.
-- **Automation**: `updated_at` triggers and performance indexes.
-
-### 2. Required Extensions
-Ensure the `uuid-ossp` extension is enabled in your Supabase project (included in the master script).
+A premium, enterprise-grade mobile application designed for Exotex to manage product warranties, field services, and supply chain logistics. Built with **React Native (Expo)** and powered by **Supabase**.
 
 ---
 
-## 📸 Storage & Images
+## ✨ Core Features
 
-### Storage Structure
-- `warranty-images/`: Stores images for sales and warranty registrations.
-- `complaint-images/`: Stores images uploaded during complaint submission.
+### 🛡️ Warranty & Sales Management
+- **Digital Registration:** Seamlessly register new product sales with high-resolution image attachments.
+- **QR Verification:** Automatically generate and verify product warranty cards via unique QR codes.
+- **Sub-Branch Approval:** Advanced workflow allowing sub-branches to manually approve pending warranties for immediate generation.
 
-### Upload Handling
-The app uses a robust multi-stage upload process with local fallbacks:
-1. Attempt upload to Supabase.
-2. If network fails, save locally using `expo-file-system`.
-3. Auto-syncing logic (where applicable).
+### 🛠️ Field Service & Maintenance
+- **Field Visit Documentation:** Specialized forms for **Residential** and **Industrial** site visits.
+- **Complaint Lifecycle:** Track customer complaints from initial submission through technician assignment to final resolution.
+- **Service Reports:** Auto-generate professional PDF service reports directly from the field.
 
----
+### 📦 Intelligent Logistics
+- **Stock Management:** Real-time inventory tracking with automated stock deduction upon sales.
+- **Multi-Branch Filtering:** Regional and branch-based data isolation for Super Admins and Branch Managers.
+- **Quotation Builder:** Professional quotation generation for spare parts and services.
 
-## 📄 PDF & Document Templates
+### 🛰️ Offline-First & Sync Ready
+- **Form Recovery System:** Automatically saves drafts of warranties and field visits. Never lose progress due to connectivity issues or app restarts.
+- **Multi-Stage Asset Sync:** Robust image upload pipeline that retries failed uploads and provides local file system fallbacks.
 
-### Customization
-PDF templates for Sales, Complaints, and Quotations are generated using HTML-to-PDF converters (`expo-print`).
-
-- **Location**: `src/utils/` (e.g., `QuotationTemplate.ts`, `ComplaintTemplate.ts`).
-- **Assets**: Logos and stamps are stored in `assets/Warranty_pdf_template/`.
-
-### QR Codes
-Warranty cards automatically generate QR codes for verification.
-
----
-
-## 🔐 Security & Roles
-
-### User Roles
-- **Super Admin**: Full across-branch visibility and deletion rights.
-- **Admin**: Full access to branch data and stock management.
-- **User**: Access to branch-specific features (Sales, Visits, Complaints).
-
-### RLS Policies
-The system uses **Row Level Security** to ensure data isolation. Most tables require authentication (`TO authenticated`), while Complaints allow public insertion for customer feedback.
+### 🎨 Premium User Experience
+- **iPad Optimized:** Fully responsive layouts tailored for both handheld mobile devices and technician tablets.
+- **Rich Interaction:** Integrated haptic feedback and custom sound effects for professional feedback.
+- **EAS Insights:** Real-time monitoring of app performance, reach, and user engagement.
 
 ---
 
-## 📱 Development & Deployment
+## 🛠️ Technical Stack
 
-### Environment Variables
-Create a `.env` file with:
+- **Frontend:** React Native (Expo SDK 54)
+- **Backend:** Supabase (PostgreSQL, Auth, Storage)
+- **State & Storage:** AsyncStorage, Context API, Expo Secure Store
+- **PDF Engine:** `expo-print` with custom HTML templates
+- **Release Pipeline:** EAS (Expo Application Services) with deterministic `package-lock.json` builds.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+1. Install [Node.js](https://nodejs.org/) (LTS)
+2. Install [Expo Go](https://expo.dev/expo-go) on your mobile device.
+3. Setup [EAS CLI](https://docs.expo.dev/build/setup/): `npm install -g eas-cli`
+
+### Installation
+```bash
+git clone https://github.com/your-repo/Warranty_manage_app.git
+cd Warranty_manage_app
+npm install
+```
+
+### Environment Setup
+Create a `.env` file in the root directory:
 ```env
-EXPO_PUBLIC_SUPABASE_URL=your_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_key
+EXPO_PUBLIC_SUPABASE_URL=your_project_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ```
 
 ### Running Locally
@@ -75,14 +68,26 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_key
 npx expo start
 ```
 
-### Building the APK
+---
+
+## 📱 Deployment
+
+### Building for Play Store
+The project uses EAS for production-grade Android builds:
 ```bash
 eas build -p android --profile production
 ```
 
+### Updates
+To push non-native updates instantly to users:
+```bash
+eas update --auto
+```
+
 ---
 
-## 📋 Features Roadmap & Maintenance
-- **Current**: iPad Responsive UI, Android-style animations, Success sound effects (`expo-av`).
-- **Data Integrity**: Maintenance of stock levels is automatically triggered by sales.
-- **Filtering**: Regional and branch-based filtering across all dashboards.
+## 📋 Security & RLS
+This application implements strict **Row Level Security (RLS)** in Supabase to ensure data privacy between different organizational branches. All mission-critical data requires authenticated access, while complaint submissions are available publicly to facilitate customer feedback.
+
+---
+*Developed for Exotex by Apurv*
