@@ -10,6 +10,7 @@ import { Asset } from 'expo-asset';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
 import { THEME } from '../../constants/theme';
 import { playNotifySound } from '../../utils/SoundManager';
+import { getAssetBase64 } from '../../utils/AssetUtils';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -52,13 +53,11 @@ export default function ComplaintSuccess() {
 
     const handleDownloadPDF = async () => {
         try {
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateComplaintPDFHTML(complaint, logoUri, signUri);
 
