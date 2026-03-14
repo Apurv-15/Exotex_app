@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platfo
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { Storage } from '../../utils/storage';
 import { FieldVisitService } from '../../services/FieldVisitService';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
@@ -14,6 +15,7 @@ import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
 import { ActionSheetIOS } from 'react-native'; // For better UI choice if needed, but Alert is fine
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
+import { getAssetBase64 } from '../../utils/AssetUtils';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -38,6 +40,26 @@ export default function FieldVisitForm() {
             setIsOnline(state.isConnected ?? true);
         });
         return () => unsubscribe();
+    }, []);
+
+    // Auto-fill employee data
+    useEffect(() => {
+        const loadSavedData = async () => {
+            try {
+                const savedEngineer = await Storage.getItem('last_sales_engineer');
+                const savedBranch = await Storage.getItem('last_branch_name');
+                if (savedEngineer || savedBranch) {
+                    setFormData(prev => ({
+                        ...prev,
+                        salesEngineerName: savedEngineer || prev.salesEngineerName,
+                        branchName: savedBranch || prev.branchName
+                    }));
+                }
+            } catch (e) {
+                console.warn('Failed to load field visit auto-fill data', e);
+            }
+        };
+        loadSavedData();
     }, []);
 
     const [formData, setFormData] = useState({
@@ -154,11 +176,12 @@ export default function FieldVisitForm() {
     };
 
     const isStep1Valid = () => {
+        const phoneRegex = /^[0-9]{10}$/;
         return (
             formData.clientCompanyName.trim() !== '' &&
             formData.siteAddress.trim() !== '' &&
             formData.contactPersonName.trim() !== '' &&
-            formData.mobileNumber.trim() !== ''
+            phoneRegex.test(formData.mobileNumber.trim())
         );
     };
 
@@ -179,7 +202,8 @@ export default function FieldVisitForm() {
     const canProceed = () => {
         if (!formData.propertyType) return false;
         if (formData.propertyType === 'Residential') {
-            return formData.contactPersonName.trim() !== '' && formData.mobileNumber.trim() !== '';
+            const phoneRegex = /^[0-9]{10}$/;
+            return formData.contactPersonName.trim() !== '' && phoneRegex.test(formData.mobileNumber.trim());
         }
         if (currentStep === 1) return isStep1Valid();
         if (currentStep === 2) return isStep2Valid();
@@ -223,11 +247,27 @@ export default function FieldVisitForm() {
 
     const handleNext = () => {
         if (!canProceed()) {
+            const phoneRegex = /^[0-9]{10}$/;
+            if (formData.mobileNumber.trim() !== '' && !phoneRegex.test(formData.mobileNumber.trim())) {
+                showAlert('Invalid Mobile Number', 'Please enter a valid 10-digit mobile number.');
+                return;
+            }
             showAlert('Missing Fields', 'Please fill in all required fields.');
             return;
         }
         if (currentStep < TOTAL_STEPS) {
             // SoundManager.playNext();
+            // Save employee data for auto-fill
+            const saveAutoFill = async () => {
+                try {
+                    if (formData.salesEngineerName) await Storage.setItem('last_sales_engineer', formData.salesEngineerName);
+                    if (formData.branchName) await Storage.setItem('last_branch_name', formData.branchName);
+                } catch (e) {
+                    console.warn('Failed to save field visit auto-fill data', e);
+                }
+            };
+            saveAutoFill();
+
             setCurrentStep(currentStep + 1);
         }
     };
@@ -316,14 +356,11 @@ export default function FieldVisitForm() {
         try {
             setLoading(true);
             setUploadStatus('Generating report...');
-
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateFieldVisitHTML(formData, logoUri, signUri);
 
@@ -544,9 +581,13 @@ export default function FieldVisitForm() {
                                 style={styles.input}
                                 placeholder="9876543210"
                                 placeholderTextColor="#9CA3AF"
-                                keyboardType="phone-pad"
+                                keyboardType="number-pad"
+                                maxLength={10}
                                 value={formData.mobileNumber}
-                                onChangeText={(v) => updateField('mobileNumber', v)}
+                                onChangeText={(v) => {
+                                    const numericValue = v.replace(/[^0-9]/g, '');
+                                    updateField('mobileNumber', numericValue);
+                                }}
                             />
                         </View>
                         <View style={[styles.inputContainer, { flex: 1 }]}>
