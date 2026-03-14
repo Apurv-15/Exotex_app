@@ -2,8 +2,11 @@
   "expo": {
     "name": "Ekotex",
     "slug": "Warranty_manage_app",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
     "icon": "./assets/company_logo.jpeg",
     "userInterfaceStyle": "light",
     "splash": {
@@ -17,15 +20,13 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/company_logo.jpeg",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "CAMERA"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -35,7 +36,8 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "expo-audio"
     ],
     "extra": {
       "eas": {
