@@ -20,6 +20,7 @@ import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 import { playNotifySound } from '../../utils/SoundManager';
+import { getAssetBase64 } from '../../utils/AssetUtils';
 
 const PRODUCT_MODELS = [
   { name: 'EKO-GREEN G3', rate: '21185.59', description: 'Energy Efficient Hard Water Conditioner - G3 Series' },
@@ -35,7 +36,7 @@ const PRODUCT_MODELS = [
 ];
 
 // Extracted outside the main component so it does not remount and lose focus on every keystroke!
-const FormInput = ({ label, value, onChange, placeholder = '', multiline = false, kb = 'default' }: any) => (
+const FormInput = ({ label, value, onChange, placeholder = '', multiline = false, kb = 'default', maxLength }: any) => (
   <View style={styles.inputCard}>
     <Text style={styles.inputLabel}>{label}</Text>
     <TextInput
@@ -45,6 +46,7 @@ const FormInput = ({ label, value, onChange, placeholder = '', multiline = false
       placeholder={placeholder}
       multiline={multiline}
       keyboardType={kb}
+      maxLength={maxLength}
       placeholderTextColor="#94A4B8"
     />
   </View>
@@ -91,26 +93,34 @@ export default function CreateQuotationScreen() {
   };
 
 
-  const isFormValid = () =>
-    formData.customerName.trim() !== '' &&
-    formData.phone.trim() !== '' &&
-    formData.billingAddress.trim() !== '';
+  const isFormValid = () => {
+    const phoneRegex = /^[0-9]{10}$/;
+    return (
+      formData.customerName.trim() !== '' &&
+      phoneRegex.test(formData.phone.trim()) &&
+      formData.billingAddress.trim() !== ''
+    );
+  };
 
   const handleGeneratePDF = async () => {
+    const phoneRegex = /^[0-9]{10}$/;
     if (!isFormValid()) {
+      if (formData.phone.trim() !== '' && !phoneRegex.test(formData.phone.trim())) {
+        if (Platform.OS === 'web') window.alert('Please enter a valid 10-digit mobile number.');
+        else Alert.alert('Invalid Mobile!', 'Please enter a valid 10-digit mobile number.');
+        return;
+      }
       if (Platform.OS === 'web') window.alert('Please fill Name, Phone and Billing Address.');
       else Alert.alert('Wait!', 'Please fill Name, Phone and Billing Address.');
       return;
     }
 
     try {
-      // Resolve assets
-      const logoAsset = Asset.fromModule(LogoImage);
-      const signAsset = Asset.fromModule(SignStampImage);
-      await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-      const logoUri = logoAsset.localUri || logoAsset.uri;
-      const signUri = signAsset.localUri || signAsset.uri;
+      // Convert assets to Base64 for robust loading in PDFs
+      const [logoUri, signUri] = await Promise.all([
+        getAssetBase64(LogoImage),
+        getAssetBase64(SignStampImage)
+      ]);
 
       try {
         await QuotationService.createQuotation({
@@ -185,7 +195,18 @@ export default function CreateQuotationScreen() {
             <FormInput label="CLIENT NAME *" value={formData.customerName} onChange={(t: string) => setFormData(p => ({ ...p, customerName: t }))} placeholder="e.g. Dr. Syed" />
             <FormInput label="COMPANY" value={formData.companyName} onChange={(t: string) => setFormData(p => ({ ...p, companyName: t }))} />
             <View style={styles.row}>
-              <View style={{ flex: 1, marginRight: 10 }}><FormInput label="PHONE *" kb="phone-pad" value={formData.phone} onChange={(t: string) => setFormData(p => ({ ...p, phone: t }))} /></View>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <FormInput
+                  label="PHONE *"
+                  kb="number-pad"
+                  maxLength={10}
+                  value={formData.phone}
+                  onChange={(t: string) => {
+                    const numericValue = t.replace(/[^0-9]/g, '');
+                    setFormData(p => ({ ...p, phone: numericValue }));
+                  }}
+                />
+              </View>
               <View style={{ flex: 1 }}><FormInput label="EMAIL" kb="email-address" value={formData.email} onChange={(t: string) => setFormData(p => ({ ...p, email: t }))} /></View>
             </View>
           </GlassPanel>
