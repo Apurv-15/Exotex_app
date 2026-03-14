@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 // @ts-ignore
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Keys that MUST be stored securely
 const SECURE_KEYS = ['auth_token', 'supabase.auth.token', 'supabase-auth-token'];
