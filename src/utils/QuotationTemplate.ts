@@ -136,8 +136,10 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
         .signatory-box { text-align: center; }
         .sign-img { width: 120px; height: 70px; object-fit: contain; margin: 5px 0; }
 
-        .terms { font-size: 10px; line-height: 1.5; margin-top: 20px; }
-        .page-footer { margin-top: 25px; font-size: 10px; font-weight: 700; text-align: center; color: #666; }
+        .terms { font-size: 11px; line-height: 1.5; margin-top: 20px; color: #111; }
+        .sust-box { margin-bottom: 25px; width: 60%; }
+        .sust-text { font-size: 14px; font-weight: 400; color: #333; margin-bottom: 5px; }
+        .leaf-icon { width: 40px; height: 40px; color: #2ecc71; }
     </style>
 </head>
 <body>
@@ -253,12 +255,34 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
     </div>
 
     <div class="terms">
-        <strong style="text-decoration: underline;">Terms and Conditions:</strong><br>
-        • Payment Terms - 100% Before Installation | GST - 18% At actual<br>
-        • Installation - at your end<br>
-        • Delivery - Within 2 working days<br>
-        • Warranty - 10 Year's Coil Warranty & 2 Years Panel Warranty.<br>
-        • (45 days warranty Return Policy applies)
+        <div class="sust-box">
+            <div class="sust-text">
+                At <strong>EKOTEX</strong>, sustainability is more than a promise—it’s a practice. Through our
+                ongoing environmental initiatives, we actively contribute to tree plantation
+                drives in India and abroad. Whether it’s offsetting emissions or restoring green
+                cover, we proudly support reforestation programs as part of our broader mission
+                to promote a cleaner, greener planet.
+            </div>
+            <svg class="leaf-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8.12,20C11,20 14.27,15.5 17,8M8.27,18C7.38,18 6.54,17.22 6.54,16.26C6.54,15.47 7,14.74 8.19,13.64C8.85,13.04 9.11,12.73 9.42,12.06C9.17,13.33 8.35,14.65 7.63,15.42C7.3,15.77 7.08,16 7.08,16.26C7.08,16.5 7.19,16.73 7.82,16.73C8.44,16.73 8.79,16.4 9,16.03C9.33,15.46 9.44,14.88 10,14.03C10.74,12.91 11.53,11.5 11.53,10.15C11.53,9.5 11.3,9.04 10.96,8.73C11.69,8.4 12.44,8.19 13.04,8.19C14.6,8.19 17,10.3 17,13C17,17 12.35,20 8.12,20L8.27,18M21,2C18,2 14.5,3.5 12,7C14,10 21,11 21,11C21,11 21,2 21,2Z"/>
+            </svg>
+        </div>
+
+        <strong style="font-size: 13px;">Terms and Conditions:</strong><br>
+        <div style="font-size: 18px; font-weight: 700; margin-top: 5px;">Payment Terms - 100%</div>
+        <div style="font-size: 18px; font-weight: 700; margin-bottom: 15px;">Before Installation</div>
+
+        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">GST - 18% At actual</div>
+        
+        <div style="font-size: 18px; font-weight: 700;">Installation - at your end (</div>
+        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">Only Plumbing Exp)</div>
+
+        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">Delivery - Within 2 days</div>
+
+        <div style="font-size: 18px; font-weight: 700;">Warranty - 10 Year's Coil Warranty & 2 Years Panel Warranty.</div>
+        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">(45 days warranty Return Policy for Residential only)</div>
+
+        <div style="font-size: 18px; font-weight: 700;">Material : 100% Stainless Steel</div>
     </div>
 
     <div class="page-footer">Page 1 / 1 • This is a digitally signed document.</div>
