@@ -56,11 +56,15 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                         <Text style={styles.label}>Mobile Number</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="10-digit mobile"
+                            placeholder="9876543210"
                             placeholderTextColor="#9CA3AF"
-                            keyboardType="phone-pad"
+                            keyboardType="number-pad"
+                            maxLength={10}
                             value={formData.mobileNumber}
-                            onChangeText={(v) => updateField('mobileNumber', v)}
+                            onChangeText={(v) => {
+                                const numericValue = v.replace(/[^0-9]/g, '');
+                                updateField('mobileNumber', numericValue);
+                            }}
                         />
                     </View>
                 </View>
