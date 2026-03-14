@@ -27,6 +27,7 @@ export interface Sale {
     imageUrls?: string[]; // URLs to images in Supabase Storage
     paymentReceived: boolean;
     warrantyGenerated: boolean;
+    region?: string;
 }
 
 const STORAGE_KEY = 'WARRANTY_PRO_SALES';
@@ -63,6 +64,7 @@ const dbToSale = (row: any): Sale => ({
     imageUrls: row.image_urls || [],
     paymentReceived: row.payment_received || false,
     warrantyGenerated: row.warranty_generated || false,
+    region: row.region || '',
 });
 
 // Helper to convert Sale object to DB row
@@ -89,6 +91,7 @@ const saleToDb = (sale: Partial<Sale>) => ({
     image_urls: sale.imageUrls || [],
     payment_received: sale.paymentReceived || false,
     warranty_generated: sale.warrantyGenerated || false,
+    region: sale.region || null,
 });
 
 export const SalesService = {
@@ -135,7 +138,7 @@ export const SalesService = {
             } else {
                 try {
                     // Use legacy API for expo-file-system v54+
-                    const FileSystem = require('expo-file-system');
+                    const FileSystem = require('expo-file-system/legacy');
                     const encoding = FileSystem.EncodingType?.Base64 || 'base64';
 
                     // Read file as Base64
@@ -198,7 +201,7 @@ export const SalesService = {
         }
         try {
             // Use legacy API for expo-file-system v54+
-            const FileSystem = require('expo-file-system');
+            const FileSystem = require('expo-file-system/legacy');
             const fileName = `${warrantyId}_${index}_${Date.now()}.jpg`;
             const localDir = `${FileSystem.documentDirectory}warranty-images/`;
 
@@ -339,7 +342,7 @@ export const SalesService = {
                     .from('sales')
                     .select('*')
                     .eq('branch_id', branchId)
-                    .order('created_at', { ascending: false });
+                    .order('sale_date', { ascending: false });
 
                 if (error) throw error;
                 return (data || []).map(dbToSale);
@@ -351,6 +354,48 @@ export const SalesService = {
         // Fallback to local storage
         const sales = await SalesService.getSales();
         return sales.filter(sale => sale.branchId === branchId);
+    },
+
+    // Get sales by region
+    getSalesByRegion: async (region: string): Promise<Sale[]> => {
+        if (!region) return [];
+
+        if (isSupabaseConfigured()) {
+            try {
+                const { data, error } = await supabase
+                    .from('sales')
+                    .select('*')
+                    .or(`region.ilike.%${region.trim()}%,city.ilike.%${region.trim()}%`)
+                    .order('sale_date', { ascending: false });
+
+                if (error) {
+                    // Handle missing column error (42703: undefined_column)
+                    if (error.code === '42703') {
+                        console.warn('Region column missing in DB, falling back to city-only ilike');
+                        const { data: cityData, error: cityErr } = await supabase
+                            .from('sales')
+                            .select('*')
+                            .ilike('city', `%${region.trim()}%`)
+                            .order('sale_date', { ascending: false });
+                        
+                        if (cityErr) throw cityErr;
+                        return (cityData || []).map(dbToSale);
+                    }
+                    throw error;
+                }
+                return (data || []).map(dbToSale);
+            } catch (error) {
+                console.error(`Supabase error fetching sales for region ${region}:`, error);
+            }
+        }
+
+        // Fallback to local
+        const allSales = await SalesService.getSales();
+        const regionLower = region.toLowerCase().trim();
+        return allSales.filter(s => 
+            (s.region?.toLowerCase().trim() === regionLower) || 
+            (s.city?.toLowerCase().trim() === regionLower)
+        );
     },
 
     // Get all sales (alias)
