@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/company_logo.jpeg",
         "backgroundColor": "#ffffff"
