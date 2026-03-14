@@ -14,7 +14,7 @@ import { LineChart } from 'react-native-chart-kit';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 import DetailedAnalyticsContent from '../../components/DetailedAnalyticsContent';
-const FileSystem = require('expo-file-system');
+const FileSystem = require('expo-file-system/legacy');
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { Alert } from 'react-native';
@@ -26,6 +26,7 @@ import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 import { Asset } from 'expo-asset';
 import { supabase } from '../../config/supabase';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
+import { getAssetBase64 } from '../../utils/AssetUtils';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // @ts-ignore
@@ -511,13 +512,11 @@ export default function MainBranchDashboard() {
 
     const handleDownloadComplaint = async (complaint: Complaint) => {
         try {
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateComplaintPDFHTML(complaint, logoUri, signUri);
 
@@ -535,13 +534,11 @@ export default function MainBranchDashboard() {
 
     const handleDownloadVisit = async (visit: any) => {
         try {
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateFieldVisitHTML(visit, logoUri, signUri);
 
@@ -559,13 +556,11 @@ export default function MainBranchDashboard() {
 
     const handleDownloadQuotation = async (q: Quotation) => {
         try {
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateQuotationHTML(
                 q,
