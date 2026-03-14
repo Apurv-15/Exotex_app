@@ -34,6 +34,7 @@ import ProductCataloguePdf from '../../assets/Training pdf/PRODUCT CATLOGUE.pdf'
 // @ts-ignore
 import FlowRateChartPdf from '../../assets/Training pdf/Flow Rate chart.pdf';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
+import { getAssetBase64 } from '../../utils/AssetUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -72,15 +73,35 @@ export default function SubBranchDashboard() {
     const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [showAllWarranties, setShowAllWarranties] = useState(false);
 
     const fetchSales = useCallback(async () => {
         try {
             // First, refresh user profile to catch any region changes from Admin
             const latestProfile = await refreshProfile();
             const activeUser = latestProfile || user;
+            
+            let finalData: Sale[] = [];
 
-            const data = await SalesService.getSalesByBranch(activeUser?.branchId || '');
-            setSales(data);
+            if (activeUser?.region) {
+                // If a region is assigned, try fetching strictly for that region first
+                const regionalData = await SalesService.getSalesByRegion(activeUser.region);
+                
+                if (regionalData && regionalData.length > 0) {
+                    finalData = regionalData;
+                } else {
+                    // Fallback to branch-level data ONLY if no regional data is found yet
+                    // This prevents empty screens during data migration/tagging
+                    finalData = await SalesService.getSalesByBranch(activeUser?.branchId || '');
+                }
+            } else {
+                // Standard branch user with no specific region assigned
+                finalData = await SalesService.getSalesByBranch(activeUser?.branchId || '');
+            }
+            
+            setSales(finalData.sort((a, b) => 
+                new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime()
+            ));
 
             // Fetch field visits
             const visits = await FieldVisitService.getFieldVisitsByBranch(activeUser?.branchId || '');
@@ -277,13 +298,11 @@ export default function SubBranchDashboard() {
         try {
             setLoading(true);
 
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateFieldVisitHTML(visit, logoUri, signUri);
 
@@ -304,13 +323,11 @@ export default function SubBranchDashboard() {
     const handleDownloadQuotation = async (q: Quotation) => {
         try {
             setLoading(true);
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateQuotationHTML(
                 q,
@@ -343,13 +360,11 @@ export default function SubBranchDashboard() {
         try {
             setLoading(true);
 
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateComplaintPDFHTML(complaint, logoUri, signUri);
 
@@ -671,8 +686,9 @@ export default function SubBranchDashboard() {
                         {/* Recent Warranties Section */}
                         <View style={styles.recentHeader}>
                             <Text style={styles.sectionTitle}>Recent Warranties</Text>
-                            {/* TODO: Create WarrantiesList screen */}
-                            <Text style={styles.seeAllText}>View More</Text>
+                            <Pressable onPress={() => setShowAllWarranties(true)}>
+                                <Text style={styles.seeAllText}>View More</Text>
+                            </Pressable>
                         </View>
 
                         <GlassPanel style={styles.listContainer}>
@@ -982,13 +998,11 @@ export default function SubBranchDashboard() {
                                                     try {
                                                         setLoading(true);
 
-                                                        // Resolve assets
-                                                        const logoAsset = Asset.fromModule(LogoImage);
-                                                        const signAsset = Asset.fromModule(SignStampImage);
-                                                        await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-                                                        const logoUri = logoAsset.localUri || logoAsset.uri;
-                                                        const signUri = signAsset.localUri || signAsset.uri;
+                                                        // Convert assets to Base64 for robust loading in PDFs
+                                                        const [logoUri, signUri] = await Promise.all([
+                                                            getAssetBase64(LogoImage),
+                                                            getAssetBase64(SignStampImage)
+                                                        ]);
 
                                                         const html = generateFieldVisitHTML(visit, logoUri, signUri);
 
@@ -1416,6 +1430,103 @@ export default function SubBranchDashboard() {
                             </>
                         )}
                     </GlassPanel>
+                </View>
+            </Modal>
+
+            {/* All Warranties Modal */}
+            <Modal
+                visible={showAllWarranties}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={() => setShowAllWarranties(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: THEME.colors.background }}>
+                    {/* Header */}
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 50,
+                        paddingHorizontal: 20,
+                        paddingBottom: 16,
+                        backgroundColor: 'white',
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#F3F4F6',
+                        gap: 12,
+                    }}>
+                        <Pressable
+                            onPress={() => setShowAllWarranties(false)}
+                            style={{ width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 20, backgroundColor: '#F3F4F6' }}
+                        >
+                            <MaterialCommunityIcons name="arrow-left" size={22} color={THEME.colors.text} />
+                        </Pressable>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 18, fontFamily: THEME.fonts.bold, color: THEME.colors.text }}>All Warranties</Text>
+                            <Text style={{ fontSize: 13, color: THEME.colors.textSecondary, fontFamily: THEME.fonts.body }}>
+                                {sales.filter(s => s.warrantyId).length} total
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* List */}
+                    <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }} showsVerticalScrollIndicator={false}>
+                        {sales.filter(s => s.warrantyId).length === 0 ? (
+                            <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                                <MaterialCommunityIcons name="inbox-outline" size={48} color={THEME.colors.textSecondary} />
+                                <Text style={{ color: THEME.colors.textSecondary, marginTop: 12, fontSize: 16, fontFamily: THEME.fonts.body }}>No warranties yet</Text>
+                            </View>
+                        ) : (
+                            sales.filter(s => s.warrantyId).map(item => {
+                                const countdown = calculateDaysRemaining(item.saleDate);
+                                const isPending = !item.warrantyGenerated;
+                                return (
+                                    <Pressable
+                                        key={item.id}
+                                        style={({ pressed }) => [
+                                            styles.listItem,
+                                            { backgroundColor: 'white', borderRadius: 16, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+                                            pressed && { opacity: 0.85 }
+                                        ]}
+                                        onPress={() => {
+                                            setShowAllWarranties(false);
+                                            setTimeout(() => {
+                                                if (item.warrantyGenerated) {
+                                                    navigation.navigate('WarrantyCard', { sale: item });
+                                                } else {
+                                                    handleUpdatePayment(item);
+                                                }
+                                            }, 300);
+                                        }}
+                                    >
+                                        <View style={[styles.listIcon, { backgroundColor: isPending ? '#FEF3C7' : THEME.colors.mintLight }]}>
+                                            <MaterialCommunityIcons
+                                                name={isPending ? 'calendar-clock' : 'check-circle'}
+                                                size={20}
+                                                color={isPending ? THEME.colors.warning : THEME.colors.success}
+                                            />
+                                        </View>
+                                        <View style={styles.listInfo}>
+                                            <Text style={styles.listTitle}>{item.productModel}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                                <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
+                                                    {item.customerName} • {item.city}
+                                                </Text>
+                                                <View style={[styles.countdownBadge, { backgroundColor: (isPending ? THEME.colors.warning : countdown.color) + '20' }]}>
+                                                    <Text style={[styles.countdownText, { color: isPending ? THEME.colors.warning : countdown.color }]}>
+                                                        {isPending ? `PENDING (${countdown.days}d)` : countdown.label}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                        <View style={styles.listAmount}>
+                                            <Text style={styles.amountText}>{item.warrantyId}</Text>
+                                            <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                        </View>
+                                    </Pressable>
+                                );
+                            })
+                        )}
+                        <View style={{ height: 40 }} />
+                    </ScrollView>
                 </View>
             </Modal>
         </MeshBackground>
