@@ -21,6 +21,7 @@ import { Buffer } from 'buffer';
 // @ts-ignore
 import UserManualPdf from '../../assets/User_manual.pdf';
 import { playNotifySound } from '../../utils/SoundManager';
+import { getAssetBase64 } from '../../utils/AssetUtils';
 
 export default function WarrantyCard() {
     const route = useRoute<any>();
@@ -444,13 +445,11 @@ export default function WarrantyCard() {
     const handleDownloadPDF = async () => {
         setLoading(true);
         try {
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const html = generateWarrantyHTML(logoUri, signUri);
 
