@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Platform, Image, StatusBar, KeyboardAvoidingView, Modal } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 import { useAuth } from '../../context/AuthContext';
-// import { SoundManager } from '../../utils/SoundManager';
+import { Storage } from '../../utils/storage';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 
@@ -44,12 +44,38 @@ export default function CreateSaleStep1() {
         productDetailsConfirmed: false,
         paymentConfirmed: false
     });
+    const [isLoaded, setIsLoaded] = React.useState(false);
+
+    // Auto-fill employee/plumber data
+    useEffect(() => {
+        const loadSavedData = async () => {
+            try {
+                const savedExec = await Storage.getItem('last_exec_name');
+                const savedDesig = await Storage.getItem('last_exec_desig');
+                const savedPlumber = await Storage.getItem('last_plumber_name');
+
+                setFormData(prev => ({
+                    ...prev,
+                    executiveName: savedExec || user?.name || '',
+                    designation: savedDesig || '',
+                    plumberName: savedPlumber || ''
+                }));
+            } catch (e) {
+                console.warn('Failed to load auto-fill data', e);
+            } finally {
+                setIsLoaded(true);
+            }
+        };
+
+        loadSavedData();
+    }, [user]);
 
 
     const isStep1Valid = () => {
+        const phoneRegex = /^[0-9]{10}$/;
         return (
             formData.customerName.trim() !== '' &&
-            formData.phone.trim() !== '' &&
+            phoneRegex.test(formData.phone.trim()) &&
             formData.address.trim() !== '' &&
             formData.city.trim() !== '' &&
             formData.invoiceNumber.trim() !== '' &&
@@ -69,9 +95,25 @@ export default function CreateSaleStep1() {
 
     const handleNext = () => {
         if (!isStep1Valid()) {
+            if (formData.phone.trim() !== '' && !/^[0-9]{10}$/.test(formData.phone.trim())) {
+                showAlert('Invalid Mobile Number', 'Please enter a valid 10-digit mobile number.');
+                return;
+            }
             showAlert('Missing Fields', 'Please fill in all required fields and confirm the checkboxes.');
             return;
         }
+
+        // Save employee/plumber data for auto-fill next time
+        const saveAutoFillData = async () => {
+            try {
+                if (formData.executiveName) await Storage.setItem('last_exec_name', formData.executiveName);
+                if (formData.designation) await Storage.setItem('last_exec_desig', formData.designation);
+                if (formData.plumberName) await Storage.setItem('last_plumber_name', formData.plumberName);
+            } catch (e) {
+                console.warn('Failed to save auto-fill data', e);
+            }
+        };
+        saveAutoFillData();
 
         // SoundManager.playNext();
         navigation.navigate('CreateSaleStep2', { formData });
@@ -139,9 +181,13 @@ export default function CreateSaleStep1() {
                                         style={styles.input}
                                         placeholder="9876543210"
                                         placeholderTextColor="#9CA3AF"
-                                        keyboardType="phone-pad"
+                                        keyboardType="number-pad"
+                                        maxLength={10}
                                         value={formData.phone}
-                                        onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                                        onChangeText={(text) => {
+                                            const numericValue = text.replace(/[^0-9]/g, '');
+                                            setFormData({ ...formData, phone: numericValue });
+                                        }}
                                     />
                                 </View>
                                 <View style={[styles.inputContainer, { flex: 1 }]}>
