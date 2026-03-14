@@ -574,27 +574,34 @@ export const SalesService = {
 
     // Search sale by invoice number or warranty ID
     getSaleByInvoice: async (invoiceNo: string): Promise<Sale | null> => {
+        if (!invoiceNo) return null;
+        const query = invoiceNo.trim();
+
         if (isSupabaseConfigured()) {
             try {
-                // We use warranty_id to store the Invoice Number based on current usage
+                // Search in both warranty_id and invoice_number with fuzzy matching
                 const { data, error } = await supabase
                     .from('sales')
                     .select('*')
-                    .eq('warranty_id', invoiceNo)
-                    .single();
+                    .or(`warranty_id.ilike.%${query}%,invoice_number.ilike.%${query}%`)
+                    .limit(1);
 
                 if (error) {
-                    if (error.code === 'PGRST116') return null; // Not found
+                    if (error.code === 'PGRST116') return null;
                     throw error;
                 }
-                return dbToSale(data);
+                return data && data.length > 0 ? dbToSale(data[0]) : null;
             } catch (error) {
                 console.error('Supabase getSaleByInvoice error:', error);
             }
         }
 
         const sales = await SalesService.getSales();
-        return sales.find(s => s.invoiceNumber === invoiceNo || s.warrantyId === invoiceNo) || null;
+        const lowerQuery = query.toLowerCase();
+        return sales.find(s => 
+            (s.invoiceNumber && s.invoiceNumber.toLowerCase().includes(lowerQuery)) || 
+            (s.warrantyId && s.warrantyId.toLowerCase().includes(lowerQuery))
+        ) || null;
     },
 
     // Autocomplete search for warranty ID
@@ -606,7 +613,7 @@ export const SalesService = {
                 const { data, error } = await supabase
                     .from('sales')
                     .select('*')
-                    .ilike('warranty_id', `%${queryText}%`)
+                    .or(`warranty_id.ilike.%${queryText}%,invoice_number.ilike.%${queryText}%`)
                     .limit(5);
 
                 if (error) throw error;

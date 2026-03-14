@@ -243,7 +243,7 @@ export default function CreateSaleStep1() {
                                     <Text style={styles.label}>Invoice Number *</Text>
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="INV12345"
+                                        placeholder="Enter Invoice No"
                                         placeholderTextColor="#9CA3AF"
                                         value={formData.invoiceNumber}
                                         onChangeText={(text) => setFormData({ ...formData, invoiceNumber: text })}
