@@ -90,6 +90,7 @@ export default function CreateSaleStep2() {
                     ...formData,
                     saleDate: new Date().toISOString().split('T')[0],
                     branchId: user?.branchId || 'unknown',
+                    region: user?.region || '',
                 },
                 images, // Already filtered as valid strings
                 (progress) => {
