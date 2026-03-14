@@ -12,7 +12,10 @@ import { SalesService } from '../../services/SalesService';
 import { useAuth } from '../../context/AuthContext';
 import GlassPanel from '../../components/GlassPanel';
 import MeshBackground from '../../components/MeshBackground';
+import { Storage } from '../../utils/storage';
+import { useEffect } from 'react';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
+import { getAssetBase64 } from '../../utils/AssetUtils';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -47,6 +50,31 @@ export default function RaiseComplaintStep2() {
         designation: route.params.complaint?.resolvedByDesignation || '',
         warrantyAttached: route.params.complaint?.warrantyCardAttached || false
     });
+
+    // Auto-fill employee data
+    useEffect(() => {
+        if (!isEditMode) {
+            const loadSavedData = async () => {
+                try {
+                    const savedDept = await Storage.getItem('last_complaint_dept');
+                    const savedOfficer = await Storage.getItem('last_complaint_officer');
+                    const savedResolvedBy = await Storage.getItem('last_complaint_resolved_by');
+                    const savedDesig = await Storage.getItem('last_complaint_desig');
+
+                    setFormData(prev => ({
+                        ...prev,
+                        dept: savedDept || prev.dept,
+                        officer: savedOfficer || prev.officer,
+                        resolvedBy: savedResolvedBy || prev.resolvedBy,
+                        designation: savedDesig || prev.designation
+                    }));
+                } catch (e) {
+                    console.warn('Failed to load complaint auto-fill data', e);
+                }
+            };
+            loadSavedData();
+        }
+    }, [isEditMode]);
 
     const [imageUris, setImageUris] = useState<string[]>(route.params.complaint?.imageUrls || []);
     const [uploading, setUploading] = useState(false);
@@ -190,6 +218,19 @@ export default function RaiseComplaintStep2() {
                 city: clientData.city
             };
 
+            // Save employee data for auto-fill next time
+            const saveAutoFill = async () => {
+                try {
+                    if (formData.dept) await Storage.setItem('last_complaint_dept', formData.dept);
+                    if (formData.officer) await Storage.setItem('last_complaint_officer', formData.officer);
+                    if (formData.resolvedBy) await Storage.setItem('last_complaint_resolved_by', formData.resolvedBy);
+                    if (formData.designation) await Storage.setItem('last_complaint_desig', formData.designation);
+                } catch (e) {
+                    console.warn('Failed to save complaint auto-fill data', e);
+                }
+            };
+            saveAutoFill();
+
             if (isEditMode) {
                 await ComplaintService.updateComplaint(complaintId, complaint);
                 navigation.navigate('ComplaintSuccess', { complaint });
@@ -220,14 +261,11 @@ export default function RaiseComplaintStep2() {
     const handleDownloadReport = async (complaintData?: Complaint) => {
         try {
             setLoading(true);
-
-            // Resolve assets
-            const logoAsset = Asset.fromModule(LogoImage);
-            const signAsset = Asset.fromModule(SignStampImage);
-            await Promise.all([logoAsset.downloadAsync(), signAsset.downloadAsync()]);
-
-            const logoUri = logoAsset.localUri || logoAsset.uri;
-            const signUri = signAsset.localUri || signAsset.uri;
+            // Convert assets to Base64 for robust loading in PDFs
+            const [logoUri, signUri] = await Promise.all([
+                getAssetBase64(LogoImage),
+                getAssetBase64(SignStampImage)
+            ]);
 
             const complaintToPrint = complaintData || {
                 complaintId,
