@@ -45,6 +45,11 @@ export default function ProfileScreen() {
     };
 
     const handleUpdatePassword = async () => {
+        if (user?.role !== 'Admin' && user?.role !== 'Super Admin') {
+            Alert.alert("Access Denied", "Only administrators can update passwords. Please contact your manager.");
+            return;
+        }
+
         if (newPassword.length < 6) {
             Alert.alert("Failed to Update", 'Password must be at least 6 characters' + "\nPlease try again.");
             return;
@@ -129,64 +134,76 @@ export default function ProfileScreen() {
                         </Pressable>
                     </GlassPanel>
 
-                    <GlassPanel style={styles.section} intensity={40}>
-                        <Text style={styles.sectionTitle}>Change Password</Text>
+                    {(user?.role === 'Admin' || user?.role === 'Super Admin') ? (
+                        <GlassPanel style={styles.section} intensity={40}>
+                            <Text style={styles.sectionTitle}>Change Password</Text>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>New Password</Text>
-                            <View style={styles.passwordContainer}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>New Password</Text>
+                                <View style={styles.passwordContainer}>
+                                    <TextInput
+                                        style={styles.passwordInput}
+                                        value={newPassword}
+                                        onChangeText={setNewPassword}
+                                        placeholder="Enter new password"
+                                        secureTextEntry={!showPassword}
+                                        textContentType="newPassword"
+                                        autoComplete="password-new"
+                                    />
+                                    <Pressable
+                                        onPress={() => setShowPassword(!showPassword)}
+                                        style={styles.eyeIcon}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name={showPassword ? "eye-off" : "eye"}
+                                            size={20}
+                                            color={THEME.colors.textSecondary}
+                                        />
+                                    </Pressable>
+                                </View>
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Confirm New Password</Text>
                                 <TextInput
-                                    style={styles.passwordInput}
-                                    value={newPassword}
-                                    onChangeText={setNewPassword}
-                                    placeholder="Enter new password"
+                                    style={styles.input}
+                                    value={confirmPassword}
+                                    onChangeText={setConfirmPassword}
+                                    placeholder="Confirm new password"
                                     secureTextEntry={!showPassword}
                                     textContentType="newPassword"
                                     autoComplete="password-new"
                                 />
-                                <Pressable
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    style={styles.eyeIcon}
-                                >
-                                    <MaterialCommunityIcons
-                                        name={showPassword ? "eye-off" : "eye"}
-                                        size={20}
-                                        color={THEME.colors.textSecondary}
-                                    />
-                                </Pressable>
                             </View>
-                        </View>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Confirm New Password</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
-                                placeholder="Confirm new password"
-                                secureTextEntry={!showPassword}
-                                textContentType="newPassword"
-                                autoComplete="password-new"
-                            />
-                        </View>
-
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.button,
-                                { backgroundColor: THEME.colors.primary },
-                                pressed && styles.buttonPressed,
-                                loading && styles.buttonDisabled
-                            ]}
-                            onPress={handleUpdatePassword}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="white" />
-                            ) : (
-                                <Text style={[styles.buttonText, { color: '#064E3B' }]}>Update Password</Text>
-                            )}
-                        </Pressable>
-                    </GlassPanel>
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.button,
+                                    { backgroundColor: THEME.colors.primary },
+                                    pressed && styles.buttonPressed,
+                                    loading && styles.buttonDisabled
+                                ]}
+                                onPress={handleUpdatePassword}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <Text style={[styles.buttonText, { color: '#064E3B' }]}>Update Password</Text>
+                                )}
+                            </Pressable>
+                        </GlassPanel>
+                    ) : (
+                        <GlassPanel style={styles.section} intensity={40}>
+                            <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+                                <MaterialCommunityIcons name="shield-lock" size={48} color={THEME.colors.textSecondary} />
+                                <Text style={[styles.sectionTitle, { marginTop: 12, marginBottom: 8 }]}>Security Policy</Text>
+                                <Text style={[styles.hint, { textAlign: 'center', fontSize: 13 }]}>
+                                    To update your password, please contact your Administrator or manager for verification.
+                                </Text>
+                            </View>
+                        </GlassPanel>
+                    )}
 
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>Role: {user?.role}</Text>

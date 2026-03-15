@@ -57,8 +57,8 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
             font-size: 12px;
             color: #111;
             background: #fff;
-            padding: 25px 35px;
-            line-height: 1.4;
+            padding: 20px 30px;
+            line-height: 1.3;
             width: 210mm;
             min-height: 297mm;
             margin: 0 auto;
@@ -95,7 +95,7 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
         .addr-row { display: flex; gap: 20px; margin-bottom: 15px; }
         .addr-col { flex: 1; font-size: 11px; line-height: 1.4; }
         
-        .divider-line { border-top: 2px solid #9EC9E0; margin: 12px 0; }
+        .divider-line { border-top: 2px solid #9EC9E0; margin: 8px 0; }
 
         table.items { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
         table.items th {
@@ -111,7 +111,7 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
         .r { text-align: right; }
         .c { text-align: center; }
 
-        .totals-wrap { display: flex; justify-content: flex-end; margin-top: 15px; }
+        .totals-wrap { display: flex; justify-content: flex-end; margin-top: 8px; }
         table.totals { width: 45%; border-collapse: collapse; font-size: 13px; }
         table.totals td { padding: 4px 6px; text-align: right; }
         .total-row td {
@@ -126,19 +126,19 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
             justify-content: space-between;
             border-top: 2px solid #9EC9E0;
             border-bottom: 2px solid #9EC9E0;
-            padding: 6px 0;
+            padding: 4px 0;
             font-size: 11px;
-            margin-top: 15px;
+            margin-top: 8px;
         }
 
-        .bottom-section { display: flex; justify-content: space-between; margin-top: 20px; }
+        .bottom-section { display: flex; justify-content: space-between; margin-top: 10px; }
         .bank-details { font-size: 11px; line-height: 1.5; }
         .signatory-box { text-align: center; }
         .sign-img { width: 120px; height: 70px; object-fit: contain; margin: 5px 0; }
 
-        .terms { font-size: 11px; line-height: 1.5; margin-top: 20px; color: #111; }
-        .sust-box { margin-bottom: 25px; width: 60%; }
-        .sust-text { font-size: 14px; font-weight: 400; color: #333; margin-bottom: 5px; }
+        .terms { font-size: 11px; line-height: 1.3; margin-top: 10px; color: #111; }
+        .sust-box { margin-bottom: 10px; width: 80%; }
+        .sust-text { font-size: 10px; font-weight: 400; color: #333; margin-bottom: 3px; }
         .leaf-icon { width: 40px; height: 40px; color: #2ecc71; }
     </style>
 </head>
@@ -268,21 +268,19 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
             </svg>
         </div>
 
-        <strong style="font-size: 13px;">Terms and Conditions:</strong><br>
-        <div style="font-size: 18px; font-weight: 700; margin-top: 5px;">Payment Terms - 100%</div>
-        <div style="font-size: 18px; font-weight: 700; margin-bottom: 15px;">Before Installation</div>
+        <strong style="font-size: 12px;">Terms and Conditions:</strong><br>
+        <div style="font-size: 11px; margin-top: 3px;">Payment Terms - 100% Before Installation</div>
 
-        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">GST - 18% At actual</div>
+        <div style="font-size: 11px; margin-top: 2px;">GST - 18% At actual</div>
         
-        <div style="font-size: 18px; font-weight: 700;">Installation - at your end (</div>
-        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">Only Plumbing Exp)</div>
+        <div style="font-size: 11px; margin-top: 2px;">Installation - at your end (Only Plumbing Exp)</div>
 
-        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">Delivery - Within 2 days</div>
+        <div style="font-size: 11px; margin-top: 2px;">Delivery - Within 2 days</div>
 
-        <div style="font-size: 18px; font-weight: 700;">Warranty - 10 Year's Coil Warranty & 2 Years Panel Warranty.</div>
-        <div style="font-size: 18px; font-weight: 700; margin-bottom: 5px;">(45 days warranty Return Policy for Residential only)</div>
+        <div style="font-size: 11px; margin-top: 2px;">Warranty - 10 Year's Coil Warranty & 2 Years Panel Warranty.</div>
+        <div style="font-size: 11px;">(45 days warranty Return Policy for Residential only)</div>
 
-        <div style="font-size: 18px; font-weight: 700;">Material : 100% Stainless Steel</div>
+        <div style="font-size: 11px; margin-top: 2px;">Material : 100% Stainless Steel</div>
     </div>
 
     <div class="page-footer">Page 1 / 1 • This is a digitally signed document.</div>
