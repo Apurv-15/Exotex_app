@@ -257,9 +257,9 @@ export default function CreateSaleStep2() {
                                 <ActivityIndicator color="white" />
                             ) : (
                                 <>
-                                    <MaterialCommunityIcons name={formData?.paymentConfirmed ? "shield-check" : "content-save-check"} size={20} color="white" />
+                                    <MaterialCommunityIcons name={formData?.paymentReceived ? "shield-check" : "content-save-check"} size={20} color="white" />
                                     <Text style={styles.submitButtonText}>
-                                        {formData?.paymentConfirmed ? 'Generate Warranty' : 'Register Pending Sale'}
+                                        {formData?.paymentReceived ? 'Generate Warranty' : 'Register Pending Sale'}
                                     </Text>
                                 </>
                             )}

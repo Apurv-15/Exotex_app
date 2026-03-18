@@ -42,7 +42,7 @@ export default function CreateSaleStep1() {
         productModel: '',
         serialNumber: '',
         productDetailsConfirmed: false,
-        paymentConfirmed: false
+        paymentReceived: false
     });
     const [isLoaded, setIsLoaded] = React.useState(false);
 
@@ -451,12 +451,12 @@ export default function CreateSaleStep1() {
 
                     {/* Payment Confirmation */}
                     <View style={styles.section}>
-                        <GlassPanel style={[styles.card, styles.paymentCard, formData.paymentConfirmed && styles.paymentCardActive]}>
+                        <GlassPanel style={[styles.card, styles.paymentCard, formData.paymentReceived && styles.paymentCardActive]}>
                             <View style={styles.paymentInfo}>
                                 <MaterialCommunityIcons
-                                    name={formData.paymentConfirmed ? "cash-check" : "cash-remove"}
+                                    name={formData.paymentReceived ? "cash-check" : "cash-remove"}
                                     size={24}
-                                    color={formData.paymentConfirmed ? "#10B981" : "#EF4444"}
+                                    color={formData.paymentReceived ? "#10B981" : "#EF4444"}
                                 />
                                 <View style={styles.paymentTextContainer}>
                                     <Text style={styles.paymentTitle}>Payment Received?</Text>
@@ -464,10 +464,10 @@ export default function CreateSaleStep1() {
                                 </View>
                             </View>
                             <Pressable
-                                onPress={() => setFormData({ ...formData, paymentConfirmed: !formData.paymentConfirmed })}
-                                style={[styles.toggleContainer, formData.paymentConfirmed && styles.toggleActive]}
+                                onPress={() => setFormData({ ...formData, paymentReceived: !formData.paymentReceived })}
+                                style={[styles.toggleContainer, formData.paymentReceived && styles.toggleActive]}
                             >
-                                <View style={[styles.toggleCircle, formData.paymentConfirmed && styles.toggleCircleActive]} />
+                                <View style={[styles.toggleCircle, formData.paymentReceived && styles.toggleCircleActive]} />
                             </Pressable>
                         </GlassPanel>
                     </View>
