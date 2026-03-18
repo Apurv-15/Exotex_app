@@ -632,5 +632,114 @@ export const SalesService = {
                 (s.invoiceNumber && s.invoiceNumber.toLowerCase().includes(queryText.toLowerCase()))
             )
             .slice(0, 5);
+    },
+
+    // ============================================
+    // PAGINATION METHODS - NEW
+    // ============================================
+    
+    getSalesPaginated: async (
+        limit: number = 50,
+        page: number = 1,
+        filters?: {
+            branchId?: string;
+            status?: 'pending' | 'approved' | 'rejected';
+            dateFrom?: string;
+            dateTo?: string;
+        }
+    ): Promise<{ data: Sale[]; total: number; hasMore: boolean }> => {
+        if (!isSupabaseConfigured()) {
+            console.warn('Supabase not configured for pagination');
+            return { data: [], total: 0, hasMore: false };
+        }
+
+        try {
+            const offset = (page - 1) * limit;
+            
+            let query = supabase
+                .from('sales')
+                .select('*', { count: 'exact' });
+
+            // Apply filters if provided
+            if (filters?.branchId) {
+                query = query.eq('branch_id', filters.branchId);
+            }
+            if (filters?.status) {
+                query = query.eq('status', filters.status);
+            }
+            if (filters?.dateFrom) {
+                query = query.gte('sale_date', filters.dateFrom);
+            }
+            if (filters?.dateTo) {
+                query = query.lte('sale_date', filters.dateTo);
+            }
+
+            const { data, count, error } = await query
+                .order('sale_date', { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) throw error;
+
+            const total = count || 0;
+            const hasMore = offset + limit < total;
+
+            return {
+                data: (data || []).map(dbToSale),
+                total,
+                hasMore
+            };
+        } catch (error) {
+            console.error('Error fetching paginated sales:', error);
+            throw error;
+        }
+    },
+
+    getSalesByBranchPaginated: async (
+        branchId: string,
+        limit: number = 50,
+        page: number = 1
+    ): Promise<{ data: Sale[]; total: number; hasMore: boolean }> => {
+        return SalesService.getSalesPaginated(limit, page, { branchId });
+    },
+
+    getSalesByStatusPaginated: async (
+        status: 'pending' | 'approved' | 'rejected',
+        limit: number = 50,
+        page: number = 1
+    ): Promise<{ data: Sale[]; total: number; hasMore: boolean }> => {
+        return SalesService.getSalesPaginated(limit, page, { status });
+    },
+
+    searchSalesPaginated: async (
+        query: string,
+        limit: number = 50,
+        page: number = 1
+    ): Promise<{ data: Sale[]; total: number; hasMore: boolean }> => {
+        if (!isSupabaseConfigured()) return { data: [], total: 0, hasMore: false };
+
+        try {
+            const offset = (page - 1) * limit;
+            
+            const { data, count, error } = await supabase
+                .from('sales')
+                .select('*', { count: 'exact' })
+                .or(`customer_name.ilike.%${query}%,phone.ilike.%${query}%,invoice_number.ilike.%${query}%`)
+                .order('sale_date', { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) throw error;
+
+            const total = count || 0;
+            const hasMore = offset + limit < total;
+
+            return {
+                data: (data || []).map(dbToSale),
+                total,
+                hasMore
+            };
+        } catch (error) {
+            console.error('Error searching paginated sales:', error);
+            throw error;
+        }
     }
 };

@@ -138,5 +138,57 @@ export const QuotationService = {
 
         const items = await QuotationService.getAllQuotations();
         return items.filter(q => q.branchId === branchId);
+    },
+
+    // ============================================
+    // PAGINATION METHODS - NEW
+    // ============================================
+    
+    getQuotationsPaginated: async (
+        limit: number = 50,
+        page: number = 1,
+        branchId?: string
+    ): Promise<{ data: Quotation[]; total: number; hasMore: boolean }> => {
+        if (!isSupabaseConfigured()) {
+            return { data: [], total: 0, hasMore: false };
+        }
+
+        try {
+            const offset = (page - 1) * limit;
+            
+            let query = supabase
+                .from('quotations')
+                .select('*', { count: 'exact' });
+
+            if (branchId) {
+                query = query.eq('branch_id', branchId);
+            }
+
+            const { data, count, error } = await query
+                .order('quotation_date', { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) throw error;
+
+            const total = count || 0;
+            const hasMore = offset + limit < total;
+
+            return {
+                data: (data || []).map(dbToQuotation),
+                total,
+                hasMore
+            };
+        } catch (error) {
+            console.error('Error fetching paginated quotations:', error);
+            throw error;
+        }
+    },
+
+    getQuotationsByBranchPaginated: async (
+        branchId: string,
+        limit: number = 50,
+        page: number = 1
+    ): Promise<{ data: Quotation[]; total: number; hasMore: boolean }> => {
+        return QuotationService.getQuotationsPaginated(limit, page, branchId);
     }
 };
