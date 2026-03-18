@@ -191,8 +191,10 @@ export const generateFieldVisitHTML = (formData: any, logoUri: string, signStamp
                 <div class="info-item"><span class="info-label">Date of Visit:</span><div class="info-value">${formData.dateOfVisit}</div></div>
                 <div class="info-item"><span class="info-label">Branch Name:</span><div class="info-value">${formData.branchName}</div></div>
                 <div class="info-item"><span class="info-label">Sales / Engineer Name:</span><div class="info-value">${formData.salesEngineerName}</div></div>
-                <div class="info-item"><span class="info-label">Client / Company Name:</span><div class="info-value">${formData.clientCompanyName}</div></div>
-                <div class="info-item full-width"><span class="info-label">Site Address:</span><div class="info-value">${formData.siteAddress}</div></div>
+                <div class="info-item"><span class="info-label">Client / Company Name:</span><div class="info-value">${formData.clientCompanyName || 'N/A'}</div></div>
+                <div class="info-item"><span class="info-label">Industry Type:</span><div class="info-value">${formData.industryType || 'N/A'}</div></div>
+                <div class="info-item"><span class="info-label">Building / Project Name:</span><div class="info-value">${formData.companyBuildingName || 'N/A'}</div></div>
+                <div class="info-item full-width"><span class="info-label">Site Address:</span><div class="info-value">${formData.siteAddress || 'N/A'}</div></div>
                 <div class="info-item"><span class="info-label">Contact Person:</span><div class="info-value">${formData.contactPersonName}</div></div>
                 <div class="info-item"><span class="info-label">Designation:</span><div class="info-value">${formData.designation}</div></div>
                 <div class="info-item"><span class="info-label">Mobile Number:</span><div class="info-value">${formData.mobileNumber}</div></div>
@@ -205,6 +207,7 @@ export const generateFieldVisitHTML = (formData: any, logoUri: string, signStamp
             <div class="section-header">2. Residential Details</div>
             <div class="info-grid">
                 <div class="info-item"><span class="info-label">Tank Capacity:</span><div class="info-value">${formData.tankCapacity || 'N/A'}</div></div>
+                <div class="info-item"><span class="info-label">Current PPM:</span><div class="info-value">${formData.waterHardnessPPM || 'N/A'}</div></div>
                 <div class="info-item"><span class="info-label">Current TDS:</span><div class="info-value">${formData.waterTDS || 'N/A'}</div></div>
                 <div class="info-item"><span class="info-label">Pipe Size:</span><div class="info-value">${formData.pipeLineSize || 'N/A'}</div></div>
                 <div class="info-item"><span class="info-label">Has Water Purifier:</span><div class="info-value">${formData.hasWaterPurifier ? 'Yes (' + formData.waterPurifierBrand + ')' : 'No'}</div></div>
@@ -228,6 +231,7 @@ export const generateFieldVisitHTML = (formData: any, logoUri: string, signStamp
                 <div class="info-item"><span class="info-label">Application Area:</span><div class="info-value">${formatArray(formData.applicationArea)}</div></div>
                 <div class="info-item"><span class="info-label">Pipeline Size:</span><div class="info-value">${formData.pipeLineSize || 'N/A'}</div></div>
                 <div class="info-item"><span class="info-label">Operating Pressure:</span><div class="info-value">${formData.operatingPressure || 'N/A'}</div></div>
+                <div class="info-item"><span class="info-label">Operating Temperature:</span><div class="info-value">${formData.operatingTemperature || 'N/A'}</div></div>
             </div>
         </div>
 

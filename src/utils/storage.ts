@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // @ts-ignore
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -39,17 +40,14 @@ export const Storage = {
             console.warn(`Storage: Request to read ${key} from FS failed`, e);
         }
 
-        // 3. Fallback: Check SecureStore (migration path for existing data)
-        // This ensures we don't lose data that was previously stored in SecureStore
+        // 3. Fallback: Check AsyncStorage first (safer for large data) then SecureStore
         try {
+            const asyncValue = await AsyncStorage.getItem(key);
+            if (asyncValue) return asyncValue;
+            
             const secureValue = await SecureStore.getItemAsync(key);
-            if (secureValue) {
-                // Optional: We could migrate it now, but lazy migration on next save is safer
-                return secureValue;
-            }
-        } catch (e) {
-            // Ignore SecureStore errors (e.g. value too large during read? unlikely but possible)
-        }
+            if (secureValue) return secureValue;
+        } catch (e) {}
 
         return null;
     },
@@ -70,15 +68,15 @@ export const Storage = {
         try {
             const fileUri = getFileUri(key);
             if (!fileUri) {
-                // Fallback to SecureStore if FS is not available
-                await SecureStore.setItemAsync(key, value);
+                // Fallback to AsyncStorage if FS is not available
+                await AsyncStorage.setItem(key, value);
                 return;
             }
             await FileSystem.writeAsStringAsync(fileUri, value);
         } catch (e) {
             console.error(`Storage: Failed to write ${key} to FS`, e);
-            // Fallback
-            await SecureStore.setItemAsync(key, value).catch(() => { });
+            // Fallback to AsyncStorage (handles > 2KB reliably)
+            await AsyncStorage.setItem(key, value).catch(() => { });
         }
     },
 
@@ -89,7 +87,7 @@ export const Storage = {
         }
 
         if (SECURE_KEYS.includes(key)) {
-            await SecureStore.deleteItemAsync(key);
+            await SecureStore.deleteItemAsync(key).catch(() => { });
             return;
         }
 
@@ -99,12 +97,10 @@ export const Storage = {
             if (fileUri) {
                 await FileSystem.deleteAsync(fileUri, { idempotent: true });
             }
-        } catch (e) {
-            // Check SecureStore fallback
-            await SecureStore.deleteItemAsync(key).catch(() => { });
-        }
+        } catch (e) { }
 
-        // Also cleanup SecureStore in case it was there
+        // Cleanup both AsyncStorage and SecureStore
+        await AsyncStorage.removeItem(key).catch(() => { });
         await SecureStore.deleteItemAsync(key).catch(() => { });
     },
 };
