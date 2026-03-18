@@ -240,6 +240,8 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
     </div>
 
     <div class="bottom-section">
+        <!-- Bank Details Section Removed as per request -->
+        <!-- 
         <div class="bank-details">
             <strong style="font-size: 14px; text-decoration: underline;">Bank Details:</strong><br>
             Bank: <strong>RBL Bank</strong><br>
@@ -247,6 +249,7 @@ export const generateQuotationHTML = (formData: any, logoUri: string, signStampU
             IFSC Code: <strong>RATN0000070</strong><br>
             Branch: <strong>MUMBAI - FORT</strong>
         </div>
+        -->
         <div class="signatory-box">
             <div style="font-size: 12px;">For AOP ELECTRIFICIENT PRIVATE LIMITED</div>
             <img class="sign-img" src="${signStampUri}" />

@@ -87,7 +87,7 @@ export default function CreateQuotationScreen() {
       ...prev,
       itemName: machine.name,
       itemDescription: machine.description,
-      rate: machine.rate,
+      rate: machine.rate !== '0' ? machine.rate : '0',
     }));
     setShowMachineModal(false);
   };
