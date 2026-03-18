@@ -321,5 +321,136 @@ export const ComplaintService = {
         const complaints = await ComplaintService.getComplaints();
         const updated = complaints.map(c => c.complaintId === complaintId ? { ...c, ...updates } : c);
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    },
+
+    // ============================================
+    // PAGINATION METHODS - NEW
+    // ============================================
+    
+    getComplaintsPaginated: async (
+        limit: number = 50,
+        page: number = 1,
+        branchId?: string
+    ): Promise<{ data: Complaint[]; total: number; hasMore: boolean }> => {
+        if (!isSupabaseConfigured()) {
+            return { data: [], total: 0, hasMore: false };
+        }
+
+        try {
+            const offset = (page - 1) * limit;
+            
+            let query = supabase
+                .from('complaints')
+                .select('*', { count: 'exact' });
+
+            if (branchId) {
+                query = query.eq('branch_id', branchId);
+            }
+
+            const { data, count, error } = await query
+                .order('date_of_complaint', { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) throw error;
+
+            const total = count || 0;
+            const hasMore = offset + limit < total;
+
+            const mappedData: Complaint[] = (data || []).map(row => ({
+                id: row.id,
+                complaintId: row.complaint_id,
+                invoiceNo: row.invoice_no,
+                customerName: row.customer_name,
+                customerPhone: row.customer_phone,
+                customerEmail: row.customer_email,
+                category: row.category,
+                description: row.description,
+                dateOfComplaint: row.date_of_complaint,
+                assignedDepartment: row.assigned_department,
+                assignedOfficer: row.assigned_officer,
+                actionTaken: row.action_taken,
+                resolutionDate: row.resolution_date,
+                status: row.status,
+                clientConfirmation: row.client_confirmation,
+                clientFeedback: row.client_feedback,
+                resolvedByName: row.resolved_by_name,
+                resolvedByDesignation: row.resolved_by_designation,
+                imageUrls: row.image_urls || [],
+                warrantyCardAttached: row.warranty_card_attached,
+                branchId: row.branch_id,
+                city: row.city,
+                createdAt: row.created_at
+            }));
+
+            return {
+                data: mappedData,
+                total,
+                hasMore
+            };
+        } catch (error) {
+            console.error('Error fetching paginated complaints:', error);
+            throw error;
+        }
+    },
+
+    getComplaintsByStatusPaginated: async (
+        status: string,
+        limit: number = 50,
+        page: number = 1
+    ): Promise<{ data: Complaint[]; total: number; hasMore: boolean }> => {
+        if (!isSupabaseConfigured()) {
+            return { data: [], total: 0, hasMore: false };
+        }
+
+        try {
+            const offset = (page - 1) * limit;
+            
+            const { data, count, error } = await supabase
+                .from('complaints')
+                .select('*', { count: 'exact' })
+                .eq('status', status)
+                .order('date_of_complaint', { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) throw error;
+
+            const total = count || 0;
+            const hasMore = offset + limit < total;
+
+            const mappedData: Complaint[] = (data || []).map(row => ({
+                id: row.id,
+                complaintId: row.complaint_id,
+                invoiceNo: row.invoice_no,
+                customerName: row.customer_name,
+                customerPhone: row.customer_phone,
+                customerEmail: row.customer_email,
+                category: row.category,
+                description: row.description,
+                dateOfComplaint: row.date_of_complaint,
+                assignedDepartment: row.assigned_department,
+                assignedOfficer: row.assigned_officer,
+                actionTaken: row.action_taken,
+                resolutionDate: row.resolution_date,
+                status: row.status,
+                clientConfirmation: row.client_confirmation,
+                clientFeedback: row.client_feedback,
+                resolvedByName: row.resolved_by_name,
+                resolvedByDesignation: row.resolved_by_designation,
+                imageUrls: row.image_urls || [],
+                warrantyCardAttached: row.warranty_card_attached,
+                branchId: row.branch_id,
+                city: row.city,
+                createdAt: row.created_at
+            }));
+
+            return {
+                data: mappedData,
+                total,
+                hasMore
+            };
+        } catch (error) {
+            console.error('Error fetching paginated complaints by status:', error);
+            throw error;
+        }
     }
 };
