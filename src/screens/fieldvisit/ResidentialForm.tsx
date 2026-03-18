@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import GlassPanel from '../../components/GlassPanel';
 
@@ -7,27 +7,49 @@ interface ResidentialFormProps {
     formData: any;
     updateField: (field: string, value: any) => void;
     toggleArrayField: (field: string, value: string) => void;
+    showAlert: (title: string, message: string) => void;
 }
 
-export function ResidentialForm({ formData, updateField, toggleArrayField }: ResidentialFormProps) {
+// Checkbox component moved outside for performance
+const Checkbox = React.memo(({ label, checked, onPress }: { label: string; checked: boolean; onPress: () => void }) => (
+    <Pressable style={styles.checkboxRow} onPress={onPress}>
+        <View style={[styles.checkbox, checked && styles.checkboxActive]}>
+            {checked && <MaterialCommunityIcons name="check" size={14} color="white" />}
+        </View>
+        <Text style={styles.checkboxLabel}>{label}</Text>
+    </Pressable>
+));
 
-    const Checkbox = ({ label, checked, onPress }: { label: string; checked: boolean; onPress: () => void }) => (
-        <Pressable style={styles.checkboxRow} onPress={onPress}>
-            <View style={[styles.checkbox, checked && styles.checkboxActive]}>
-                {checked && <MaterialCommunityIcons name="check" size={14} color="white" />}
-            </View>
-            <Text style={styles.checkboxLabel}>{label}</Text>
-        </Pressable>
-    );
+// Radio button component moved outside for performance
+const RadioButton = React.memo(({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
+    <Pressable style={styles.radioRow} onPress={onPress}>
+        <View style={[styles.radio, selected && styles.radioActive]}>
+            {selected && <View style={styles.radioDot} />}
+        </View>
+        <Text style={styles.radioLabel}>{label}</Text>
+    </Pressable>
+));
 
-    const RadioButton = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
-        <Pressable style={styles.radioRow} onPress={onPress}>
-            <View style={[styles.radio, selected && styles.radioActive]}>
-                {selected && <View style={styles.radioDot} />}
-            </View>
-            <Text style={styles.radioLabel}>{label}</Text>
-        </Pressable>
-    );
+export function ResidentialForm({ formData, updateField, toggleArrayField, showAlert }: ResidentialFormProps) {
+
+    const handleWaterSourcePress = () => {
+        Alert.alert(
+            "Select Water Source",
+            "Choose the primary water source:",
+            [
+                { text: "Borewell", onPress: () => updateField('waterSource', ['Borewell']) },
+                { text: "Municipal", onPress: () => updateField('waterSource', ['Municipal']) },
+                { text: "Tank", onPress: () => updateField('waterSource', ['Tank']) },
+                {
+                    text: "Other", onPress: () => {
+                        updateField('waterSource', ['Other']);
+                    }
+                },
+                { text: "Cancel", style: "cancel" }
+            ]
+        );
+    };
+
 
     return (
         <View style={styles.container}>
@@ -81,6 +103,17 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                 </View>
 
                 <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Company / Building Name</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Enter company or building name"
+                        placeholderTextColor="#9CA3AF"
+                        value={formData.companyBuildingName}
+                        onChangeText={(v) => updateField('companyBuildingName', v)}
+                    />
+                </View>
+
+                <View style={styles.inputContainer}>
                     <Text style={styles.label}>Address</Text>
                     <TextInput
                         style={styles.input}
@@ -105,13 +138,21 @@ export function ResidentialForm({ formData, updateField, toggleArrayField }: Res
                     </View>
                     <View style={[styles.inputContainer, { flex: 1 }]}>
                         <Text style={styles.label}>Water Source</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Select source"
-                            placeholderTextColor="#9CA3AF"
-                            value={formData.waterSource.join(', ')}
-                            onFocus={() => { }} // Could add a picker here
-                        />
+                        <Pressable onPress={handleWaterSourcePress} style={styles.pickerTrigger}>
+                            <Text style={[styles.input, !formData.waterSource.length && { color: '#9CA3AF' }]}>
+                                {formData.waterSource.length > 0 ? formData.waterSource.join(', ') : 'Select source'}
+                            </Text>
+                            <MaterialCommunityIcons name="chevron-down" size={16} color="#6B7280" />
+                        </Pressable>
+                        {formData.waterSource.includes('Other') && (
+                            <TextInput
+                                style={[styles.input, { marginTop: 8 }]}
+                                placeholder="Specify other source"
+                                placeholderTextColor="#9CA3AF"
+                                value={formData.waterSourceOther}
+                                onChangeText={(v) => updateField('waterSourceOther', v)}
+                            />
+                        )}
                     </View>
                 </View>
 
@@ -357,5 +398,10 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#4B5563',
     },
-
+    pickerTrigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+    },
 });

@@ -25,14 +25,36 @@ import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_s
 
 const TOTAL_STEPS = 3;
 
+// Checkbox component moved outside for performance
+const Checkbox = React.memo(({ label, checked, onPress }: { label: string; checked: boolean; onPress: () => void }) => (
+    <Pressable style={styles.checkboxRow} onPress={onPress}>
+        <View style={[styles.checkbox, checked && styles.checkboxActive]}>
+            {checked && <MaterialCommunityIcons name="check" size={14} color="white" />}
+        </View>
+        <Text style={styles.checkboxLabel}>{label}</Text>
+    </Pressable>
+));
+
+// Radio button component moved outside for performance
+const RadioButton = React.memo(({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
+    <Pressable style={styles.radioRow} onPress={onPress}>
+        <View style={[styles.radio, selected && styles.radioActive]}>
+            {selected && <View style={styles.radioDot} />}
+        </View>
+        <Text style={styles.radioLabel}>{label}</Text>
+    </Pressable>
+));
+
 export default function FieldVisitForm() {
     const navigation = useNavigation<any>();
     const { user } = useAuth();
+    const scrollRef = React.useRef<ScrollView>(null);
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isOnline, setIsOnline] = useState(true);
     const [uploadStatus, setUploadStatus] = useState('');
+
 
     // Check network status on mount
     useEffect(() => {
@@ -63,11 +85,13 @@ export default function FieldVisitForm() {
     }, []);
 
     const [formData, setFormData] = useState({
-        // SECTION 1: Basic Site & Client Information
-        dateOfVisit: new Date().toISOString().split('T')[0],
-        branchName: user?.branchId || '',
-        salesEngineerName: user?.name || '',
+        // General Info
+        propertyType: '', // Residential, Commercial, Industrial, Agriculture
+        dateOfVisit: new Date().toLocaleDateString('en-GB'),
+        branchName: '',
+        salesEngineerName: '',
         clientCompanyName: '',
+        companyBuildingName: '',
         siteAddress: '',
         industryType: '',
         contactPersonName: '',
@@ -79,39 +103,39 @@ export default function FieldVisitForm() {
         waterSource: [] as string[], // Borewell, Municipal, Tank, Other
         waterSourceOther: '',
         dailyWaterConsumption: '',
-        purposeOfWaterUsage: [] as string[], // Process, Cooling, Boiler, Domestic, Other
+        purposeOfWaterUsage: [] as string[], // Drinking, Industrial, Agriculture, Other
         purposeOther: '',
         waterHardnessPPM: '',
-        scalingIssueObserved: '', // Yes/No
+        scalingIssueObserved: '', // Yes, No
         scalingDescription: '',
 
-        // SECTION 3: Existing System & Problem Identification
-        existingWaterTreatment: '', // Yes/No
+        // SECTION 3: Existing Water Treatment System Details
+        existingWaterTreatment: '', // Yes, No
         existingSystemDetails: '',
-        problemsFaced: [] as string[], // Scaling, High Maintenance Cost, Frequent Breakdown, Chemical Usage, Other
+        problemsFaced: [] as string[], // Scaling, Corrosion, Bio-fouling, Other
         problemsOther: '',
         maintenanceFrequency: '',
         customerExpectations: '',
 
         // SECTION 4: Area of Application
-        applicationArea: [] as string[], // Boiler, Cooling Tower, Heat Exchanger, Pipeline, Process Line, Other
+        applicationArea: [] as string[], // Main Intake, Cooling Tower, Boiler, Heat Exchanger, Other
         applicationOther: '',
         pipeLineSize: '',
         operatingPressure: '',
         operatingTemperature: '',
 
-        // SECTION 5: Technical & Commercial Observations
-        ekotexInstallationFeasible: '', // Yes/No
+        // SECTION 5: Technical Observations
+        ekotexInstallationFeasible: '', // Yes, No, To be decided
         recommendedEkotexModel: '',
         quantityRequired: '',
         siteConstraints: '',
         accessoriesRequired: '',
 
         // SECTION 6: Commercial Discussion Summary
-        customerInterestLevel: '', // High/Medium/Low
-        budgetDiscussed: '', // Yes/No
+        customerInterestLevel: '', // Hot, Warm, Cold
+        budgetDiscussed: '',
         expectedDecisionTimeline: '',
-        decisionMakerIdentified: '', // Yes/No
+        decisionMakerIdentified: '',
 
         // SECTION 7: Competitor & Market Information
         existingCompetitorSolution: '',
@@ -125,19 +149,18 @@ export default function FieldVisitForm() {
         drawingsCollected: false,
 
         // SECTION 9: Follow-up & Action Plan
-        nextActionRequired: [] as string[], // Quotation, Demo, Technical Discussion, Follow-up Meeting, Other
+        nextActionRequired: [] as string[],
         nextActionOther: '',
         responsiblePerson: '',
         expectedFollowUpDate: '',
 
-        // SECTION 10: Executive Remarks
+        // Executive Remarks
         salesEngineerRemarks: '',
-        overallSiteAssessment: '', // Excellent/Good/Average/Not Suitable
+        overallSiteAssessment: '',
         conversionProbability: '',
         visitedBySignature: '',
 
-        // Property Type Selection
-        propertyType: '', // Residential, Commercial, Industrial, Agriculture
+        // Residential Specific
         tankCapacity: '',
         waterTDS: '',
         waterQualityIssues: [] as string[],
@@ -181,15 +204,16 @@ export default function FieldVisitForm() {
             formData.clientCompanyName.trim() !== '' &&
             formData.siteAddress.trim() !== '' &&
             formData.contactPersonName.trim() !== '' &&
-            phoneRegex.test(formData.mobileNumber.trim())
+            phoneRegex.test(formData.mobileNumber.trim()) &&
+            formData.waterSource.length > 0 &&
+            formData.purposeOfWaterUsage.length > 0
         );
     };
 
     const isStep2Valid = () => {
-        return (
-            formData.waterSource.length > 0 &&
-            formData.purposeOfWaterUsage.length > 0
-        );
+        // Step 2 contains Sections 3, 4, 5. 
+        // We can add validation for those if needed, but for now we'll allow it.
+        return true;
     };
 
     const isStep3Valid = () => {
@@ -390,25 +414,6 @@ export default function FieldVisitForm() {
         }
     };
 
-    // Checkbox component
-    const Checkbox = ({ label, checked, onPress }: { label: string; checked: boolean; onPress: () => void }) => (
-        <Pressable style={styles.checkboxRow} onPress={onPress}>
-            <View style={[styles.checkbox, checked && styles.checkboxActive]}>
-                {checked && <MaterialCommunityIcons name="check" size={14} color="white" />}
-            </View>
-            <Text style={styles.checkboxLabel}>{label}</Text>
-        </Pressable>
-    );
-
-    // Radio button component
-    const RadioButton = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
-        <Pressable style={styles.radioRow} onPress={onPress}>
-            <View style={[styles.radio, selected && styles.radioActive]}>
-                {selected && <View style={styles.radioDot} />}
-            </View>
-            <Text style={styles.radioLabel}>{label}</Text>
-        </Pressable>
-    );
 
     // Progress Bar
     const ProgressBar = () => (
@@ -524,6 +529,17 @@ export default function FieldVisitForm() {
                             placeholderTextColor="#9CA3AF"
                             value={formData.clientCompanyName}
                             onChangeText={(v) => updateField('clientCompanyName', v)}
+                        />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Building / Project Name</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter building or project name"
+                            placeholderTextColor="#9CA3AF"
+                            value={formData.companyBuildingName}
+                            onChangeText={(v) => updateField('companyBuildingName', v)}
                         />
                     </View>
 
@@ -1259,6 +1275,7 @@ export default function FieldVisitForm() {
                 )}
 
                 <ScrollView
+                    ref={scrollRef}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
@@ -1269,6 +1286,7 @@ export default function FieldVisitForm() {
                             formData={formData}
                             updateField={updateField}
                             toggleArrayField={toggleArrayField}
+                            showAlert={showAlert}
                         />
                     ) : (
                         <>
