@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, StatusBar, Modal, TextInput, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, Platform, ActivityIndicator, Image, Modal, TextInput, RefreshControl, Alert, StatusBar, AppState } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { THEME } from '../../constants/theme';
 import { SalesService, Sale } from '../../services/SalesService';
@@ -14,69 +14,48 @@ import { LineChart } from 'react-native-chart-kit';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
 import DetailedAnalyticsContent from '../../components/DetailedAnalyticsContent';
-const FileSystem = require('expo-file-system/legacy');
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
-import { Alert } from 'react-native';
 import { ComplaintService, Complaint } from '../../services/ComplaintService';
 import { QuotationService, Quotation } from '../../services/QuotationService';
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
 import { generateQuotationHTML } from '../../utils/QuotationTemplate';
-import { Asset } from 'expo-asset';
 import { supabase } from '../../config/supabase';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
 import { getAssetBase64 } from '../../utils/AssetUtils';
+import * as FileSystem from 'expo-file-system';
+
+// Import Dashboard Components
+import { DashboardTab } from '../../components/dashboard/DashboardTab';
+import { ComplaintsTab } from '../../components/dashboard/ComplaintsTab';
+import { VisitsTab } from '../../components/dashboard/VisitsTab';
+import { QuotationsTab } from '../../components/dashboard/QuotationsTab';
+import { StockTab } from '../../components/dashboard/StockTab';
+import { PhotosTab } from '../../components/dashboard/PhotosTab';
+import { UsersTab } from '../../components/dashboard/UsersTab';
+
+// Import Constants and Helpers
+import {
+    getRegionColor,
+    calculateDaysRemaining,
+    calculateDaysPassed,
+    PRODUCT_MODELS
+} from '../../constants/dashboard';
+
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
-// import { SoundManager } from '../../utils/SoundManager';
 
 const screenWidth = Dimensions.get('window').width;
 
-// Region colors for visual distinction (updated for mint theme)
-const REGION_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
-    'Mumbai': { bg: '#D1FAE5', text: '#059669', icon: 'city' },
-    'Delhi': { bg: '#FEF3C7', text: '#D97706', icon: 'city-variant' },
-    'Bangalore': { bg: '#E0E7FF', text: '#4F46E5', icon: 'office-building' },
-    'Chennai': { bg: '#DBEAFE', text: '#2563EB', icon: 'home-city' },
-    'Kolkata': { bg: '#FCE7F3', text: '#DB2777', icon: 'city-variant-outline' },
-    'Hyderabad': { bg: '#FFEDD5', text: '#EA580C', icon: 'domain' },
-    'Pune': { bg: '#F3E8FF', text: '#9333EA', icon: 'town-hall' },
-    'default': { bg: '#F3F4F6', text: '#6B7280', icon: 'map-marker' },
-};
-
-const getRegionColor = (city: string) => REGION_COLORS[city] || REGION_COLORS['default'];
-
-const PRODUCT_MODELS = [
-    'EKO-GREEN G3',
-    'EKO-GREEN G5',
-    'EKO-GREEN G6',
-    'EKO-GREEN G33',
-    'EKO-GREEN G130',
-    'EKO-GREEN G230',
-    'EKO-GREEN G330',
-    'EKO-GREEN G530',
-    'EKO-GREEN G600',
-];
-
-const calculateDaysRemaining = (saleDate: string) => {
-    const start = new Date(saleDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    start.setHours(0, 0, 0, 0);
-
-    const diffTime = today.getTime() - start.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    const remaining = 45 - diffDays;
-
-    return {
-        days: remaining,
-        isExpired: remaining <= 0,
-        label: remaining <= 0 ? (remaining === 0 ? 'Today' : `Expired ${Math.abs(remaining)} days ago`) : `${remaining} Days Left`,
-        color: remaining > 15 ? THEME.colors.success : (remaining > 0 ? THEME.colors.warning : THEME.colors.error)
-    };
+const normalizeRegion = (name: string) => {
+    if (!name) return '';
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    // Title Case normalization
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 };
 
 export default function MainBranchDashboard() {
@@ -99,7 +78,7 @@ export default function MainBranchDashboard() {
     const [stockLoading, setStockLoading] = useState(false);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
-    // Photos selection state (lifted for floating toolbar)
+    // Photos selection state
     const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isDownloadingPhotos, setIsDownloadingPhotos] = useState(false);
@@ -108,6 +87,7 @@ export default function MainBranchDashboard() {
     const [editingUser, setEditingUser] = useState<any | null>(null);
     const [isUpdatingUser, setIsUpdatingUser] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [dataVersion, setDataVersion] = useState(0);
 
     const fetchData = useCallback(async (isInitial: boolean = true) => {
         if (isInitial) setLoading(true);
@@ -119,38 +99,44 @@ export default function MainBranchDashboard() {
             let complaintsData: Complaint[] = [];
             let quotationsData: Quotation[] = [];
 
-            // If Super Admin or Admin, get everything. Otherwise filter by branch/region.
-            if (user?.role === 'Super Admin' || user?.role === 'Admin') {
-                const [s, v, st, c, q] = await Promise.all([
-                    SalesService.getAllSales(),
-                    FieldVisitService.getFieldVisits(),
-                    StockService.getAllStock(),
-                    ComplaintService.getComplaints(),
-                    QuotationService.getAllQuotations()
-                ]);
-                salesData = s;
-                visitsData = v;
-                stockData = st;
-                complaintsData = c;
-                quotationsData = q;
-            } else {
-                // User restricted to their branch or region
-                const userBranch = user?.branchId;
-                const userRegion = user?.region;
+            // OPTIMIZED: Fetch only first page (50 items) initially with pagination
+            const userBranch = user?.branchId;
+            const userRegion = user?.region;
 
-                const [s, v, st, c, q] = await Promise.all([
-                    userBranch ? SalesService.getSalesByBranch(userBranch) : SalesService.getAllSales(),
-                    userBranch ? FieldVisitService.getFieldVisitsByBranch(userBranch) : FieldVisitService.getFieldVisits(),
-                    userRegion ? StockService.getStockByRegion(userRegion) : StockService.getAllStock(),
-                    userBranch ? ComplaintService.getComplaints(userBranch) : ComplaintService.getComplaints(),
-                    userBranch ? QuotationService.getQuotationsByBranch(userBranch) : QuotationService.getAllQuotations()
-                ]);
-                salesData = s;
-                visitsData = v;
-                stockData = st;
-                complaintsData = c;
-                quotationsData = q;
-            }
+            // Prepare the correct fetch promises
+            const salesFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userBranch)
+                ? SalesService.getSalesPaginated(50, 1)
+                : SalesService.getSalesByBranchPaginated(userBranch, 50, 1);
+
+            const visitsFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userBranch)
+                ? FieldVisitService.getFieldVisitsPaginated(50, 1)
+                : FieldVisitService.getFieldVisitsByBranchPaginated(userBranch, 50, 1);
+
+            const complaintsFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userBranch)
+                ? ComplaintService.getComplaintsPaginated(50, 1)
+                : ComplaintService.getComplaintsPaginated(50, 1, userBranch);
+
+            const stockFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userRegion)
+                ? StockService.getAllStock()
+                : StockService.getStockByRegion(userRegion);
+
+            const quotationsFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userBranch)
+                ? QuotationService.getQuotationsPaginated(50, 1)
+                : QuotationService.getQuotationsByBranchPaginated(userBranch, 50, 1);
+
+            const [sResult, vResult, cResult, stResult, qResult] = await Promise.all([
+                salesFetch,
+                visitsFetch,
+                complaintsFetch,
+                stockFetch,
+                quotationsFetch
+            ]) as any;
+
+            salesData = sResult?.data || [];
+            visitsData = vResult?.data || [];
+            complaintsData = cResult?.data || [];
+            stockData = Array.isArray(stResult) ? stResult : (stResult?.data || []);
+            quotationsData = qResult?.data || [];
 
             setAllSales(salesData);
             setAllVisits(visitsData);
@@ -158,72 +144,139 @@ export default function MainBranchDashboard() {
             setAllComplaints(complaintsData || []);
             setAllQuotations(quotationsData || []);
 
-            // 3. Fetch all users for management
+            // Fetch all users for management
             const { data: userData } = await supabase.from('users').select('*');
 
-            // 3. Build the list of Branches to show on dashboard cards
-            // Use branchId instead of name/city for unique identification
+            // Build the list of Branches to show on dashboard cards
             const BLACKLIST = ['main', 'sub1', 'Xrxr', 'Dvd', 'Ss', 'd', '400604', 'test', 'garbage'];
 
             const userBranches = (userData || [])
                 .filter((u: any) => u.branch_id && u.branch_id.trim() !== '')
-                .map((u: any) => u.branch_id as string);
+                .map((u: any) => normalizeRegion(u.branch_id));
 
             const saleBranches = salesData
-                .map(s => s.branchId)
-                .filter((b): b is string => !!b && b.trim() !== '');
+                .map(s => normalizeRegion(s.branchId))
+                .filter(b => b !== '');
 
             const visitBranches = visitsData
-                .map((v: any) => v.branchId)
-                .filter((b: any): b is string => !!b && typeof b === 'string' && b.trim() !== '');
+                .map((v: any) => normalizeRegion(v.branchId))
+                .filter(b => b !== '');
 
             const complaintBranches = (complaintsData || [])
-                .map((c: any) => (c as any).branchId)
-                .filter((b: any): b is string => !!b && typeof b === 'string' && b.trim() !== '');
+                .map((c: any) => normalizeRegion((c as any).branchId))
+                .filter(b => b !== '');
+
+            const stockBranches = stockData
+                .map(s => normalizeRegion(s.region))
+                .filter(b => b !== '');
+
+            const quotationBranches = (quotationsData || [])
+                .map((q: any) => normalizeRegion(q.branchId || q.region))
+                .filter(b => b !== '');
+
+            const BLACKLIST_NORMALIZED = BLACKLIST.map(b => normalizeRegion(b));
 
             // All unique branch IDs merged, excluding the ones marked as fake
             const allBranches = Array.from(
-                new Set([...userBranches, ...saleBranches, ...visitBranches, ...complaintBranches])
-            ).filter(r => !BLACKLIST.includes(r));
+                new Set([
+                    ...userBranches, 
+                    ...saleBranches, 
+                    ...visitBranches, 
+                    ...complaintBranches, 
+                    ...stockBranches,
+                    ...quotationBranches
+                ])
+            ).filter(r => !BLACKLIST_NORMALIZED.includes(r)).sort();
 
             setOfficialRegions(allBranches);
             setAllUsers(userData || []);
 
-            // Set initial display sales
+            // Set initial display sales (first 5 for dashboard preview)
             setSales(salesData);
             setFieldVisits(visitsData.slice(0, 5));
-
+            setDataVersion(prev => prev + 1);
         } catch (error: any) {
             console.error('FetchData Error:', error);
             Alert.alert("Failed to Update", `Failed to fetch data: ${error.message || 'Unknown error'}` + "\nPlease try again.");
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     }, [user?.role, user?.branchId, user?.region]);
 
-    const onRefresh = useCallback(async () => {
-        setRefreshing(true);
-        await fetchData(false);
-        setRefreshing(false);
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [fetchData])
+    );
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            if (nextState === 'active') {
+                fetchData(false);
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
     }, [fetchData]);
 
-    useFocusEffect(useCallback(() => {
-        fetchData(true);
-    }, [fetchData]));
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchData(false);
+    }, [fetchData]);
+
+    const handleUpdateUser = async (email: string, updates: any) => {
+        setIsUpdatingUser(true);
+        try {
+            await AuthService.adminUpdateProfile(email, {
+                name: updates.name,
+                role: updates.role,
+                branchId: updates.branch_id,
+                region: updates.region
+            });
+            await fetchData(false);
+            setEditingUser(null);
+            Alert.alert('Success', 'User updated successfully');
+        } catch (err: any) {
+            Alert.alert("Failed to Update", `Failed to update user: ${err.message || 'Unknown error'}` + "\nPlease try again.");
+        } finally {
+            setIsUpdatingUser(false);
+        }
+    };
 
     const handleViewMoreToggle = () => {
         setShowAllSales(!showAllSales);
     };
 
-    // Filter by time
-    // Filter sales — only show data from official regions (users with assigned regions).
-    // This prevents test/garbage data from polluting the dashboard.
+    const handleDeleteUser = (email: string) => {
+        Alert.alert(
+            'Delete User',
+            `Are you sure you want to delete ${email}? This user will lose all database access.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await AuthService.deleteUser(email);
+                            fetchData(false);
+                            Alert.alert('Success', 'User deleted successfully');
+                        } catch (err: any) {
+                            Alert.alert("Failed to Update", `Failed to delete user: ${err.message || 'Unknown error'}` + "\nPlease try again.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const filteredSales = useMemo(() => {
         const now = new Date();
         return allSales.filter(s => {
-            // Skip if branch is not in the official list
-            if (officialRegions.length > 0 && !officialRegions.includes(s.branchId)) return false;
-
+            if (officialRegions.length > 0 && !officialRegions.includes(normalizeRegion(s.branchId))) return false;
             if (filter === 'All') return true;
             const date = new Date(s.saleDate);
             if (filter === 'Today') return date.toDateString() === now.toDateString();
@@ -236,9 +289,7 @@ export default function MainBranchDashboard() {
     const filteredVisits = useMemo(() => {
         const now = new Date();
         return allVisits.filter(v => {
-            // Skip visits from non-official branches
-            if (officialRegions.length > 0 && !officialRegions.includes((v as any).branchId)) return false;
-
+            if (officialRegions.length > 0 && !officialRegions.includes(normalizeRegion((v as any).branchId))) return false;
             const visitDate = new Date(v.visitDate);
             if (filter === 'All') return true;
             if (filter === 'Today') return visitDate.toDateString() === now.toDateString();
@@ -252,7 +303,7 @@ export default function MainBranchDashboard() {
     const displaySales = useMemo(() => {
         let list = filteredSales;
         if (selectedRegion) {
-            list = list.filter(s => s.branchId === selectedRegion);
+            list = list.filter(s => normalizeRegion(s.branchId) === selectedRegion);
         }
 
         return [...list].sort((a, b) => {
@@ -266,7 +317,7 @@ export default function MainBranchDashboard() {
     const displayVisits = useMemo(() => {
         let list = filteredVisits;
         if (selectedRegion) {
-            list = list.filter(v => (v as any).branchId === selectedRegion);
+            list = list.filter(v => normalizeRegion((v as any).branchId) === selectedRegion);
         }
 
         return [...list].sort((a, b) => {
@@ -345,7 +396,7 @@ export default function MainBranchDashboard() {
         });
 
         filteredSales.forEach(item => {
-            const region = item.branchId;
+            const region = normalizeRegion(item.branchId);
             if (!region || !grouped[region]) return; // Only count official regions
             grouped[region].total++;
             if (item.status === 'approved') grouped[region].approved++;
@@ -362,7 +413,7 @@ export default function MainBranchDashboard() {
         });
 
         filteredVisits.forEach(item => {
-            const region = (item as any).branchId;
+            const region = normalizeRegion((item as any).branchId);
             if (!region || !grouped[region]) return; // Only count official regions
             grouped[region].total++;
             if (item.status === 'completed') grouped[region].completed++;
@@ -374,7 +425,7 @@ export default function MainBranchDashboard() {
         const now = new Date();
         return allComplaints.filter(c => {
             // Skip complaints from non-official branches
-            if (officialRegions.length > 0 && !officialRegions.includes((c as any).branchId)) return false;
+            if (officialRegions.length > 0 && !officialRegions.includes(normalizeRegion((c as any).branchId))) return false;
 
             if (filter === 'All') return true;
             const date = new Date(c.dateOfComplaint);
@@ -393,7 +444,7 @@ export default function MainBranchDashboard() {
         });
 
         filteredComplaints.forEach(item => {
-            const region = (item as any).branchId;
+            const region = normalizeRegion((item as any).branchId);
             if (!region || !grouped[region]) return; // Only count official regions
             grouped[region].total++;
             if (item.status === 'Resolved' || item.status === 'Closed') {
@@ -408,7 +459,7 @@ export default function MainBranchDashboard() {
     const displayComplaints = useMemo(() => {
         let list = filteredComplaints;
         if (selectedRegion) {
-            list = list.filter(c => (c as any).branchId === selectedRegion);
+            list = list.filter(c => normalizeRegion((c as any).branchId) === selectedRegion);
         }
 
         return [...list].sort((a, b) => {
@@ -422,7 +473,7 @@ export default function MainBranchDashboard() {
         const now = new Date();
         return allQuotations.filter(q => {
             // Only show quotations from official branches
-            if (officialRegions.length > 0 && !officialRegions.includes((q as any).branchId)) return false;
+            if (officialRegions.length > 0 && !officialRegions.includes(normalizeRegion((q as any).branchId || q.region))) return false;
 
             if (filter === 'All') return true;
             const qDate = q.createdAt || q.quotationDate;
@@ -444,7 +495,7 @@ export default function MainBranchDashboard() {
         });
 
         filteredQuotations.forEach(item => {
-            const region = (item as any).branchId || 'Other';
+            const region = normalizeRegion((item as any).branchId || item.region) || 'Other';
             if (!grouped[region]) {
                 grouped[region] = { region, total: 0 };
             }
@@ -458,7 +509,7 @@ export default function MainBranchDashboard() {
     const displayQuotations = useMemo(() => {
         let list = filteredQuotations;
         if (selectedRegion) {
-            list = list.filter(q => (q as any).branchId === selectedRegion);
+            list = list.filter(q => normalizeRegion((q as any).branchId || q.region) === selectedRegion);
         }
 
         return [...list].sort((a, b) => {
@@ -565,7 +616,7 @@ export default function MainBranchDashboard() {
         try {
             for (const url of selectedPhotos) {
                 const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
-                const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+                const fileUri = `${(FileSystem as any).cacheDirectory}${filename}`;
                 const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
 
                 if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
@@ -1374,9 +1425,11 @@ export default function MainBranchDashboard() {
 }
 
 const StockManagementContent = ({ allStock, onUpdate, scrollViewRef, officialRegions }: { allStock: Stock[], onUpdate: () => void, scrollViewRef: React.RefObject<ScrollView | null>, officialRegions: string[] }) => {
-    // Determine the regions to show (fallback to a default list if empty)
-    const regionsList = officialRegions.length > 0 ? officialRegions : ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 'Pune'];
+    const regionsList = ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Hyderabad', 'Pune'];
     const [selectedRegion, setSelectedRegion] = useState(regionsList[0]);
+
+
+
     const [modelName, setModelName] = useState('');
     const [quantity, setQuantity] = useState('');
     const [updating, setUpdating] = useState(false);
@@ -1403,7 +1456,7 @@ const StockManagementContent = ({ allStock, onUpdate, scrollViewRef, officialReg
         }
     };
 
-    const regionalStock = allStock.filter(s => s.region === selectedRegion);
+    const regionalStock = allStock.filter(s => normalizeRegion(s.region) === selectedRegion);
 
     return (
         <View style={{ paddingBottom: 20 }}>
@@ -1725,7 +1778,7 @@ const PhotosGalleryContent = ({
         setIsDownloading(true);
         try {
             const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
-            const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+            const fileUri = `${(FileSystem as any).cacheDirectory}${filename}`;
             const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
 
             if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
@@ -1910,15 +1963,15 @@ const SortControls = ({ sortOrder, setSortOrder }: { sortOrder: 'newest' | 'olde
     );
 };
 
-const UserTabContent = ({ 
-    allUsers, 
-    currentUser, 
-    onDelete, 
+const UserTabContent = ({
+    allUsers,
+    currentUser,
+    onDelete,
     onEdit
-}: { 
-    allUsers: any[], 
-    currentUser: any, 
-    onDelete: (email: string) => void, 
+}: {
+    allUsers: any[],
+    currentUser: any,
+    onDelete: (email: string) => void,
     onEdit: (user: any) => void
 }) => {
     return (
@@ -2473,5 +2526,12 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: THEME.fonts.bold,
         color: THEME.colors.text,
+    },
+    headerBtn: {
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

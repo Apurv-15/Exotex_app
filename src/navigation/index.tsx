@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View, BackHandler, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
@@ -150,7 +150,7 @@ function UserStack() {
 
 export default function RootNavigator() {
 
-    const navigationRef = React.useRef(null);
+    const navigationRef = React.useRef<NavigationContainerRef<any>>(null);
 
     React.useEffect(() => {
         const backAction = () => {
