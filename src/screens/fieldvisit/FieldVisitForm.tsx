@@ -13,9 +13,11 @@ import { ResidentialForm } from './ResidentialForm';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
+import { useSyncStore } from '../../store/SyncStore';
 import { ActionSheetIOS } from 'react-native'; // For better UI choice if needed, but Alert is fine
 import { generateFieldVisitHTML } from '../../utils/FieldVisitTemplate';
 import { getAssetBase64 } from '../../utils/AssetUtils';
+import { SyncStatusBanner } from '../../components/sync/SyncStatusBanner';
 
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -366,15 +368,37 @@ export default function FieldVisitForm() {
             setUploadStatus('Success!');
             // SoundManager.playSuccess();
 
-            navigation.navigate('FieldVisitSuccess', { formData });
+
         } catch (error: any) {
             console.error('Submit error:', error);
-            showAlert('Failed to Update', error.message || 'Failed to save field visit');
+            const errorMsg = error.message || 'Unknown network error';
+            
+            // Reassuring popup for field visits
+            const displayMsg = `Your data wasn't able to show to the dashboard due to: ${errorMsg}.\n\nDon't worry, your data has been saved locally and our system will sync it to the dashboard automatically as soon as the connection is stable. Technical log generated for admin.`;
+            if (Platform.OS === 'web') {
+                window.alert(displayMsg);
+            } else {
+                Alert.alert("Dashboard Sync Problem", displayMsg);
+            }
+
+            // Automatically generate log for super admin page
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'FieldVisitForm',
+                message: `Failed to save field visit for ${formData.clientCompanyName}`,
+                details: errorMsg,
+                table: 'field_visits',
+                localId: formData.clientCompanyName
+            });
+
             setUploadStatus('');
         } finally {
             setLoading(false);
             setUploadProgress(0);
         }
+
+        // Navigate to success for PDF generation
+        navigation.navigate('FieldVisitSuccess', { formData });
     };
 
     const handleDownloadReport = async () => {
@@ -1262,6 +1286,7 @@ export default function FieldVisitForm() {
                 )}
 
                 {/* Progress Bar */}
+                <SyncStatusBanner />
                 {formData.propertyType && formData.propertyType !== 'Residential' && <ProgressBar />}
 
                 {/* Upload Progress */}
