@@ -1,5 +1,8 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
+import { Platform } from 'react-native';
+import { OfflineQueueService } from './OfflineQueueService';
+import { SyncService } from './SyncService';
 
 export interface FieldVisit {
     id: string;
@@ -647,28 +650,16 @@ export const FieldVisitService = {
             onProgress?.(80); // All uploads complete
         }
 
-        if (isSupabaseConfigured()) {
-            try {
-                const dbData = fieldVisitToDb({
-                    ...visitData,
-                    status: 'completed',
-                    imageUrls,
-                });
+        const dbData = fieldVisitToDb({
+            ...visitData,
+            status: 'completed',
+            imageUrls,
+        });
 
-                const { data, error } = await supabase
-                    .from('field_visits')
-                    .insert([dbData])
-                    .select()
-                    .single();
+        await OfflineQueueService.enqueue('CREATE', 'field_visits', dbData, visitId, 'high');
+        SyncService.forceSync();
 
-                if (error) throw error;
-                return dbToFieldVisit(data);
-            } catch (error) {
-                console.error('Supabase error, falling back to local storage:', error);
-            }
-        }
-
-        // Fallback to local storage
+        // Optimistic UI fallback to local storage
         const visits = await FieldVisitService.getFieldVisits();
         const newVisit: FieldVisit = {
             ...visitData,
@@ -684,21 +675,13 @@ export const FieldVisitService = {
 
     // Update field visit status
     updateFieldVisitStatus: async (visitId: string, status: FieldVisit['status']): Promise<void> => {
-        if (isSupabaseConfigured()) {
-            try {
-                const { error } = await supabase
-                    .from('field_visits')
-                    .update({ status })
-                    .eq('id', visitId);
+        const payload = { id: visitId, status };
 
-                if (error) throw error;
-                return;
-            } catch (error) {
-                console.error('Supabase error, falling back to local storage:', error);
-            }
-        }
+        // Enqueue update to Supabase
+        await OfflineQueueService.enqueue('UPDATE', 'field_visits', payload, visitId, 'medium');
+        SyncService.forceSync();
 
-        // Fallback to local storage
+        // Fallback for local storage (Optimistic UI)
         const visits = await FieldVisitService.getFieldVisits();
         const updatedVisits = visits.map(v => v.id === visitId ? { ...v, status } : v);
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
