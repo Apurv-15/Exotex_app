@@ -17,6 +17,12 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { SyncService } from './src/services/SyncService';
 import { GlobalOfflinePopup } from './src/components/sync/GlobalOfflinePopup';
+import { registerGlobalHandlers } from './src/core/errors/GlobalHandlers';
+import { GlobalErrorBoundary } from './src/core/errors/GlobalErrorBoundary';
+import { logger } from './src/core/logging/Logger';
+
+// Register system-level listeners (JS & Native unhandled crashes)
+registerGlobalHandlers();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,6 +37,7 @@ export default function App() {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
+    logger.info('App', 'VMS System Starting...');
     async function handleCheckUpdates() {
       if (__DEV__) return;
       try {
@@ -96,13 +103,15 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <PaperProvider>
-        <AuthProvider>
-          <RootNavigator />
-          <GlobalOfflinePopup />
-        </AuthProvider>
-      </PaperProvider>
-    </SafeAreaProvider>
+    <GlobalErrorBoundary>
+      <SafeAreaProvider>
+        <PaperProvider>
+          <AuthProvider>
+            <RootNavigator />
+            <GlobalOfflinePopup />
+          </AuthProvider>
+        </PaperProvider>
+      </SafeAreaProvider>
+    </GlobalErrorBoundary>
   );
 }
