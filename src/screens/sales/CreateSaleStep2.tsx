@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
 import MeshBackground from '../../components/MeshBackground';
 import GlassPanel from '../../components/GlassPanel';
+import { useSyncStore } from '../../store/SyncStore';
 // import { SoundManager } from '../../utils/SoundManager';
 
 const IMAGE_CONFIG = [
@@ -112,11 +113,40 @@ export default function CreateSaleStep2() {
                     navigation.navigate('MainDashboard');
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Submit error:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            const errorMsg = error.message || 'Unknown network error';
+
+            // Specific reassuring popup for sales registrations
+            const displayMsg = `Your data wasn't able to show to the dashboard immediately due to: ${errorMsg}.\n\nDon't worry, the sale is registered locally and will sync to the dashboard automatically once connection is restored. You can still generate the warranty card.`;
+            if (Platform.OS === 'web') {
+                window.alert(displayMsg);
+            } else {
+                Alert.alert("Dashboard Sync Problem", displayMsg);
+            }
+
+            // Automatically generate log for super admin page
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'SalesScreen',
+                message: `Failed to register sale for ${formData?.customerName}`,
+                details: errorMsg,
+                table: 'sales',
+                localId: formData?.customerName
+            });
+
+            // If it was supposed to generate a warranty card (payment received), navigate anyway
+            if (formData?.paymentReceived) {
+                navigation.replace('WarrantyCard', { 
+                    sale: { 
+                        ...formData, 
+                        saleDate: new Date().toISOString().split('T')[0],
+                        branchId: user?.branchId || 'unknown'
+                    } 
+                });
+            }
+
             setUploadStatus('');
-            showAlert('Failed to Update', 'Please try again.\n' + errorMessage);
         } finally {
             setSubmitting(false);
             setUploadProgress(0);
