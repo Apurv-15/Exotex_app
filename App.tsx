@@ -15,6 +15,8 @@ import {
   Nunito_900Black
 } from '@expo-google-fonts/nunito';
 import * as SplashScreen from 'expo-splash-screen';
+import { SyncService } from './src/services/SyncService';
+import { GlobalOfflinePopup } from './src/components/sync/GlobalOfflinePopup';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -55,7 +57,10 @@ export default function App() {
         // 1. Check for OTA Updates on mount
         await handleCheckUpdates();
 
-        // 2. Wait for fonts
+        // 2. Initialize Background Sync Service
+        SyncService.init();
+
+        // 3. Wait for fonts
         if (fontsLoaded || fontError) {
           await SplashScreen.hideAsync();
           setAppReady(true);
@@ -95,6 +100,7 @@ export default function App() {
       <PaperProvider>
         <AuthProvider>
           <RootNavigator />
+          <GlobalOfflinePopup />
         </AuthProvider>
       </PaperProvider>
     </SafeAreaProvider>
