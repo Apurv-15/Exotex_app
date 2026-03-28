@@ -35,6 +35,7 @@ import ProductCataloguePdf from '../../assets/Training pdf/PRODUCT CATLOGUE.pdf'
 import FlowRateChartPdf from '../../assets/Training pdf/Flow Rate chart.pdf';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
 import { getAssetBase64 } from '../../utils/AssetUtils';
+import { useSyncStore } from '../../store/SyncStore';
 
 const { width } = Dimensions.get('window');
 
@@ -145,6 +146,120 @@ export default function SubBranchDashboard() {
             // Fetch quotations for this branch
             const branchQuotations = await QuotationService.getQuotationsByBranch(userBranch);
             setQuotations(branchQuotations);
+
+            // Fetch any locally queued data that hasn't synced yet
+            const syncQueue = useSyncStore.getState().queue;
+            const userBranchTrimmed = userBranch.trim();
+
+            // Merge local sales
+            const localSales = syncQueue
+                .filter(op => op.table === 'sales' && op.status !== 'completed' && op.status !== 'failed')
+                .map(op => {
+                    const row = op.payload;
+                    return {
+                        id: op.localId, // Use local ID for optimistic tracking
+                        customerName: row.customer_name,
+                        phone: row.phone,
+                        email: row.email || '',
+                        address: row.address,
+                        city: row.city,
+                        date: row.date,
+                        invoiceNumber: row.invoice_number,
+                        waterTestingBefore: row.water_testing_before || '',
+                        waterTestingAfter: row.water_testing_after || '',
+                        executiveName: row.executive_name || '',
+                        designation: row.designation || '',
+                        plumberName: row.plumber_name || '',
+                        productModel: row.product_model,
+                        serialNumber: row.serial_number,
+                        productDetailsConfirmed: row.product_details_confirmed,
+                        saleDate: row.sale_date,
+                        branchId: row.branch_id,
+                        warrantyId: row.warranty_id,
+                        status: row.status,
+                        imageUrls: row.image_urls || [],
+                        paymentReceived: row.payment_received || false,
+                        warrantyGenerated: row.warranty_generated || false,
+                        region: row.region || '',
+                    } as Sale;
+                });
+            setSales(prev => [...localSales, ...prev]);
+
+            // Merge local field visits
+            const localVisits = syncQueue
+                .filter(op => op.table === 'field_visits' && op.status !== 'completed' && op.status !== 'failed')
+                .map(op => {
+                    const row = op.payload;
+                    return {
+                        id: op.localId,
+                        clientCompanyName: row.site_name,
+                        siteName: row.site_name,
+                        contactPersonName: row.contact_person,
+                        contactPerson: row.contact_person,
+                        mobileNumber: row.phone,
+                        phone: row.phone,
+                        siteAddress: row.address,
+                        address: row.address,
+                        dateOfVisit: row.visit_date,
+                        visitDate: row.visit_date,
+                        ...row
+                    };
+                });
+            setFieldVisits(prev => [...localVisits, ...prev]);
+
+            // Merge local complaints
+            const localComplaints = syncQueue
+                .filter(op => op.table === 'complaints' && op.status !== 'completed' && op.status !== 'failed')
+                .map(op => {
+                    const row = op.payload;
+                    return {
+                        id: op.localId,
+                        complaintId: row.complaint_id,
+                        invoiceNo: row.invoice_no,
+                        customerName: row.customer_name,
+                        customerPhone: row.customer_phone,
+                        customerEmail: row.customer_email,
+                        category: row.category,
+                        description: row.description,
+                        dateOfComplaint: row.date_of_complaint,
+                        status: row.status,
+                        imageUrls: row.image_urls || [],
+                        warrantyCardAttached: row.warranty_card_attached,
+                        branchId: row.branch_id,
+                        city: row.city,
+                        createdAt: op.timestamp
+                    } as Complaint;
+                });
+            setComplaints(prev => [...localComplaints, ...prev]);
+
+            // Merge local quotations
+            const localQuotations = syncQueue
+                .filter(op => op.table === 'quotations' && op.status !== 'completed' && op.status !== 'failed')
+                .map(op => {
+                    const row = op.payload;
+                    return {
+                        id: op.localId,
+                        quotationNo: row.quotation_no,
+                        quotationDate: row.quotation_date,
+                        validity: row.validity,
+                        customerName: row.customer_name,
+                        companyName: row.company_name,
+                        phone: row.phone,
+                        email: row.email,
+                        billingAddress: row.billing_address,
+                        shippingAddress: row.shipping_address,
+                        itemName: row.item_name,
+                        itemDescription: row.item_description,
+                        rate: row.rate,
+                        qty: row.qty,
+                        discountPerc: row.discount_perc,
+                        region: row.region,
+                        branchId: row.branch_id,
+                        createdAt: op.timestamp
+                    } as Quotation;
+                });
+            setQuotations(prev => [...localQuotations, ...prev]);
+
         } catch (error) {
             console.error(error);
         } finally {
