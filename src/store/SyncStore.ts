@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { Storage } from '../utils/storage';
 import { QueuedOperation, SyncNotification, ConflictRecord, SyncStats, SyncLog } from '../types/sync';
 
 interface SyncState {
@@ -89,3 +90,32 @@ export const useSyncStore = create<SyncState>((set) => ({
   }),
   clearLogs: () => set({ logs: [] })
 }));
+
+// Setup persistence mapping manually to avoid Webpack/Metro `import.meta` ESM crashing on web
+const STORE_KEY = 'sync-store-native-db';
+
+const initializeStore = async () => {
+    try {
+        const stored = await Storage.getItem(STORE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            useSyncStore.setState({
+                logs: parsed.logs || [],
+                stats: parsed.stats || useSyncStore.getState().stats,
+                queue: parsed.queue || []
+            });
+        }
+    } catch(e) {
+        console.warn("Failed to mount persistence store", e);
+    }
+};
+
+initializeStore();
+
+useSyncStore.subscribe((state) => {
+    Storage.setItem(STORE_KEY, JSON.stringify({
+        logs: state.logs,
+        stats: state.stats,
+        queue: state.queue
+    })).catch(() => {});
+});

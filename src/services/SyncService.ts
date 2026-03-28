@@ -4,6 +4,7 @@ import { OfflineQueueService } from './OfflineQueueService';
 import { useSyncStore } from '../store/SyncStore';
 import { QueuedOperation } from '../types/sync';
 import { NetworkService } from './NetworkService';
+import { logger } from '../core/logging/Logger';
 
 class SyncServiceBase {
   private processing = false;
@@ -74,8 +75,8 @@ class SyncServiceBase {
       // Update global last sync time
       useSyncStore.getState().updateStats({ lastSyncTime: new Date().toISOString() });
 
-    } catch (error) {
-      console.error('Core sync error:', error);
+    } catch (error: any) {
+      logger.error('SyncService', 'Core sync error during batch processing', { error: error.message || error });
     } finally {
       this.processing = false;
       useSyncStore.getState().setIsSyncing(false);
@@ -123,10 +124,7 @@ class SyncServiceBase {
       });
 
       // Audit Log for Super Admin
-      useSyncStore.getState().addLog({
-        level: 'success',
-        module: 'SyncService',
-        message: `Synced ${op.type} to ${op.table}`,
+      logger.success('SyncService', `Synced ${op.type} to ${op.table}`, {
         details: `LocalID: ${op.localId}`,
         operationId: op.id,
         table: op.table,
@@ -134,7 +132,11 @@ class SyncServiceBase {
       });
 
     } catch (error: any) {
-      console.error(`Operation failed id [${op.id}]:`, error);
+      logger.error('SyncService', `Operation execution failed for [${op.id}]`, {
+        error: error.message || error,
+        table: op.table,
+        localId: op.localId
+      });
       
       // Retry via Queue Service (which handles Exponential Backoff)
       await OfflineQueueService.handleFailure(op.id, error.message || 'Unknown network error');
@@ -156,15 +158,17 @@ class SyncServiceBase {
           });
       }
 
-      // Detailed Error Log for Super Admin/Audit
-      useSyncStore.getState().addLog({
-        level: updatedOp?.status === 'failed' ? 'error' : 'warn',
-        module: 'SyncService',
-        message: `Failed to sync ${op.table}`,
+      // Detailed Error Log for Super Admin/Audit (using the Logger for consistent formatting)
+      const logLevel = updatedOp?.status === 'failed' ? 'error' : 'warn';
+      const isOnline = useSyncStore.getState().isOnline;
+      
+      logger[logLevel]('SyncService', `Failed to sync ${op.table}`, {
         details: error.message || 'Unknown network/Supabase error',
+        networkStatus: isOnline ? 'Online' : 'Offline',
         operationId: op.id,
         table: op.table,
-        localId: op.localId
+        localId: op.localId,
+        fullError: error
       });
     }
   }

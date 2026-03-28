@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import { QueuedOperation } from '../types/sync';
 import { useSyncStore } from '../store/SyncStore';
+import { logger } from '../core/logging/Logger';
 
 const QUEUE_STORAGE_KEY = '@app_sync_queue_v1';
 const MAX_RETRIES = 5;
@@ -31,8 +32,8 @@ export class OfflineQueueService {
           useSyncStore.getState().setQueue(queue);
       }
       return cleanedQueue;
-    } catch (error) {
-      console.error('Failed to load queue:', error);
+    } catch (error: any) {
+      logger.error('OfflineQueue', 'Failed to load sync queue from storage', { error: error.message || error });
       return [];
     }
   }
@@ -41,8 +42,8 @@ export class OfflineQueueService {
     try {
       await AsyncStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
       useSyncStore.getState().setQueue(queue);
-    } catch (error) {
-      console.error('Failed to save queue:', error);
+    } catch (error: any) {
+      logger.error('OfflineQueue', 'Failed to save sync queue to storage', { error: error.message || error });
     }
   }
 
@@ -62,7 +63,7 @@ export class OfflineQueueService {
     // Check for duplicates
     const isDuplicate = queue.some(op => op.localId === localId && op.status !== 'completed' && op.status !== 'failed');
     if (isDuplicate) {
-      console.warn(`Duplicate operation detected for localId: ${localId}`);
+      logger.warn('OfflineQueue', `Duplicate operation detected for localId: ${localId}`, { table, type });
       return queue.find(op => op.localId === localId)!;
     }
 
@@ -85,10 +86,7 @@ export class OfflineQueueService {
     await this.saveQueue(queue);
 
     // Audit Log for Super Admin - Initial Enqueue (Offline Proof)
-    useSyncStore.getState().addLog({
-      level: 'info',
-      module: 'OfflineQueue',
-      message: `Enqueued ${type} for ${table}`,
+    logger.info('OfflineQueue', `Enqueued ${type} for ${table}`, {
       details: `Saved locally while offline. LocalID: ${localId}`,
       operationId: newItem.id,
       table: table,

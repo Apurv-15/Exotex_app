@@ -46,6 +46,8 @@ export interface SyncLog {
   level: 'info' | 'warn' | 'error' | 'success';
   module: string; // e.g., 'SyncService', 'UploadService'
   message: string;
+  location?: string; // e.g. 'SyncService.ts:142'
+  stack?: string;
   details?: string;
   operationId?: string;
   table?: string;
