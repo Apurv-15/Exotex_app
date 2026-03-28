@@ -1,5 +1,7 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
+import { OfflineQueueService } from './OfflineQueueService';
+import { SyncService } from './SyncService';
 
 export interface Quotation {
     id: string;
@@ -72,27 +74,17 @@ const quotationToDb = (q: Partial<Quotation>) => ({
 
 export const QuotationService = {
     createQuotation: async (data: Omit<Quotation, 'id' | 'createdAt'>): Promise<Quotation> => {
-        if (isSupabaseConfigured()) {
-            try {
-                const dbData = quotationToDb(data);
-                const { data: insertedData, error } = await supabase
-                    .from('quotations')
-                    .insert([dbData])
-                    .select()
-                    .single();
+        const localId = Math.random().toString(36).substr(2, 9);
+        const dbData = quotationToDb(data);
 
-                if (error) throw error;
-                return dbToQuotation(insertedData);
-            } catch (error) {
-                console.error('Supabase error creating quotation, falling back to local storage:', error);
-            }
-        }
+        await OfflineQueueService.enqueue('CREATE', 'quotations', dbData, localId, 'medium');
+        SyncService.forceSync();
 
-        // Fallback to local storage
+        // Fallback to local storage (Optimistic UI)
         const quotations = await QuotationService.getAllQuotations();
         const newQuotation: Quotation = {
             ...data,
-            id: Math.random().toString(36).substr(2, 9),
+            id: localId,
             createdAt: new Date().toISOString(),
         };
 
