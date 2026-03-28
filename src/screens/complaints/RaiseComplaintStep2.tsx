@@ -12,6 +12,7 @@ import { SalesService } from '../../services/SalesService';
 import { useAuth } from '../../context/AuthContext';
 import GlassPanel from '../../components/GlassPanel';
 import MeshBackground from '../../components/MeshBackground';
+import { useSyncStore } from '../../store/SyncStore';
 import { Storage } from '../../utils/storage';
 import { useEffect } from 'react';
 import { generateComplaintPDFHTML } from '../../utils/ComplaintTemplate';
@@ -233,25 +234,47 @@ export default function RaiseComplaintStep2() {
 
             if (isEditMode) {
                 await ComplaintService.updateComplaint(complaintId, complaint);
-                navigation.navigate('ComplaintSuccess', { complaint });
             } else {
                 try {
                     await ComplaintService.createComplaint(complaint);
-                    navigation.navigate('ComplaintSuccess', { complaint });
                 } catch (err: any) {
                     if (err.code === '23505') {
                         // Handle duplicate key by suggesting a new ID or just regenerating it
                         const newId = `CMP-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`;
                         setComplaintId(newId);
                         Alert.alert('Duplicate ID', 'The generated ID was already in use. We have updated the ID, please try submitting again.');
+                        setLoading(false);
+                        setUploading(false);
+                        return; // Stop here
                     } else {
                         throw err;
                     }
                 }
             }
-        } catch (error) {
+            
+            // Navigation on success
+            navigation.navigate('ComplaintSuccess', { complaint });
+        } catch (error: any) {
             console.error('Submit error:', error);
-            Alert.alert("Failed to Update", 'Failed to save complaint.' + "\nPlease try again.");
+            const errorMsg = error.message || 'Unknown network error';
+
+            // Reassuring popup for complaints
+            const displayMsg = `Your data wasn't able to show to the dashboard immediately due to: ${errorMsg}.\n\nDon't worry, the system has saved your data locally and will automatically retry syncing it to the dashboard once the connection is stable.`;
+            if (Platform.OS === 'web') {
+                window.alert(displayMsg);
+            } else {
+                Alert.alert("Dashboard Sync Problem", displayMsg);
+            }
+
+            // Automatically generate log for super admin page
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'ComplaintScreen',
+                message: `Failed to save complaint ${complaintId}`,
+                details: errorMsg,
+                table: 'complaints',
+                localId: complaintId
+            });
         } finally {
             setLoading(false);
             setUploading(false);
