@@ -1,6 +1,8 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
 import { Platform } from 'react-native';
+import { OfflineQueueService } from './OfflineQueueService';
+import { SyncService } from './SyncService';
 
 
 export interface Sale {
@@ -436,56 +438,27 @@ export const SalesService = {
             onProgress?.(80); // All uploads complete
         }
 
-        if (isSupabaseConfigured()) {
-            try {
-                const status = saleData.paymentReceived ? 'approved' : 'pending';
-                const warrantyGenerated = saleData.paymentReceived;
-
-                const dbData = saleToDb({
-                    ...saleData,
-                    warrantyId,
-                    status,
-                    imageUrls,
-                    warrantyGenerated,
-                });
-
-                const { data, error } = await supabase
-                    .from('sales')
-                    .insert([dbData])
-                    .select()
-                    .single();
-
-                if (error) throw error;
-
-                // Automatically decrement stock after successful warranty creation
-                try {
-                    const { StockService } = require('./StockService');
-                    // Use branchId as region (or extract region from user context if available)
-                    await StockService.decrementStock(
-                        saleData.branchId, // Using branchId as region
-                        saleData.productModel,
-                        1
-                    );
-                    console.log(`✅ Stock decremented for ${saleData.productModel} in ${saleData.branchId}`);
-                } catch (stockError: any) {
-                    // Log but don't fail the warranty creation if stock update fails
-                    console.warn('Stock decrement warning:', stockError.message);
-                }
-
-                return dbToSale(data);
-            } catch (error) {
-                console.error('Supabase error, falling back to local storage:', error);
-            }
-        }
-
-        // Fallback to local storage
-        const sales = await SalesService.getSales();
         const status = saleData.paymentReceived ? 'approved' : 'pending';
         const warrantyGenerated = saleData.paymentReceived;
 
+        const dbData = saleToDb({
+            ...saleData,
+            warrantyId,
+            status,
+            imageUrls,
+            warrantyGenerated,
+        });
+
+        const localId = Math.random().toString(36).substr(2, 9);
+        await OfflineQueueService.enqueue('CREATE', 'sales', dbData, localId, 'high');
+        SyncService.forceSync();
+
+        // Optimistic UI updates
+        const sales = await SalesService.getSales();
+
         const newSale: Sale = {
             ...saleData,
-            id: Math.random().toString(36).substr(2, 9),
+            id: localId,
             warrantyId,
             status,
             imageUrls,
@@ -500,26 +473,17 @@ export const SalesService = {
     // Update payment status and generate warranty
     updatePaymentStatus: async (saleId: string, received: boolean): Promise<void> => {
         const updateData = {
+            id: saleId,
             payment_received: received,
-            status: received ? 'approved' : 'pending',
+            status: (received ? 'approved' : 'pending') as Sale['status'],
             warranty_generated: received
         };
 
-        if (isSupabaseConfigured()) {
-            try {
-                const { error } = await supabase
-                    .from('sales')
-                    .update(updateData)
-                    .eq('id', saleId);
+        // Enqueue the update
+        await OfflineQueueService.enqueue('UPDATE', 'sales', updateData, saleId, 'high');
+        SyncService.forceSync();
 
-                if (error) throw error;
-                return;
-            } catch (error) {
-                console.error('Supabase updatePaymentStatus error:', error);
-            }
-        }
-
-        // Fallback to local storage
+        // Fallback to local storage (Optimistic UI)
         const sales = await SalesService.getSales();
         const updatedSales = sales.map(s => s.id === saleId ? {
             ...s,
@@ -532,21 +496,13 @@ export const SalesService = {
 
     // Update sale status
     updateSaleStatus: async (saleId: string, status: Sale['status']): Promise<void> => {
-        if (isSupabaseConfigured()) {
-            try {
-                const { error } = await supabase
-                    .from('sales')
-                    .update({ status })
-                    .eq('id', saleId);
+        const payload = { id: saleId, status };
 
-                if (error) throw error;
-                return;
-            } catch (error) {
-                console.error('Supabase error, falling back to local storage:', error);
-            }
-        }
+        // Enqueue update to Supabase
+        await OfflineQueueService.enqueue('UPDATE', 'sales', payload, saleId, 'medium');
+        SyncService.forceSync();
 
-        // Fallback to local storage
+        // Fallback to local storage (Optimistic UI)
         const sales = await SalesService.getSales();
         const updatedSales = sales.map(s => s.id === saleId ? { ...s, status } : s);
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
