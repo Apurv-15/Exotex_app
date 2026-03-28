@@ -47,7 +47,7 @@ export const ComplaintService = {
                     .order('created_at', { ascending: false });
 
                 if (branchId) {
-                    query = query.eq('branch_id', branchId);
+                    query = query.ilike('branch_id', branchId.trim());
                 }
 
                 const { data, error } = await query;
@@ -344,7 +344,7 @@ export const ComplaintService = {
                 .select('*', { count: 'exact' });
 
             if (branchId) {
-                query = query.eq('branch_id', branchId);
+                query = query.ilike('branch_id', branchId.trim());
             }
 
             const { data, count, error } = await query

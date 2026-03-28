@@ -56,6 +56,28 @@ const calculateDaysRemaining = (saleDate: string) => {
     };
 };
 
+// Robust date parsing for different formats
+const parseDateSafe = (dateStr: string | null | undefined): Date => {
+    if (!dateStr) return new Date(0);
+    // Handle DD/MM/YYYY format
+    if (dateStr.includes('/')) {
+        const [d, m, y] = dateStr.split('/').map(Number);
+        // JS Date constructor is 0-indexed for month
+        return new Date(y, m - 1, d);
+    }
+    // Handle YYYY-MM-DD format or ISO
+    return new Date(dateStr);
+};
+
+const toISODate = (d: string | null | undefined) => {
+    if (!d) return '';
+    try {
+        return parseDateSafe(d).toISOString().split('T')[0];
+    } catch {
+        return '';
+    }
+};
+
 export default function SubBranchDashboard() {
     const { logout, user, refreshProfile } = useAuth();
     const navigation = useNavigation<any>();
@@ -81,22 +103,25 @@ export default function SubBranchDashboard() {
             const latestProfile = await refreshProfile();
             const activeUser = latestProfile || user;
             
+            const userBranch = activeUser?.branchId?.trim() || '';
+            const userRegion = activeUser?.region?.trim() || '';
+            
             let finalData: Sale[] = [];
 
-            if (activeUser?.region) {
+            if (userRegion) {
                 // If a region is assigned, try fetching strictly for that region first
-                const regionalData = await SalesService.getSalesByRegion(activeUser.region);
+                const regionalData = await SalesService.getSalesByRegion(userRegion);
                 
                 if (regionalData && regionalData.length > 0) {
                     finalData = regionalData;
                 } else {
                     // Fallback to branch-level data ONLY if no regional data is found yet
                     // This prevents empty screens during data migration/tagging
-                    finalData = await SalesService.getSalesByBranch(activeUser?.branchId || '');
+                    finalData = await SalesService.getSalesByBranch(userBranch);
                 }
             } else {
                 // Standard branch user with no specific region assigned
-                finalData = await SalesService.getSalesByBranch(activeUser?.branchId || '');
+                finalData = await SalesService.getSalesByBranch(userBranch);
             }
             
             setSales(finalData.sort((a, b) => 
@@ -104,21 +129,21 @@ export default function SubBranchDashboard() {
             ));
 
             // Fetch field visits
-            const visits = await FieldVisitService.getFieldVisitsByBranch(activeUser?.branchId || '');
+            const visits = await FieldVisitService.getFieldVisitsByBranch(userBranch);
             setFieldVisits(visits);
 
             // Fetch regional stock
-            if (activeUser?.region) {
-                const stock = await StockService.getStockByRegion(activeUser.region);
+            if (userRegion) {
+                const stock = await StockService.getStockByRegion(userRegion);
                 setBranchStock(stock);
             }
 
             // Fetch branch complaints
-            const branchComplaints = await ComplaintService.getComplaints(activeUser?.branchId || '');
+            const branchComplaints = await ComplaintService.getComplaints(userBranch);
             setComplaints(branchComplaints);
 
             // Fetch quotations for this branch
-            const branchQuotations = await QuotationService.getQuotationsByBranch(activeUser?.branchId || '');
+            const branchQuotations = await QuotationService.getQuotationsByBranch(userBranch);
             setQuotations(branchQuotations);
         } catch (error) {
             console.error(error);
@@ -144,18 +169,7 @@ export default function SubBranchDashboard() {
     const filteredSales = useMemo(() => {
         const now = new Date();
         return sales.filter(s => {
-            if (period === '7d') {
-                const date = new Date(s.saleDate);
-                const sevenDaysAgo = new Date();
-                sevenDaysAgo.setDate(now.getDate() - 7);
-                return date >= sevenDaysAgo;
-            }
-            if (period === 'Today') return new Date(s.saleDate).toDateString() === now.toDateString();
-            if (period === '30d') {
-                const date = new Date(s.saleDate);
-                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-            }
-            if (period === '1y') return new Date(s.saleDate).getFullYear() === now.getFullYear();
+            if (period === '1y') return parseDateSafe(s.saleDate).getFullYear() === now.getFullYear();
             return true;
         });
     }, [sales, period]);
@@ -163,7 +177,7 @@ export default function SubBranchDashboard() {
     const filteredVisits = useMemo(() => {
         const now = new Date();
         return fieldVisits.filter(v => {
-            const date = new Date(v.visitDate);
+            const date = parseDateSafe(v.visitDate || v.dateOfVisit);
             if (period === '7d') {
                 const sevenDaysAgo = new Date();
                 sevenDaysAgo.setDate(now.getDate() - 7);
@@ -179,7 +193,7 @@ export default function SubBranchDashboard() {
     const filteredQuotations = useMemo(() => {
         const now = new Date();
         return quotations.filter(q => {
-            const date = new Date(q.createdAt || q.quotationDate);
+            const date = parseDateSafe(q.createdAt || q.quotationDate);
             if (period === '7d') {
                 const sevenDaysAgo = new Date();
                 sevenDaysAgo.setDate(now.getDate() - 7);
@@ -208,15 +222,23 @@ export default function SubBranchDashboard() {
         });
     }, [sales]);
 
+    // Cumulative stats (Totals) - Better for UX as "Overview"
+    const totalWarrantiesCount = sales.filter(s => s.warrantyGenerated).length;
+    const totalPendingWarrantiesCount = sales.filter(s => !s.warrantyGenerated && s.status !== 'rejected').length;
+    const totalVisitsCount = fieldVisits.length;
+    const totalComplaintsCount = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+
+    // Filtered stats (for Charts/Analytics)
+    const activeWarrantiesCount = filteredSales.filter(s => s.warrantyGenerated).length;
+    const pendingWarrantiesCount = sales.filter(s => !s.warrantyGenerated && s.status !== 'rejected').length; // Keep total for pending as it's an action item
+    const fieldVisitsCompleted = filteredVisits.length;
+    const activeComplaintsCount = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
+
     const handleUpdatePayment = (sale: Sale) => {
         setSelectedSale(sale);
         setShowSuccess(false);
         setActionModalVisible(true);
     };
-
-    const activeWarrantiesCount = filteredSales.filter(s => s.warrantyGenerated).length;
-    const pendingWarrantiesCount = sales.filter(s => !s.warrantyGenerated && s.status !== 'rejected').length;
-    const fieldVisitsCompleted = filteredVisits.length;
 
     // Data generation based on period
     const getChartData = () => {
@@ -231,8 +253,8 @@ export default function SubBranchDashboard() {
                 date.setDate(date.getDate() - i);
                 const dateStr = date.toISOString().split('T')[0];
                 labels.push(period === 'Today' ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' }));
-                warrantyData.push(sales.filter(s => s.saleDate === dateStr && s.warrantyId).length);
-                fieldVisitData.push(fieldVisits.filter(v => v.visitDate === dateStr).length);
+                warrantyData.push(sales.filter(s => toISODate(s.saleDate) === dateStr && s.warrantyId).length);
+                fieldVisitData.push(fieldVisits.filter(v => toISODate(v.visitDate || v.dateOfVisit) === dateStr).length);
             }
         } else if (period === '30d') {
             // Group by 5 days for 30 days view
@@ -389,7 +411,6 @@ export default function SubBranchDashboard() {
         }
     };
 
-    const activeComplaintsCount = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
 
     const sortedComplaints = useMemo(() => {
         return [...complaints].sort((a, b) => {
@@ -550,36 +571,65 @@ export default function SubBranchDashboard() {
                                 <View style={styles.statIconWrapperVerify}>
                                     <MaterialIcons name="verified-user" size={20} color={THEME.colors.secondary} />
                                 </View>
-                                <View>
-                                    <Text style={styles.statValue}>{activeWarrantiesCount}</Text>
-                                    <Text style={styles.statLabel}>ACTIVE WARRANTIES</Text>
+                                <View style={{ flex: 1, justifyContent: 'center' }}>
+                                    <Text style={styles.statValue}>{totalWarrantiesCount}</Text>
+                                    <Text style={styles.statLabel}>WARRANTIES</Text>
+                                </View>
+                                <View style={[styles.statBadge, { backgroundColor: THEME.colors.primary + '15' }]}>
+                                    <Text style={[styles.statBadgeText, { color: THEME.colors.primary }]}>Total</Text>
                                 </View>
                             </GlassPanel>
-                            <GlassPanel style={[styles.statCard, { backgroundColor: '#FEF3C780', padding: 0 }]}>
+
+                            <GlassPanel style={[styles.statCard, { backgroundColor: '#FEF3C780', padding: 12 }]}>
                                 <Pressable
-                                    style={{ flex: 1, padding: 12, justifyContent: 'space-between' }}
+                                    style={{ flex: 1, justifyContent: 'center' }}
                                     onPress={() => setActiveTab('Pending')}
                                 >
                                     <View style={[styles.statIconWrapperPending, { backgroundColor: '#FEF3C7' }]}>
                                         <MaterialCommunityIcons name="clock-outline" size={20} color="#D97706" />
                                     </View>
-                                    <View>
+                                    <View style={{ marginTop: 8 }}>
                                         <Text style={[styles.statValue, { color: '#D97706' }]}>{pendingWarrantiesCount}</Text>
-                                        <Text style={[styles.statLabel, { color: '#92400E' }]}>PENDING SALES</Text>
+                                        <Text style={[styles.statLabel, { color: '#92400E' }]}>PENDING</Text>
+                                    </View>
+                                    <View style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}>
+                                        <Text style={[styles.statBadgeText, { color: '#D97706' }]}>Sales</Text>
                                     </View>
                                 </Pressable>
                             </GlassPanel>
-                            <GlassPanel style={[styles.statCard, { backgroundColor: '#FEE2E280', padding: 0 }]}>
+
+                            <GlassPanel style={[styles.statCard, { backgroundColor: '#D1FAE580', padding: 12 }]}>
                                 <Pressable
-                                    style={{ flex: 1, padding: 12, justifyContent: 'space-between' }}
+                                    style={{ flex: 1, justifyContent: 'center' }}
+                                    onPress={() => setActiveTab('FieldVisits')}
+                                >
+                                    <View style={[styles.statIconWrapperPending, { backgroundColor: '#D1FAE5' }]}>
+                                        <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#059669" />
+                                    </View>
+                                    <View style={{ marginTop: 8 }}>
+                                        <Text style={[styles.statValue, { color: '#059669' }]}>{totalVisitsCount}</Text>
+                                        <Text style={[styles.statLabel, { color: '#065F46' }]}>VISITS</Text>
+                                    </View>
+                                    <View style={[styles.statBadge, { backgroundColor: '#D1FAE5' }]}>
+                                        <Text style={[styles.statBadgeText, { color: '#059669' }]}>Total</Text>
+                                    </View>
+                                </Pressable>
+                            </GlassPanel>
+
+                            <GlassPanel style={[styles.statCard, { backgroundColor: '#FEE2E280', padding: 12 }]}>
+                                <Pressable
+                                    style={{ flex: 1, justifyContent: 'center' }}
                                     onPress={() => setActiveTab('Complaints')}
                                 >
                                     <View style={[styles.statIconWrapperPending, { backgroundColor: '#FEE2E2' }]}>
                                         <MaterialIcons name="report-problem" size={20} color="#EF4444" />
                                     </View>
-                                    <View>
+                                    <View style={{ marginTop: 8 }}>
                                         <Text style={[styles.statValue, { color: '#EF4444' }]}>{activeComplaintsCount}</Text>
-                                        <Text style={[styles.statLabel, { color: '#B91C1C' }]}>ACTIVE COMPLAINTS</Text>
+                                        <Text style={[styles.statLabel, { color: '#B91C1C' }]}>COMPLAINTS</Text>
+                                    </View>
+                                    <View style={[styles.statBadge, { backgroundColor: '#FEE2E2' }]}>
+                                        <Text style={[styles.statBadgeText, { color: '#EF4444' }]}>Open</Text>
                                     </View>
                                 </Pressable>
                             </GlassPanel>
@@ -686,8 +736,8 @@ export default function SubBranchDashboard() {
                         {/* Recent Warranties Section */}
                         <View style={styles.recentHeader}>
                             <Text style={styles.sectionTitle}>Recent Warranties</Text>
-                            <Pressable onPress={() => setShowAllWarranties(true)}>
-                                <Text style={styles.seeAllText}>View More</Text>
+                            <Pressable onPress={() => setActiveTab('Dashboard')}>
+                                <Text style={styles.seeAllText}>View All</Text>
                             </Pressable>
                         </View>
 
@@ -736,6 +786,79 @@ export default function SubBranchDashboard() {
                                             <View style={styles.listAmount}>
                                                 <Text style={styles.amountText}>{item.warrantyId}</Text>
                                                 <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                            </View>
+                                        </Pressable>
+                                    );
+                                })
+                            )}
+                        </GlassPanel>
+
+                        {/* Recent Field Visits Section */}
+                        <View style={[styles.recentHeader, { marginTop: 24 }]}>
+                            <Text style={styles.sectionTitle}>Recent Field Visits</Text>
+                            <Pressable onPress={() => setActiveTab('FieldVisits')}>
+                                <Text style={styles.seeAllText}>View All</Text>
+                            </Pressable>
+                        </View>
+
+                        <GlassPanel style={styles.listContainer}>
+                            {fieldVisits.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <MaterialCommunityIcons name="clipboard-text-outline" size={32} color={THEME.colors.textSecondary} />
+                                    <Text style={styles.emptyText}>No field visits yet</Text>
+                                </View>
+                            ) : (
+                                fieldVisits.slice(0, 3).map((visit, idx) => {
+                                    const date = new Date(visit.dateOfVisit || visit.visitDate || visit.createdAt);
+                                    const type = visit.propertyType || visit.visitType || 'Inspection';
+                                    return (
+                                        <Pressable
+                                            key={visit.id || idx}
+                                            style={[styles.listItem, idx === fieldVisits.slice(0, 3).length - 1 && { borderBottomWidth: 0 }]}
+                                            onPress={async () => {
+                                                try {
+                                                    setLoading(true);
+                                                    const [logoUri, signUri] = await Promise.all([
+                                                        getAssetBase64(LogoImage),
+                                                        getAssetBase64(SignStampImage)
+                                                    ]);
+                                                    const html = generateFieldVisitHTML(visit, logoUri, signUri);
+                                                    if (Platform.OS === 'web') {
+                                                        const printWindow = window.open('', '_blank');
+                                                        if (printWindow) {
+                                                            printWindow.document.write(html);
+                                                            printWindow.document.close();
+                                                            setTimeout(() => printWindow.print(), 500);
+                                                        }
+                                                    } else {
+                                                        const { uri } = await Print.printToFileAsync({ html });
+                                                        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+                                                    }
+                                                } catch (error) {
+                                                    Alert.alert("Failed to Update", 'Failed to generate report PDF');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                        >
+                                            <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
+                                                <MaterialCommunityIcons
+                                                    name={type === 'Residential' ? 'home-outline' : 'factory'}
+                                                    size={20}
+                                                    color={THEME.colors.primary}
+                                                />
+                                            </View>
+                                            <View style={styles.listInfo}>
+                                                <Text style={styles.listTitle} numberOfLines={1}>
+                                                    {visit.clientCompanyName || visit.contactPersonName || visit.siteName || visit.companyBuildingName || 'Unknown Site'}
+                                                </Text>
+                                                <Text style={styles.listSub}>{visit.city || visit.industryType || 'No Location'}</Text>
+                                            </View>
+                                            <View style={styles.listAmount}>
+                                                <View style={[styles.countdownBadge, { backgroundColor: THEME.colors.primary + '15', marginBottom: 4 }]}>
+                                                    <Text style={[styles.countdownText, { color: THEME.colors.primary, fontSize: 10 }]}>{type}</Text>
+                                                </View>
+                                                <Text style={styles.dateText}>{date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
                                             </View>
                                         </Pressable>
                                     );
@@ -987,13 +1110,13 @@ export default function SubBranchDashboard() {
                                 </View>
                             ) : (
                                 <>
-                                    {sortedVisits.slice(0, 4).map((visit: any, idx: number) => {
+                                    {sortedVisits.map((visit: any, idx: number) => {
                                         const date = new Date(visit.dateOfVisit || visit.visitDate || visit.createdAt);
                                         const type = visit.propertyType || visit.visitType || 'Inspection';
                                         return (
                                             <Pressable
                                                 key={visit.id || idx}
-                                                style={[styles.listItem, idx === sortedVisits.slice(0, 4).length - 1 && sortedVisits.length <= 4 && { borderBottomWidth: 0 }]}
+                                                style={[styles.listItem, idx === sortedVisits.length - 1 && { borderBottomWidth: 0 }]}
                                                 onPress={async () => {
                                                     try {
                                                         setLoading(true);
@@ -1040,11 +1163,11 @@ export default function SubBranchDashboard() {
                                                 </View>
                                                 <View style={[styles.listInfo, { flex: 1, marginRight: 8 }]}>
                                                     <Text style={styles.listTitle} numberOfLines={1}>
-                                                        {visit.clientCompanyName || visit.contactPersonName || visit.siteName || 'Unknown Site'}
+                                                        {visit.clientCompanyName || visit.contactPersonName || visit.siteName || visit.companyBuildingName || 'Unknown Site'}
                                                     </Text>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                         <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
-                                                            {visit.industryType || visit.city || 'No Location'}
+                                                            {visit.city || visit.industryType || 'No Location'}
                                                         </Text>
                                                         <View style={[styles.countdownBadge, { backgroundColor: THEME.colors.primary + '15' }]}>
                                                             <Text style={[styles.countdownText, { color: THEME.colors.primary, fontSize: 10 }]}>
@@ -1061,21 +1184,6 @@ export default function SubBranchDashboard() {
                                             </Pressable>
                                         );
                                     })}
-
-                                    {sortedVisits.length > 4 && (
-                                        <Pressable
-                                            style={styles.viewMoreListBtn}
-                                            onPress={() => {
-                                                // If we had a dedicated list screen, we'd navigate there.
-                                                // For now, let's show an alert or just expand the list if desired.
-                                                // Based on requirements, I'll just show an alert or navigate to a hypothetical list screen.
-                                                Alert.alert('View All Visits', `Showing only latest 4. Total visits: ${sortedVisits.length}`);
-                                            }}
-                                        >
-                                            <Text style={styles.viewMoreListText}>View {sortedVisits.length - 4} More Visits</Text>
-                                            <MaterialCommunityIcons name="arrow-right" size={16} color={THEME.colors.secondary} />
-                                        </Pressable>
-                                    )}
                                 </>
                             )}
                         </GlassPanel>
@@ -1119,6 +1227,7 @@ export default function SubBranchDashboard() {
                                                 style={styles.listItem}
                                                 onPress={() => handleUpdatePayment(item)}
                                             >
+
                                                 <View style={[styles.listIcon, { backgroundColor: '#FEF3C7' }]}>
                                                     <MaterialCommunityIcons name="clock-alert-outline" size={20} color="#D97706" />
                                                 </View>
@@ -1796,8 +1905,20 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 12,
         borderRadius: 16,
-        height: 110,
+        minHeight: 110,
         justifyContent: 'space-between',
+    },
+    statBadge: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    statBadgeText: {
+        fontSize: 9,
+        fontFamily: THEME.fonts.bold,
     },
     statIconWrapperVerify: {
         width: 32,

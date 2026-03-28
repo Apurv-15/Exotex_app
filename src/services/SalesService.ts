@@ -236,15 +236,18 @@ export const SalesService = {
         if (isSupabaseConfigured()) {
             try {
                 let query = supabase.from('sales').select('*', { count: 'exact', head: true });
-                if (branchId) query = query.eq('branch_id', branchId);
-                const { count: total } = await query;
-
                 let pQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-                if (branchId) pQuery = pQuery.eq('branch_id', branchId);
-                const { count: pending } = await pQuery;
-
                 let aQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'approved');
-                if (branchId) aQuery = aQuery.eq('branch_id', branchId);
+                
+                if (branchId) {
+                    const trimmedBranch = branchId.trim();
+                    query = query.ilike('branch_id', trimmedBranch);
+                    pQuery = pQuery.ilike('branch_id', trimmedBranch);
+                    aQuery = aQuery.ilike('branch_id', trimmedBranch);
+                }
+                
+                const { count: total } = await query;
+                const { count: pending } = await pQuery;
                 const { count: approved } = await aQuery;
 
                 return {
@@ -341,7 +344,7 @@ export const SalesService = {
                 const { data, error } = await supabase
                     .from('sales')
                     .select('*')
-                    .eq('branch_id', branchId)
+                    .ilike('branch_id', branchId.trim())
                     .order('sale_date', { ascending: false });
 
                 if (error) throw error;
@@ -662,7 +665,7 @@ export const SalesService = {
 
             // Apply filters if provided
             if (filters?.branchId) {
-                query = query.eq('branch_id', filters.branchId);
+                query = query.ilike('branch_id', filters.branchId.trim());
             }
             if (filters?.status) {
                 query = query.eq('status', filters.status);

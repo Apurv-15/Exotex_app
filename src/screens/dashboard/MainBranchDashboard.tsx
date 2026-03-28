@@ -1193,7 +1193,9 @@ export default function MainBranchDashboard() {
                                                     />
                                                 </View>
                                                 <View style={[styles.listContent, { marginRight: 8 }]}>
-                                                    <Text style={styles.listTitle} numberOfLines={1}>{visit.customerName}</Text>
+                                                    <Text style={styles.listTitle} numberOfLines={1}>
+                                                        {visit.clientCompanyName || visit.contactPersonName || visit.siteName || visit.companyBuildingName || 'Unknown Site'}
+                                                    </Text>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                         <View style={[styles.tag, { backgroundColor: isDone ? THEME.colors.success + '20' : THEME.colors.warning + '20' }]}>
                                                             <Text style={[styles.tagText, { color: isDone ? THEME.colors.success : THEME.colors.warning }]}>

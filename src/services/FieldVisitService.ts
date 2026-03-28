@@ -15,6 +15,7 @@ export interface FieldVisit {
     designation?: string;
     mobileNumber?: string;
     emailId?: string;
+    companyBuildingName?: string;
 
     // Water Source & Water Quality Details
     waterSource?: string[];
@@ -206,6 +207,7 @@ const dbToFieldVisit = (row: any): FieldVisit => ({
     scalingIssueObserved: row.scaling_issue_observed || '',
     scalingDescription: row.scaling_description || '',
 
+    // Existing System & Problems
     existingWaterTreatment: row.existing_water_treatment || '',
     existingSystemDetails: row.existing_system_details || '',
     problemsFaced: row.problems_faced || [],
@@ -213,37 +215,44 @@ const dbToFieldVisit = (row: any): FieldVisit => ({
     maintenanceFrequency: row.maintenance_frequency || '',
     customerExpectations: row.customer_expectations || '',
 
+    // Area of Application
     applicationArea: row.application_area || [],
     applicationOther: row.application_other || '',
     pipeLineSize: row.pipe_line_size || '',
     operatingPressure: row.operating_pressure || '',
     operatingTemperature: row.operating_temperature || '',
 
+    // Technical Observations
     ekotexInstallationFeasible: row.ekotex_installation_feasible || '',
     recommendedEkotexModel: row.recommended_ekotex_model || '',
     quantityRequired: row.quantity_required || '',
     siteConstraints: row.site_constraints || '',
     accessoriesRequired: row.accessories_required || '',
 
+    // Commercial Discussion
     customerInterestLevel: row.customer_interest_level || '',
     budgetDiscussed: row.budget_discussed || '',
     expectedDecisionTimeline: row.expected_decision_timeline || '',
     decisionMakerIdentified: row.decision_maker_identified || '',
 
+    // Market Info
     existingCompetitorSolution: row.existing_competitor_solution || '',
     competitorPriceRange: row.competitor_price_range || '',
     customerRemarks: row.customer_remarks || '',
 
+    // Photographs & Attachments
     sitePhotographsTaken: row.site_photographs_taken || false,
     existingSystemPhotographs: row.existing_system_photographs || false,
     problemAreaPhotographs: row.problem_area_photographs || false,
     drawingsCollected: row.drawings_collected || false,
 
+    // Follow-up
     nextActionRequired: row.next_action_required || [],
     nextActionOther: row.next_action_other || '',
     responsiblePerson: row.responsible_person || '',
     expectedFollowUpDate: row.expected_follow_up_date || '',
 
+    // Executive Remarks
     salesEngineerRemarks: row.sales_engineer_remarks || '',
     overallSiteAssessment: row.overall_site_assessment || '',
     conversionProbability: row.conversion_probability || '',
@@ -308,6 +317,7 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
     designation: visit.designation || null,
     mobile_number: visit.mobileNumber || null,
     email_id: visit.emailId || null,
+    company_building_name: visit.companyBuildingName || null,
 
     water_source: visit.waterSource || [],
     water_source_other: visit.waterSourceOther || null,
@@ -318,6 +328,7 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
     scaling_issue_observed: visit.scalingIssueObserved || null,
     scaling_description: visit.scalingDescription || null,
 
+    // Existing System & Problems
     existing_water_treatment: visit.existingWaterTreatment || null,
     existing_system_details: visit.existingSystemDetails || null,
     problems_faced: visit.problemsFaced || [],
@@ -486,15 +497,18 @@ export const FieldVisitService = {
         if (isSupabaseConfigured()) {
             try {
                 let query = supabase.from('field_visits').select('*', { count: 'exact', head: true });
-                if (branchId) query = query.eq('branch_id', branchId);
-                const { count: total } = await query;
-
                 let cQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'completed');
-                if (branchId) cQuery = cQuery.eq('branch_id', branchId);
-                const { count: completed } = await cQuery;
-
                 let pQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-                if (branchId) pQuery = pQuery.eq('branch_id', branchId);
+
+                if (branchId) {
+                    const trimmedBranch = branchId.trim();
+                    query = query.ilike('branch_id', trimmedBranch);
+                    cQuery = cQuery.ilike('branch_id', trimmedBranch);
+                    pQuery = pQuery.ilike('branch_id', trimmedBranch);
+                }
+
+                const { count: total } = await query;
+                const { count: completed } = await cQuery;
                 const { count: pending } = await pQuery;
 
                 return {
@@ -589,7 +603,7 @@ export const FieldVisitService = {
                 const { data, error } = await supabase
                     .from('field_visits')
                     .select('*')
-                    .eq('branch_id', branchId)
+                    .ilike('branch_id', branchId.trim())
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
@@ -734,7 +748,7 @@ export const FieldVisitService = {
                 .select('*', { count: 'exact' });
 
             if (filters?.branchId) {
-                query = query.eq('branch_id', filters.branchId);
+                query = query.ilike('branch_id', filters.branchId.trim());
             }
             if (filters?.status) {
                 query = query.eq('status', filters.status);

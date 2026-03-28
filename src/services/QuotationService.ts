@@ -126,7 +126,7 @@ export const QuotationService = {
                 const { data, error } = await supabase
                     .from('quotations')
                     .select('*')
-                    .eq('branch_id', branchId)
+                    .ilike('branch_id', branchId.trim())
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
@@ -161,7 +161,7 @@ export const QuotationService = {
                 .select('*', { count: 'exact' });
 
             if (branchId) {
-                query = query.eq('branch_id', branchId);
+                query = query.ilike('branch_id', branchId.trim());
             }
 
             const { data, count, error } = await query

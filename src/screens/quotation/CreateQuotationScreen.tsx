@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, Pressable,
-  Alert, Platform, KeyboardAvoidingView, Modal, FlatList
+  Alert, Platform, KeyboardAvoidingView, Modal, FlatList, ActivityIndicator
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -81,6 +81,8 @@ export default function CreateQuotationScreen() {
   });
 
   const [showMachineModal, setShowMachineModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const selectMachine = (machine: typeof PRODUCT_MODELS[0]) => {
     setFormData(prev => ({
@@ -116,6 +118,7 @@ export default function CreateQuotationScreen() {
     }
 
     try {
+      setIsGenerating(true);
       // Convert assets to Base64 for robust loading in PDFs
       const [logoUri, signUri] = await Promise.all([
         getAssetBase64(LogoImage),
@@ -153,14 +156,18 @@ export default function CreateQuotationScreen() {
             printWindow.print();
           }, 500);
         }
+        setShowSuccessModal(true);
       } else {
         const { uri } = await Print.printToFileAsync({ html });
         await Sharing.shareAsync(uri);
+        setShowSuccessModal(true);
       }
     } catch (error) {
       console.error(error);
       if (Platform.OS === 'web') window.alert('Could not generate PDF.');
       else Alert.alert("Failed to Update", 'Could not generate PDF.' + "\nPlease try again.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -245,15 +252,21 @@ export default function CreateQuotationScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.genBtn,
-              !isFormValid() && { opacity: 0.5 },
-              pressed && isFormValid() && { transform: [{ scale: 0.98 }] }
+              (!isFormValid() || isGenerating) && { opacity: 0.5 },
+              pressed && isFormValid() && !isGenerating && { transform: [{ scale: 0.98 }] }
             ]}
-            disabled={!isFormValid()}
+            disabled={!isFormValid() || isGenerating}
             onPress={handleGeneratePDF}
           >
             <LinearGradient colors={['#7C3AED', '#5B21B6']} style={styles.grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <MaterialCommunityIcons name="file-document-outline" size={24} color="white" />
-              <Text style={styles.genText}>Generate Professional PDF</Text>
+              {isGenerating ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <MaterialCommunityIcons name="file-document-outline" size={24} color="white" />
+              )}
+              <Text style={styles.genText}>
+                {isGenerating ? 'Generating...' : 'Generate Professional PDF'}
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -293,6 +306,34 @@ export default function CreateQuotationScreen() {
               />
             </View>
           </Pressable>
+        </Modal>
+        <Modal
+          visible={showSuccessModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <GlassPanel style={styles.successModalContent}>
+              <View style={styles.successIconWrapper}>
+                <MaterialCommunityIcons name="check-decagram" size={60} color="#10B981" />
+              </View>
+              <Text style={styles.successTitle}>Quotation Ready!</Text>
+              <Text style={styles.successSubtitle}>Document ID: {formData.quotationNo}</Text>
+              <Text style={styles.successMessage}>
+                Professional quotation has been generated and saved. You can now share it with the customer.
+              </Text>
+              <Pressable
+                style={styles.closeBtn}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  navigation.goBack();
+                }}
+              >
+                <Text style={styles.closeBtnText}>Done</Text>
+              </Pressable>
+            </GlassPanel>
+          </View>
         </Modal>
       </KeyboardAvoidingView>
     </MeshBackground>
@@ -391,5 +432,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#7C3AED',
+  },
+  successModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 30,
+    alignItems: 'center',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  successIconWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  successSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    fontWeight: '600',
+  },
+  successMessage: {
+    fontSize: 15,
+    color: '#4B5563',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  closeBtn: {
+    backgroundColor: '#7C3AED',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 14,
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

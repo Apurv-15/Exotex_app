@@ -22,6 +22,7 @@ import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // import { SoundManager } from '../../utils/SoundManager';
+const fmtISO = (d: Date) => d.toISOString().split('T')[0];
 
 const TOTAL_STEPS = 3;
 
@@ -87,7 +88,7 @@ export default function FieldVisitForm() {
     const [formData, setFormData] = useState({
         // General Info
         propertyType: '', // Residential, Commercial, Industrial, Agriculture
-        dateOfVisit: new Date().toLocaleDateString('en-GB'),
+        dateOfVisit: fmtISO(new Date()),
         branchName: '',
         salesEngineerName: '',
         clientCompanyName: '',

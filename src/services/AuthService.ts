@@ -138,14 +138,18 @@ export const AuthService = {
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
+                    // Normalize branch and region for consistency
+                    const normalizedBranch = branchId.trim();
+                    const normalizedRegion = region?.trim() || null;
+
                     const { error: profileError } = await supabase
                         .from('users')
                         .insert([{
                             email,
                             name,
                             role,
-                            branch_id: branchId,
-                            region: region || null
+                            branch_id: normalizedBranch,
+                            region: normalizedRegion
                         }]);
 
                     if (!profileError) {
@@ -174,8 +178,8 @@ export const AuthService = {
                 name,
                 email,
                 role: role as any,
-                branchId,
-                region
+                branchId: branchId.trim(),
+                region: region?.trim()
             };
         } catch (error: any) {
             console.error('AuthService.registerUser error:', error);
@@ -215,12 +219,15 @@ export const AuthService = {
 
             if (authError) throw authError;
 
+            // Trim region if provided
+            const trimmedRegion = updates.region?.trim();
+
             // 2. Update Public Profile Table
             const { error: profileError } = await supabase
                 .from('users')
                 .update({
                     name: updates.name,
-                    region: updates.region
+                    region: trimmedRegion
                 })
                 .eq('email', email);
 
@@ -253,8 +260,8 @@ export const AuthService = {
                 .update({
                     name: updates.name,
                     role: updates.role,
-                    branch_id: updates.branchId,
-                    region: updates.region
+                    branch_id: updates.branchId?.trim(),
+                    region: updates.region?.trim()
                 })
                 .eq('email', email);
 
