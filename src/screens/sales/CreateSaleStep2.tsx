@@ -76,6 +76,8 @@ export default function CreateSaleStep2() {
     };
 
     const handleSubmit = async () => {
+        if (submitting) return;
+
         if (images.length < 2) {
             showAlert('Images Required', 'Please upload at least 2 images (Product and Serial Number).');
             return;

@@ -36,6 +36,12 @@ import FlowRateChartPdf from '../../assets/Training pdf/Flow Rate chart.pdf';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
 import { getAssetBase64 } from '../../utils/AssetUtils';
 import { useSyncStore } from '../../store/SyncStore';
+import { SubBranchDashboardOverview } from '../../components/dashboard/SubBranchDashboardOverview';
+import { SubBranchFieldVisitsTab } from '../../components/dashboard/SubBranchFieldVisitsTab';
+import { SubBranchComplaintsTab } from '../../components/dashboard/SubBranchComplaintsTab';
+import { SubBranchQuotationsTab } from '../../components/dashboard/SubBranchQuotationsTab';
+import { SubBranchPendingTab } from '../../components/dashboard/SubBranchPendingTab';
+import { SubBranchAnalyticsTab } from '../../components/dashboard/SubBranchAnalyticsTab';
 
 const { width } = Dimensions.get('window');
 
@@ -125,31 +131,16 @@ export default function SubBranchDashboard() {
                 finalData = await SalesService.getSalesByBranch(userBranch);
             }
             
-            setSales(finalData.sort((a, b) => 
-                new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime()
-            ));
+            // Concurrent fetch for better performance (reducing dashboard lag)
+            const [visits, stockData, branchComplaints, branchQuotations] = await Promise.all([
+                FieldVisitService.getFieldVisitsByBranch(userBranch),
+                userRegion ? StockService.getStockByRegion(userRegion) : Promise.resolve([] as Stock[]),
+                ComplaintService.getComplaints(userBranch),
+                QuotationService.getQuotationsByBranch(userBranch)
+            ]);
 
-            // Fetch field visits
-            const visits = await FieldVisitService.getFieldVisitsByBranch(userBranch);
-            setFieldVisits(visits);
-
-            // Fetch regional stock
-            if (userRegion) {
-                const stock = await StockService.getStockByRegion(userRegion);
-                setBranchStock(stock);
-            }
-
-            // Fetch branch complaints
-            const branchComplaints = await ComplaintService.getComplaints(userBranch);
-            setComplaints(branchComplaints);
-
-            // Fetch quotations for this branch
-            const branchQuotations = await QuotationService.getQuotationsByBranch(userBranch);
-            setQuotations(branchQuotations);
-
-            // Fetch any locally queued data that hasn't synced yet
+            // 5. Merge sync queue items (Deduplicated)
             const syncQueue = useSyncStore.getState().queue;
-            const userBranchTrimmed = userBranch.trim();
 
             // Merge local sales
             const localSales = syncQueue
@@ -157,7 +148,7 @@ export default function SubBranchDashboard() {
                 .map(op => {
                     const row = op.payload;
                     return {
-                        id: op.localId, // Use local ID for optimistic tracking
+                        id: op.localId, 
                         customerName: row.customer_name,
                         phone: row.phone,
                         email: row.email || '',
@@ -182,8 +173,8 @@ export default function SubBranchDashboard() {
                         warrantyGenerated: row.warranty_generated || false,
                         region: row.region || '',
                     } as Sale;
-                });
-            setSales(prev => [...localSales, ...prev]);
+                })
+                .filter(ls => !finalData.some((fs: Sale) => fs.warrantyId === ls.warrantyId || fs.id === ls.id));
 
             // Merge local field visits
             const localVisits = syncQueue
@@ -204,8 +195,8 @@ export default function SubBranchDashboard() {
                         visitDate: row.visit_date,
                         ...row
                     };
-                });
-            setFieldVisits(prev => [...localVisits, ...prev]);
+                })
+                .filter(lv => !visits.some((fv: any) => fv.id === lv.id));
 
             // Merge local complaints
             const localComplaints = syncQueue
@@ -229,8 +220,8 @@ export default function SubBranchDashboard() {
                         city: row.city,
                         createdAt: op.timestamp
                     } as Complaint;
-                });
-            setComplaints(prev => [...localComplaints, ...prev]);
+                })
+                .filter(lc => !branchComplaints.some((bc: Complaint) => bc.complaintId === lc.complaintId || bc.id === lc.id));
 
             // Merge local quotations
             const localQuotations = syncQueue
@@ -257,8 +248,18 @@ export default function SubBranchDashboard() {
                         branchId: row.branch_id,
                         createdAt: op.timestamp
                     } as Quotation;
-                });
-            setQuotations(prev => [...localQuotations, ...prev]);
+                })
+                .filter(lq => !branchQuotations.some((bq: Quotation) => bq.quotationNo === lq.quotationNo || bq.id === lq.id));
+
+            // 6. Update all state in one batch to prevent lag/re-renders
+            setSales([...localSales, ...finalData].sort((a, b) => 
+                new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime()
+            ));
+            setFieldVisits([...localVisits, ...visits]);
+            setComplaints([...localComplaints, ...branchComplaints]);
+            setQuotations([...localQuotations, ...branchQuotations]);
+            setBranchStock(stockData);
+
 
         } catch (error) {
             console.error(error);
@@ -444,7 +445,14 @@ export default function SubBranchDashboard() {
             const html = generateFieldVisitHTML(visit, logoUri, signUri);
 
             if (Platform.OS === 'web') {
-                await Print.printAsync({ html });
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                }
             } else {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
@@ -570,6 +578,38 @@ export default function SubBranchDashboard() {
         }
     };
 
+    const dashboardStats = useMemo(() => ({
+        totalWarranties: sales.length,
+        pendingWarranties: sales.filter(s => !s.warrantyGenerated).length,
+        totalVisits: fieldVisits.length,
+        activeComplaints: complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length
+    }), [sales.length, fieldVisits.length, complaints.length]);
+
+    const resources = [
+        { title: 'Training Manual', subtitle: 'Complete product guide', asset: TrainingManualPdf },
+        { title: 'Training Booklet', subtitle: 'Maintenance & Service', asset: TrainingBookletPdf },
+        { title: 'Product Catalogue', subtitle: 'Full product range', asset: ProductCataloguePdf },
+    ];
+    const filteredMonthsSales = useMemo(() => {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        return sales.filter(s => new Date(s.saleDate) >= monthStart);
+    }, [sales]);
+
+    const topSellingModels = useMemo(() => {
+        const counts: { [key: string]: number } = {};
+        sales.forEach(s => {
+            counts[s.productModel] = (counts[s.productModel] || 0) + 1;
+        });
+        return Object.entries(counts)
+            .map(([model, count]) => ({ name: model, units: count }))
+            .sort((a, b) => b.units - a.units)
+            .slice(0, 5);
+    }, [sales]);
+
+    const visitGraphData = useMemo(() => chartData, [chartData]);
+
     return (
         <MeshBackground>
             <ScrollView
@@ -631,42 +671,15 @@ export default function SubBranchDashboard() {
                         contentContainerStyle={styles.tabScrollContent}
                     >
                         <GlassPanel style={styles.tabSwitcher} intensity={30}>
-                            <Pressable
-                                onPress={() => setActiveTab('Dashboard')}
-                                style={[styles.tabButton, activeTab === 'Dashboard' && styles.tabButtonActive]}
-                            >
-                                <Text style={[styles.tabButtonText, activeTab === 'Dashboard' && styles.tabButtonTextActive]}>Dashboard</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setActiveTab('Analytics')}
-                                style={[styles.tabButton, activeTab === 'Analytics' && styles.tabButtonActive]}
-                            >
-                                <Text style={[styles.tabButtonText, activeTab === 'Analytics' && styles.tabButtonTextActive]}>Analytics</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setActiveTab('Stock')}
-                                style={[styles.tabButton, activeTab === 'Stock' && styles.tabButtonActive]}
-                            >
-                                <Text style={[styles.tabButtonText, activeTab === 'Stock' && styles.tabButtonTextActive]}>Stock</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setActiveTab('FieldVisits')}
-                                style={[styles.tabButton, activeTab === 'FieldVisits' && styles.tabButtonActive]}
-                            >
-                                <Text style={[styles.tabButtonText, activeTab === 'FieldVisits' && styles.tabButtonTextActive]}>Visits</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setActiveTab('Quotations')}
-                                style={[styles.tabButton, activeTab === 'Quotations' && styles.tabButtonActive]}
-                            >
-                                <Text style={[styles.tabButtonText, activeTab === 'Quotations' && styles.tabButtonTextActive]}>Quotations</Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setActiveTab('Pending')}
-                                style={[styles.tabButton, activeTab === 'Pending' && styles.tabButtonActive]}
-                            >
-                                <Text style={[styles.tabButtonText, activeTab === 'Pending' && styles.tabButtonTextActive]}>Pending</Text>
-                            </Pressable>
+                            {(['Dashboard', 'Analytics', 'Stock', 'FieldVisits', 'Quotations', 'Complaints', 'Pending'] as const).map(tab => (
+                                <Pressable
+                                    key={tab}
+                                    onPress={() => setActiveTab(tab)}
+                                    style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
+                                >
+                                    <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>{tab}</Text>
+                                </Pressable>
+                            ))}
                         </GlassPanel>
                     </ScrollView>
                 </View>
@@ -679,839 +692,70 @@ export default function SubBranchDashboard() {
                         </GlassPanel>
                     </View>
                 ) : activeTab === 'Dashboard' ? (
-                    <>
-                        {/* Stats Grid */}
-                        <View style={styles.statsGrid}>
-                            <GlassPanel style={styles.statCard}>
-                                <View style={styles.statIconWrapperVerify}>
-                                    <MaterialIcons name="verified-user" size={20} color={THEME.colors.secondary} />
-                                </View>
-                                <View style={{ flex: 1, justifyContent: 'center' }}>
-                                    <Text style={styles.statValue}>{totalWarrantiesCount}</Text>
-                                    <Text style={styles.statLabel}>WARRANTIES</Text>
-                                </View>
-                                <View style={[styles.statBadge, { backgroundColor: THEME.colors.primary + '15' }]}>
-                                    <Text style={[styles.statBadgeText, { color: THEME.colors.primary }]}>Total</Text>
-                                </View>
-                            </GlassPanel>
-
-                            <GlassPanel style={[styles.statCard, { backgroundColor: '#FEF3C780', padding: 12 }]}>
-                                <Pressable
-                                    style={{ flex: 1, justifyContent: 'center' }}
-                                    onPress={() => setActiveTab('Pending')}
-                                >
-                                    <View style={[styles.statIconWrapperPending, { backgroundColor: '#FEF3C7' }]}>
-                                        <MaterialCommunityIcons name="clock-outline" size={20} color="#D97706" />
-                                    </View>
-                                    <View style={{ marginTop: 8 }}>
-                                        <Text style={[styles.statValue, { color: '#D97706' }]}>{pendingWarrantiesCount}</Text>
-                                        <Text style={[styles.statLabel, { color: '#92400E' }]}>PENDING</Text>
-                                    </View>
-                                    <View style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}>
-                                        <Text style={[styles.statBadgeText, { color: '#D97706' }]}>Sales</Text>
-                                    </View>
-                                </Pressable>
-                            </GlassPanel>
-
-                            <GlassPanel style={[styles.statCard, { backgroundColor: '#D1FAE580', padding: 12 }]}>
-                                <Pressable
-                                    style={{ flex: 1, justifyContent: 'center' }}
-                                    onPress={() => setActiveTab('FieldVisits')}
-                                >
-                                    <View style={[styles.statIconWrapperPending, { backgroundColor: '#D1FAE5' }]}>
-                                        <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#059669" />
-                                    </View>
-                                    <View style={{ marginTop: 8 }}>
-                                        <Text style={[styles.statValue, { color: '#059669' }]}>{totalVisitsCount}</Text>
-                                        <Text style={[styles.statLabel, { color: '#065F46' }]}>VISITS</Text>
-                                    </View>
-                                    <View style={[styles.statBadge, { backgroundColor: '#D1FAE5' }]}>
-                                        <Text style={[styles.statBadgeText, { color: '#059669' }]}>Total</Text>
-                                    </View>
-                                </Pressable>
-                            </GlassPanel>
-
-                            <GlassPanel style={[styles.statCard, { backgroundColor: '#FEE2E280', padding: 12 }]}>
-                                <Pressable
-                                    style={{ flex: 1, justifyContent: 'center' }}
-                                    onPress={() => setActiveTab('Complaints')}
-                                >
-                                    <View style={[styles.statIconWrapperPending, { backgroundColor: '#FEE2E2' }]}>
-                                        <MaterialIcons name="report-problem" size={20} color="#EF4444" />
-                                    </View>
-                                    <View style={{ marginTop: 8 }}>
-                                        <Text style={[styles.statValue, { color: '#EF4444' }]}>{activeComplaintsCount}</Text>
-                                        <Text style={[styles.statLabel, { color: '#B91C1C' }]}>COMPLAINTS</Text>
-                                    </View>
-                                    <View style={[styles.statBadge, { backgroundColor: '#FEE2E2' }]}>
-                                        <Text style={[styles.statBadgeText, { color: '#EF4444' }]}>Open</Text>
-                                    </View>
-                                </Pressable>
-                            </GlassPanel>
-                        </View>
-
-                        {/* Quick Actions */}
-                        <View style={styles.sectionCmd}>
-                            <Text style={styles.sectionTitle}>Quick Actions</Text>
-                            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.actionBtn,
-                                        { flex: 1 },
-                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                                    ]}
-                                    onPress={() => navigation.navigate('CreateSaleStep1')}
-                                >
-                                    <View style={styles.actionIcon}>
-                                        <MaterialIcons name="add" size={20} color="white" />
-                                    </View>
-                                    <Text style={styles.actionText}>New Warranty</Text>
-                                </Pressable>
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.actionBtn,
-                                        { flex: 1 },
-                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                                    ]}
-                                    onPress={() => navigation.navigate('FieldVisitForm')}
-                                >
-                                    <View style={[styles.actionIcon, { backgroundColor: THEME.colors.mintLight }]}>
-                                        <MaterialIcons name="assignment" size={20} color={THEME.colors.secondary} />
-                                    </View>
-                                    <Text style={styles.actionText}>Field Visit</Text>
-                                </Pressable>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.actionBtn,
-                                        { flex: 1 },
-                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                                    ]}
-                                    onPress={() => navigation.navigate('RaiseComplaintStep1')}
-                                >
-                                    <View style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
-                                        <MaterialIcons name="report-problem" size={20} color="#EF4444" />
-                                    </View>
-                                    <Text style={styles.actionText}>Raise Complaint</Text>
-                                </Pressable>
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.actionBtn,
-                                        { flex: 1 },
-                                        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-                                    ]}
-                                    onPress={() => navigation.navigate('CreateQuotationScreen')}
-                                >
-                                    <View style={[styles.actionIcon, { backgroundColor: '#E0F2FE' }]}>
-                                        <MaterialIcons name="receipt" size={20} color="#0EA5E9" />
-                                    </View>
-                                    <Text style={styles.actionText}>Quotation</Text>
-                                </Pressable>
-                            </View>
-                        </View>
-
-
-
-                        {/* Pending Action Warranties (Unpaid > 45 Days) */}
-                        {pendingActionSales.length > 0 && (
-                            <View style={{ marginTop: 24, marginBottom: 8 }}>
-                                <View style={styles.recentHeader}>
-                                    <Text style={[styles.sectionTitle, { color: '#EF4444' }]}>Pending Actions (Over 45 Days)</Text>
-                                    <View style={{ backgroundColor: '#EF4444', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 8 }}>
-                                        <Text style={{ color: 'white', fontSize: 10, fontFamily: THEME.fonts.bold }}>{pendingActionSales.length}</Text>
-                                    </View>
-                                </View>
-                                <GlassPanel style={[styles.listContainer, { borderColor: '#EF444440', backgroundColor: '#EF444405' }]}>
-                                    {pendingActionSales.map(item => (
-                                        <Pressable
-                                            key={item.id}
-                                            style={styles.listItem}
-                                            onPress={() => handleUpdatePayment(item)}
-                                        >
-                                            <View style={[styles.listIcon, { backgroundColor: '#FEE2E2' }]}>
-                                                <MaterialIcons name="error-outline" size={20} color="#EF4444" />
-                                            </View>
-                                            <View style={styles.listInfo}>
-                                                <Text style={styles.listTitle}>{item.productModel}</Text>
-                                                <Text style={styles.listSub} numberOfLines={1}>
-                                                    {item.customerName} • {item.city}
-                                                </Text>
-                                            </View>
-                                            <View style={{ backgroundColor: '#EF4444', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                                                <Text style={{ color: 'white', fontSize: 10, fontFamily: THEME.fonts.bold }}>UPDATE</Text>
-                                            </View>
-                                        </Pressable>
-                                    ))}
-                                </GlassPanel>
-                            </View>
-                        )}
-
-                        {/* Recent Warranties Section */}
-                        <View style={styles.recentHeader}>
-                            <Text style={styles.sectionTitle}>Recent Warranties</Text>
-                            <Pressable onPress={() => setActiveTab('Dashboard')}>
-                                <Text style={styles.seeAllText}>View All</Text>
-                            </Pressable>
-                        </View>
-
-                        <GlassPanel style={styles.listContainer}>
-                            {sales.filter(s => s.warrantyId).length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <MaterialCommunityIcons name="inbox-outline" size={32} color={THEME.colors.textSecondary} />
-                                    <Text style={styles.emptyText}>No warranties yet</Text>
-                                </View>
-                            ) : (
-                                sales.filter(s => s.warrantyId).slice(0, 3).map(item => {
-                                    const countdown = calculateDaysRemaining(item.saleDate);
-                                    const isPending = !item.warrantyGenerated;
-                                    return (
-                                        <Pressable
-                                            key={item.id}
-                                            style={styles.listItem}
-                                            onPress={() => {
-                                                if (item.warrantyGenerated) {
-                                                    navigation.navigate('WarrantyCard', { sale: item });
-                                                } else {
-                                                    handleUpdatePayment(item);
-                                                }
-                                            }}
-                                        >
-                                            <View style={[styles.listIcon, { backgroundColor: isPending ? '#FEF3C7' : THEME.colors.mintLight }]}>
-                                                <MaterialCommunityIcons 
-                                                    name={isPending ? 'calendar-clock' : 'check-circle'} 
-                                                    size={20} 
-                                                    color={isPending ? THEME.colors.warning : THEME.colors.success} 
-                                                />
-                                            </View>
-                                            <View style={styles.listInfo}>
-                                                <Text style={styles.listTitle}>{item.productModel}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                                                    <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
-                                                        {item.customerName} • {item.city}
-                                                    </Text>
-                                                    <View style={[styles.countdownBadge, { backgroundColor: (isPending ? THEME.colors.warning : countdown.color) + '20' }]}>
-                                                        <Text style={[styles.countdownText, { color: isPending ? THEME.colors.warning : countdown.color }]}>
-                                                            {isPending ? `PENDING (${countdown.days}d)` : countdown.label}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                            <View style={styles.listAmount}>
-                                                <Text style={styles.amountText}>{item.warrantyId}</Text>
-                                                <Text style={styles.dateText}>{new Date(item.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                            </View>
-                                        </Pressable>
-                                    );
-                                })
-                            )}
-                        </GlassPanel>
-
-                        {/* Recent Field Visits Section */}
-                        <View style={[styles.recentHeader, { marginTop: 24 }]}>
-                            <Text style={styles.sectionTitle}>Recent Field Visits</Text>
-                            <Pressable onPress={() => setActiveTab('FieldVisits')}>
-                                <Text style={styles.seeAllText}>View All</Text>
-                            </Pressable>
-                        </View>
-
-                        <GlassPanel style={styles.listContainer}>
-                            {fieldVisits.length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <MaterialCommunityIcons name="clipboard-text-outline" size={32} color={THEME.colors.textSecondary} />
-                                    <Text style={styles.emptyText}>No field visits yet</Text>
-                                </View>
-                            ) : (
-                                fieldVisits.slice(0, 3).map((visit, idx) => {
-                                    const date = new Date(visit.dateOfVisit || visit.visitDate || visit.createdAt);
-                                    const type = visit.propertyType || visit.visitType || 'Inspection';
-                                    return (
-                                        <Pressable
-                                            key={visit.id || idx}
-                                            style={[styles.listItem, idx === fieldVisits.slice(0, 3).length - 1 && { borderBottomWidth: 0 }]}
-                                            onPress={async () => {
-                                                try {
-                                                    setLoading(true);
-                                                    const [logoUri, signUri] = await Promise.all([
-                                                        getAssetBase64(LogoImage),
-                                                        getAssetBase64(SignStampImage)
-                                                    ]);
-                                                    const html = generateFieldVisitHTML(visit, logoUri, signUri);
-                                                    if (Platform.OS === 'web') {
-                                                        const printWindow = window.open('', '_blank');
-                                                        if (printWindow) {
-                                                            printWindow.document.write(html);
-                                                            printWindow.document.close();
-                                                            setTimeout(() => printWindow.print(), 500);
-                                                        }
-                                                    } else {
-                                                        const { uri } = await Print.printToFileAsync({ html });
-                                                        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
-                                                    }
-                                                } catch (error) {
-                                                    Alert.alert("Failed to Update", 'Failed to generate report PDF');
-                                                } finally {
-                                                    setLoading(false);
-                                                }
-                                            }}
-                                        >
-                                            <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
-                                                <MaterialCommunityIcons
-                                                    name={type === 'Residential' ? 'home-outline' : 'factory'}
-                                                    size={20}
-                                                    color={THEME.colors.primary}
-                                                />
-                                            </View>
-                                            <View style={styles.listInfo}>
-                                                <Text style={styles.listTitle} numberOfLines={1}>
-                                                    {visit.clientCompanyName || visit.contactPersonName || visit.siteName || visit.companyBuildingName || 'Unknown Site'}
-                                                </Text>
-                                                <Text style={styles.listSub}>{visit.city || visit.industryType || 'No Location'}</Text>
-                                            </View>
-                                            <View style={styles.listAmount}>
-                                                <View style={[styles.countdownBadge, { backgroundColor: THEME.colors.primary + '15', marginBottom: 4 }]}>
-                                                    <Text style={[styles.countdownText, { color: THEME.colors.primary, fontSize: 10 }]}>{type}</Text>
-                                                </View>
-                                                <Text style={styles.dateText}>{date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
-                                            </View>
-                                        </Pressable>
-                                    );
-                                })
-                            )}
-                        </GlassPanel>
-
-                        {/* Resources Section */}
-                        <View style={{ marginTop: 10, marginBottom: 20 }}>
-                            <Text style={styles.sectionTitle}>Resources</Text>
-                            <View style={{ gap: 12 }}>
-                                {[
-                                    {
-                                        title: 'Training Manual',
-                                        subtitle: 'Learn how to use the EKOTEX icons and features correctly.',
-                                        asset: TrainingManualPdf,
-                                    },
-                                    {
-                                        title: 'Training Booklet',
-                                        subtitle: 'Comprehensive guide for technical training and operations.',
-                                        asset: TrainingBookletPdf,
-                                    },
-                                    {
-                                        title: 'Product Catalogue',
-                                        subtitle: 'Browse through our full range of EKOTEX machines and tools.',
-                                        asset: ProductCataloguePdf,
-                                    },
-                                    {
-                                        title: 'Flow Rate Chart',
-                                        subtitle: 'Reference chart for machine output and flow optimization.',
-                                        asset: FlowRateChartPdf,
-                                    }
-                                ].map((item, index) => (
-                                    <GlassPanel key={index} style={styles.trainingCard}>
-                                        <View style={styles.trainingIconWrapper}>
-                                            <MaterialCommunityIcons
-                                                name={item.title.includes('Chart') ? 'chart-box-outline' : 'file-pdf-box'}
-                                                size={32}
-                                                color={item.title.includes('Chart') ? '#0EA5E9' : '#FF5252'}
-                                            />
-                                        </View>
-                                        <View style={{ flex: 1, marginLeft: 16 }}>
-                                            <Text style={styles.trainingTitle}>{item.title}</Text>
-                                            <Text style={styles.trainingSubtitle}>{item.subtitle}</Text>
-                                        </View>
-                                        <Pressable
-                                            style={({ pressed }) => [styles.viewManualBtn, pressed && { opacity: 0.7 }]}
-                                            onPress={async () => {
-                                                try {
-                                                    setLoading(true);
-                                                    const asset = Asset.fromModule(item.asset);
-                                                    await asset.downloadAsync();
-                                                    const uri = asset.localUri || asset.uri;
-
-                                                    if (Platform.OS === 'web') {
-                                                        window.open(uri, '_blank');
-                                                    } else {
-                                                        await Sharing.shareAsync(uri, {
-                                                            mimeType: 'application/pdf',
-                                                            dialogTitle: `EKOTEX ${item.title}`,
-                                                            UTI: 'com.adobe.pdf'
-                                                        });
-                                                    }
-                                                } catch (error) {
-                                                    Alert.alert("Failed to Update", `Failed to open ${item.title.toLowerCase()}\nPlease try again.`);
-                                                } finally {
-                                                    setLoading(false);
-                                                }
-                                            }}
-                                        >
-                                            <MaterialCommunityIcons name="eye-outline" size={18} color="white" />
-                                            <Text style={styles.viewManualText}>VIEW</Text>
-                                        </Pressable>
-                                    </GlassPanel>
-                                ))}
-                            </View>
-                        </View>
-
-                        <View style={{ height: 100 }} />
-                    </>
+                    <SubBranchDashboardOverview
+                        stats={dashboardStats}
+                        pendingActionSales={pendingActionSales}
+                        recentSales={sales.filter(s => s.warrantyId).slice(0, 3)}
+                        recentVisits={fieldVisits.slice(0, 3)}
+                        resources={resources}
+                        onNavigate={navigation.navigate}
+                        onSetActiveTab={setActiveTab}
+                        onUpdatePayment={handleUpdatePayment}
+                        onDownloadVisit={handleDownloadVisit}
+                        calculateDaysRemaining={calculateDaysRemaining}
+                        setLoading={setLoading}
+                    />
                 ) : activeTab === 'Analytics' ? (
-                    <View style={{ paddingHorizontal: 16 }}>
-                        <View style={styles.recentHeader}>
-                            <Text style={styles.sectionTitle}>Activity Analytics</Text>
-                        </View>
-                        {/* Total Sales Graph Card */}
-                        <GlassPanel style={[styles.graphCard, { marginTop: 0 }]}>
-                            <View style={styles.graphHeader}>
-                                <View>
-                                    <Text style={styles.graphTitle}>Success Overview</Text>
-                                    <View style={styles.amountSelectorRow}>
-                                        <Text style={styles.graphAmount}>{activeWarrantiesCount + fieldVisitsCompleted}</Text>
-                                        <View style={styles.periodSelector}>
-                                            <Pressable onPress={() => setPeriod('Today')} style={[styles.periodBtn, period === 'Today' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === 'Today' && styles.periodBtnTextActive]}>1D</Text>
-                                            </Pressable>
-                                            <Pressable onPress={() => setPeriod('7d')} style={[styles.periodBtn, period === '7d' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === '7d' && styles.periodBtnTextActive]}>7D</Text>
-                                            </Pressable>
-                                            <Pressable onPress={() => setPeriod('30d')} style={[styles.periodBtn, period === '30d' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === '30d' && styles.periodBtnTextActive]}>1M</Text>
-                                            </Pressable>
-                                            <Pressable onPress={() => setPeriod('1y')} style={[styles.periodBtn, period === '1y' && styles.periodBtnActive]}>
-                                                <Text style={[styles.periodBtnText, period === '1y' && styles.periodBtnTextActive]}>1Y</Text>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                </View>
-                                <View style={styles.trendBadge}>
-                                    <MaterialIcons name="trending-up" size={14} color="white" />
-                                    <Text style={styles.trendText}>+12.5%</Text>
-                                </View>
-                            </View>
-
-                            <LineChart
-                                data={chartData}
-                                width={width - 48}
-                                height={180}
-                                withInnerLines={false}
-                                withOuterLines={false}
-                                withVerticalLines={false}
-                                withHorizontalLines={false}
-                                withDots={true}
-                                withShadow={false}
-                                formatYLabel={(label) => Math.round(parseFloat(label)).toString()}
-                                chartConfig={{
-                                    backgroundColor: "#ffffff",
-                                    backgroundGradientFrom: "#ffffff",
-                                    backgroundGradientTo: "#ffffff",
-                                    decimalPlaces: 0,
-                                    color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
-                                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                                    style: {
-                                        borderRadius: 16
-                                    },
-                                    propsForDots: {
-                                        r: "4",
-                                        strokeWidth: 2,
-                                        stroke: "#ffffff"
-                                    },
-                                    strokeWidth: 3,
-                                    propsForLabels: {
-                                        fontSize: 10,
-                                    }
-                                }}
-                                bezier
-                                style={{
-                                    paddingRight: 35,
-                                    marginTop: 16,
-                                    marginLeft: -10,
-                                }}
-                            />
-                            {/* Legend */}
-                            <View style={styles.legendRow}>
-                                <View style={styles.legendItem}>
-                                    <View style={[styles.legendDot, { backgroundColor: THEME.colors.secondary }]} />
-                                    <Text style={styles.legendText}>Warranties Generated</Text>
-                                </View>
-                            </View>
-                        </GlassPanel>
-
-                        {/* Product Sales Breakdown */}
-                        <GlassPanel style={[styles.graphCard, { marginTop: 20 }]}>
-                            <View style={styles.graphHeader}>
-                                <Text style={styles.graphTitle}>Product Sales Breakdown</Text>
-                                <MaterialCommunityIcons name="chart-bar" size={20} color="#7C3AED" />
-                            </View>
-
-                            {(() => {
-                                // Calculate product counts
-                                const productCounts: { [key: string]: number } = {};
-                                filteredSales.forEach(sale => {
-                                    const model = sale.productModel || 'Unknown';
-                                    productCounts[model] = (productCounts[model] || 0) + 1;
-                                });
-
-                                // Convert to array and sort by count
-                                const sortedProducts = Object.entries(productCounts)
-                                    .map(([model, count]) => ({ model, count }))
-                                    .sort((a, b) => b.count - a.count)
-                                    .slice(0, 5); // Top 5 products
-
-                                const totalSales = filteredSales.length;
-
-                                if (sortedProducts.length === 0) {
-                                    return (
-                                        <View style={styles.emptyProductState}>
-                                            <MaterialCommunityIcons name="package-variant" size={40} color="#9CA3AF" />
-                                            <Text style={styles.emptyProductText}>No product data available</Text>
-                                        </View>
-                                    );
-                                }
-
-                                return (
-                                    <View style={{ marginTop: 16, gap: 12 }}>
-                                        {sortedProducts.map((product, index) => {
-                                            const percentage = totalSales > 0 ? (product.count / totalSales) * 100 : 0;
-                                            return (
-                                                <View key={product.model} style={styles.productItem}>
-                                                    <View style={styles.productHeader}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                                                            <View style={[styles.productRank, { backgroundColor: index === 0 ? '#7C3AED' : '#E5E7EB' }]}>
-                                                                <Text style={[styles.productRankText, { color: index === 0 ? 'white' : '#6B7280' }]}>
-                                                                    {index + 1}
-                                                                </Text>
-                                                            </View>
-                                                            <Text style={styles.productModelName} numberOfLines={1}>{product.model}</Text>
-                                                        </View>
-                                                        <View style={styles.productStats}>
-                                                            <Text style={styles.productCount}>{product.count}</Text>
-                                                            <Text style={styles.productPercentage}>{percentage.toFixed(1)}%</Text>
-                                                        </View>
-                                                    </View>
-                                                    <View style={styles.productBarContainer}>
-                                                        <View
-                                                            style={[
-                                                                styles.productBar,
-                                                                {
-                                                                    width: `${percentage}%`,
-                                                                    backgroundColor: index === 0 ? '#7C3AED' : '#A78BFA'
-                                                                }
-                                                            ]}
-                                                        />
-                                                    </View>
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
-                                );
-                            })()}
-                        </GlassPanel>
-                    </View>
+                    <SubBranchAnalyticsTab
+                        totalSales={sales.length}
+                        monthlySales={filteredMonthsSales.length}
+                        totalVisits={fieldVisits.length}
+                        resolvedComplaints={complaints.filter(c => c.status === 'Resolved' || c.status === 'Closed').length}
+                        topModels={topSellingModels}
+                        visitChartData={visitGraphData}
+                        onSetActiveTab={setActiveTab}
+                    />
                 ) : activeTab === 'Stock' ? (
                     <StockViewContent branchStock={branchStock} userRegion={user?.region} />
                 ) : activeTab === 'FieldVisits' ? (
-                    <View style={{ paddingBottom: 80 }}>
-                        <View style={styles.recentHeader}>
-                            <Text style={styles.sectionTitle}>Field Visits</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
-                            </View>
-                        </View>
-
-                        <GlassPanel style={styles.listContainer}>
-                            {sortedVisits.length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <MaterialCommunityIcons name="clipboard-text-outline" size={48} color={THEME.colors.textSecondary} />
-                                    <Text style={styles.emptyText}>No field visits found</Text>
-                                </View>
-                            ) : (
-                                <>
-                                    {sortedVisits.map((visit: any, idx: number) => {
-                                        const date = new Date(visit.dateOfVisit || visit.visitDate || visit.createdAt);
-                                        const type = visit.propertyType || visit.visitType || 'Inspection';
-                                        return (
-                                            <Pressable
-                                                key={visit.id || idx}
-                                                style={[styles.listItem, idx === sortedVisits.length - 1 && { borderBottomWidth: 0 }]}
-                                                onPress={async () => {
-                                                    try {
-                                                        setLoading(true);
-
-                                                        // Convert assets to Base64 for robust loading in PDFs
-                                                        const [logoUri, signUri] = await Promise.all([
-                                                            getAssetBase64(LogoImage),
-                                                            getAssetBase64(SignStampImage)
-                                                        ]);
-
-                                                        const html = generateFieldVisitHTML(visit, logoUri, signUri);
-
-                                                        if (Platform.OS === 'web') {
-                                                            const printWindow = window.open('', '_blank');
-                                                            if (printWindow) {
-                                                                printWindow.document.write(html);
-                                                                printWindow.document.close();
-                                                                setTimeout(() => {
-                                                                    printWindow.print();
-                                                                }, 500);
-                                                            }
-                                                        } else {
-                                                            const { uri } = await Print.printToFileAsync({ html });
-                                                            await Sharing.shareAsync(uri, {
-                                                                mimeType: 'application/pdf',
-                                                                dialogTitle: 'Download Field Visit Report',
-                                                                UTI: 'com.adobe.pdf'
-                                                            });
-                                                        }
-                                                    } catch (error) {
-                                                        console.error('Report generation error:', error);
-                                                        Alert.alert("Failed to Update", 'Failed to generate report PDF' + "\nPlease try again.");
-                                                    } finally {
-                                                        setLoading(false);
-                                                    }
-                                                }}
-                                            >
-                                                <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
-                                                    <MaterialCommunityIcons
-                                                        name={type === 'Residential' ? 'home-outline' : 'factory'}
-                                                        size={20}
-                                                        color={THEME.colors.primary}
-                                                    />
-                                                </View>
-                                                <View style={[styles.listInfo, { flex: 1, marginRight: 8 }]}>
-                                                    <Text style={styles.listTitle} numberOfLines={1}>
-                                                        {visit.clientCompanyName || visit.contactPersonName || visit.siteName || visit.companyBuildingName || 'Unknown Site'}
-                                                    </Text>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                        <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
-                                                            {visit.city || visit.industryType || 'No Location'}
-                                                        </Text>
-                                                        <View style={[styles.countdownBadge, { backgroundColor: THEME.colors.primary + '15' }]}>
-                                                            <Text style={[styles.countdownText, { color: THEME.colors.primary, fontSize: 10 }]}>
-                                                                {type}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                                <View style={[styles.listAmount, { minWidth: 70 }]}>
-                                                    <Text style={[styles.amountText, { fontSize: 13 }]} numberOfLines={1}>{visit.id?.slice(0, 8)}</Text>
-                                                    <Text style={styles.dateText}>{date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
-                                                </View>
-                                                <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
-                                            </Pressable>
-                                        );
-                                    })}
-                                </>
-                            )}
-                        </GlassPanel>
-                    </View>
+                    <SubBranchFieldVisitsTab
+                        visits={sortedVisits}
+                        onNavigate={navigation.navigate}
+                        onDownloadVisit={handleDownloadVisit}
+                        onSetActiveTab={setActiveTab}
+                        sortOrder={sortOrder}
+                        setSortOrder={setSortOrder}
+                    />
                 ) : activeTab === 'Pending' ? (
-                    <View style={{ paddingBottom: 80 }}>
-                        <View style={styles.recentHeader}>
-                            <Pressable
-                                onPress={() => setActiveTab('Dashboard')}
-                                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-                            >
-                                <MaterialIcons name="arrow-back" size={24} color={THEME.colors.text} />
-                                <Text style={styles.sectionTitle}>Pending Warranties</Text>
-                            </Pressable>
-                            <View style={{ backgroundColor: '#FEF3C7', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }}>
-                                <Text style={{ color: '#D97706', fontSize: 10, fontFamily: THEME.fonts.bold }}>{pendingWarrantiesCount} Total</Text>
-                            </View>
-                        </View>
-
-                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
-
-                        <GlassPanel style={styles.listContainer}>
-                            {sales.filter(s => !s.warrantyGenerated && s.status !== 'rejected').length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <MaterialCommunityIcons name="check-all" size={48} color={THEME.colors.success} />
-                                    <Text style={styles.emptyText}>All sales are processed!</Text>
-                                </View>
-                            ) : (
-                                sales
-                                    .filter(s => !s.warrantyGenerated && s.status !== 'rejected')
-                                    .sort((a, b) => {
-                                        const dateA = new Date(a.saleDate).getTime();
-                                        const dateB = new Date(b.saleDate).getTime();
-                                        return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-                                    })
-                                    .map((item) => {
-                                        const countdown = calculateDaysRemaining(item.saleDate);
-                                        return (
-                                            <Pressable
-                                                key={item.id}
-                                                style={styles.listItem}
-                                                onPress={() => handleUpdatePayment(item)}
-                                            >
-
-                                                <View style={[styles.listIcon, { backgroundColor: '#FEF3C7' }]}>
-                                                    <MaterialCommunityIcons name="clock-alert-outline" size={20} color="#D97706" />
-                                                </View>
-                                                <View style={styles.listInfo}>
-                                                    <Text style={styles.listTitle}>{item.productModel}</Text>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                        <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1}>
-                                                            {item.customerName} • {item.city}
-                                                        </Text>
-                                                        <View style={[styles.countdownBadge, { backgroundColor: countdown.color + '20' }]}>
-                                                            <Text style={[styles.countdownText, { color: countdown.color }]}>
-                                                                {countdown.label}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                    <Text style={[styles.dateText, { marginTop: 4 }]}>Invoice: {item.invoiceNumber}</Text>
-                                                </View>
-                                                <MaterialIcons name="chevron-right" size={24} color={THEME.colors.textSecondary} />
-                                            </Pressable>
-                                        );
-                                    })
-                            )}
-                        </GlassPanel>
-                    </View>
+                    <SubBranchPendingTab
+                        pendingSales={sales.filter(s => !s.warrantyGenerated)}
+                        onNavigate={navigation.navigate}
+                        onUpdatePayment={handleUpdatePayment}
+                        onSetActiveTab={setActiveTab}
+                        calculateDaysRemaining={calculateDaysRemaining}
+                        sortOrder={sortOrder}
+                        setSortOrder={setSortOrder}
+                    />
                 ) : activeTab === 'Quotations' ? (
-                    <View style={{ paddingBottom: 80 }}>
-                        <View style={styles.recentHeader}>
-                            <Pressable
-                                onPress={() => setActiveTab('Dashboard')}
-                                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-                            >
-                                <MaterialIcons name="arrow-back" size={24} color={THEME.colors.text} />
-                                <Text style={styles.sectionTitle}>Quotations</Text>
-                            </Pressable>
-                        </View>
-
-                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
-
-                        <GlassPanel style={{ padding: 8 }}>
-                            {displayQuotations.length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <MaterialCommunityIcons name="receipt" size={48} color={THEME.colors.textSecondary} />
-                                    <Text style={styles.emptyText}>No quotations found</Text>
-                                </View>
-                            ) : (
-                                displayQuotations.map((q: any, idx: number) => {
-                                    return (
-                                        <Pressable
-                                            key={q.id || idx}
-                                            style={({ pressed }) => [
-                                                styles.listItem,
-                                                pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
-                                                idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }
-                                            ]}
-                                            onPress={() => handleDownloadQuotation(q)}
-                                        >
-                                            <View style={[styles.listIcon, { backgroundColor: '#E0F2FE' }]}>
-                                                <MaterialCommunityIcons
-                                                    name="receipt"
-                                                    size={20}
-                                                    color="#0EA5E9"
-                                                />
-                                            </View>
-                                            <View style={[styles.listInfo, { flex: 1, marginRight: 8 }]}>
-                                                <Text style={styles.listTitle} numberOfLines={1}>{q.customerName}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <View style={[styles.countdownBadge, { backgroundColor: '#E0F2FE' }]}>
-                                                        <Text style={[styles.countdownText, { color: '#0EA5E9' }]} numberOfLines={1}>
-                                                            {q.quotationNo || q.id?.slice(0, 8)}
-                                                        </Text>
-                                                    </View>
-                                                    <Text style={styles.dateText}>{new Date(q.createdAt || q.quotationDate).toLocaleDateString()}</Text>
-                                                </View>
-                                            </View>
-                                            <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
-                                                <View style={{ alignItems: 'flex-end', minWidth: 60 }}>
-                                                    <Text style={[styles.amountText, { fontSize: 13, color: THEME.colors.text }]} numberOfLines={1}>
-                                                        ₹{(() => {
-                                                            const rate = parseFloat(q.rate || '0') || 0;
-                                                            const qty = parseFloat(q.qty || '0') || 0;
-                                                            const disc = parseFloat(q.discountPerc || '0') || 0;
-                                                            const discounted = rate * (1 - disc / 100);
-                                                            const total = Math.round((discounted * qty) * 1.18);
-                                                            return total.toLocaleString('en-IN');
-                                                        })()}
-                                                    </Text>
-                                                </View>
-                                                <View style={{ padding: 4 }}>
-                                                    <MaterialCommunityIcons name="file-download-outline" size={20} color={THEME.colors.primary} />
-                                                </View>
-                                                <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
-                                            </View>
-                                        </Pressable>
-                                    );
-                                })
-                            )}
-                        </GlassPanel>
-                    </View>
+                    <SubBranchQuotationsTab
+                        quotations={displayQuotations}
+                        onNavigate={navigation.navigate}
+                        onDownloadQuotation={handleDownloadQuotation}
+                        onSetActiveTab={setActiveTab}
+                        sortOrder={sortOrder}
+                        setSortOrder={setSortOrder}
+                    />
                 ) : (
-                    <View style={{ paddingBottom: 80 }}>
-                        <View style={styles.recentHeader}>
-                            <Pressable
-                                onPress={() => setActiveTab('Dashboard')}
-                                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-                            >
-                                <MaterialIcons name="arrow-back" size={24} color={THEME.colors.text} />
-                                <Text style={styles.sectionTitle}>Complaints Hub</Text>
-                            </Pressable>
-                        </View>
-
-                        <SortControls sortOrder={sortOrder} setSortOrder={setSortOrder} />
-
-                        <GlassPanel style={{ padding: 8 }}>
-                            {sortedComplaints.length === 0 ? (
-                                <View style={styles.emptyState}>
-                                    <MaterialCommunityIcons name="check-circle-outline" size={48} color={THEME.colors.success} />
-                                    <Text style={styles.emptyText}>No complaints found</Text>
-                                </View>
-                            ) : (
-                                sortedComplaints.map((comp: any, idx: number) => {
-                                    const isResolved = comp.status === 'Resolved' || comp.status === 'Closed';
-                                    return (
-                                        <Pressable
-                                            key={comp.id || idx}
-                                            style={[styles.listItem, idx === sortedComplaints.length - 1 && { borderBottomWidth: 0 }]}
-                                            onPress={() => navigation.navigate('RaiseComplaintStep2', {
-                                                complaint: comp,
-                                                clientData: {
-                                                    invoiceNumber: comp.invoiceNo,
-                                                    customerName: comp.customerName,
-                                                    phone: comp.customerPhone,
-                                                    email: comp.customerEmail,
-                                                    city: comp.city
-                                                }
-                                            })}
-                                        >
-                                            <View style={[styles.listIcon, { backgroundColor: isResolved ? THEME.colors.mintLight : '#FEE2E2' }]}>
-                                                <MaterialIcons
-                                                    name={isResolved ? "check-circle" : "warning"}
-                                                    size={20}
-                                                    color={isResolved ? THEME.colors.success : '#EF4444'}
-                                                />
-                                            </View>
-                                            <View style={[styles.listInfo, { flex: 1, marginRight: 8 }]}>
-                                                <Text style={styles.listTitle} numberOfLines={1}>{comp.customerName}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <View style={[styles.countdownBadge, { backgroundColor: isResolved ? THEME.colors.success + '20' : '#EF444420' }]}>
-                                                        <Text style={[styles.countdownText, { color: isResolved ? THEME.colors.success : '#EF4444' }]} numberOfLines={1}>
-                                                            {comp.status}
-                                                        </Text>
-                                                    </View>
-                                                    <Text style={styles.dateText}>{new Date(comp.dateOfComplaint).toLocaleDateString()}</Text>
-                                                </View>
-                                            </View>
-                                            <Pressable
-                                                onPress={() => handleDownloadComplaint(comp)}
-                                                style={{ padding: 8 }}
-                                            >
-                                                <MaterialCommunityIcons name="file-download-outline" size={24} color={THEME.colors.primary} />
-                                            </Pressable>
-                                        </Pressable>
-                                    );
-                                })
-                            )}
-                        </GlassPanel>
-                    </View>
+                    <SubBranchComplaintsTab
+                        complaints={sortedComplaints}
+                        onNavigate={navigation.navigate}
+                        onDownloadComplaint={handleDownloadComplaint}
+                        onSetActiveTab={setActiveTab}
+                        sortOrder={sortOrder}
+                        setSortOrder={setSortOrder}
+                    />
                 )}
             </ScrollView>
-
             <FloatingTabBar activeTab="home" onTabPress={(tab: any) => {
                 if (tab === 'stock') setActiveTab('Stock');
                 else if (tab === 'home') setActiveTab('Dashboard');
@@ -1591,8 +835,8 @@ export default function SubBranchDashboard() {
                                                 await SalesService.updatePaymentStatus(selectedSale.id, true);
                                                 setShowSuccess(true);
                                                 fetchSales();
-                                            } catch (error) {
-                                                Alert.alert('Error', 'Failed to generate warranty.');
+                                            } catch (err) {
+                                                Alert.alert('Error', 'Failed to update payment. Please check your internet connection.');
                                             } finally {
                                                 setActionLoading(false);
                                             }
@@ -1600,34 +844,34 @@ export default function SubBranchDashboard() {
                                         disabled={actionLoading}
                                     >
                                         {actionLoading ? (
-                                            <ActivityIndicator color="white" size="small" />
+                                            <ActivityIndicator color="white" />
                                         ) : (
                                             <>
-                                                <MaterialIcons name="verified" size={20} color="white" />
-                                                <Text style={styles.confirmBtnText}>Confirm & Generate</Text>
+                                                <MaterialIcons name="check-circle" size={20} color="white" />
+                                                <Text style={styles.confirmBtnText}>Confirm Payment</Text>
                                             </>
                                         )}
                                     </Pressable>
 
                                     <Pressable 
                                         style={[styles.modalBtn, styles.rejectBtn]}
-                                        onPress={async () => {
-                                            if (!selectedSale) return;
+                                        onPress={() => {
                                             Alert.alert(
-                                                'Confirm Rejection',
-                                                'Are you sure you want to reject this sale entry?',
+                                                'Reject Sale',
+                                                'Are you sure you want to reject this sale? This action cannot be undone.',
                                                 [
                                                     { text: 'Cancel', style: 'cancel' },
                                                     { 
-                                                        text: 'Yes, Reject', 
+                                                        text: 'Reject', 
                                                         style: 'destructive',
                                                         onPress: async () => {
+                                                            if (!selectedSale) return;
                                                             try {
                                                                 setActionLoading(true);
                                                                 await SalesService.updateSaleStatus(selectedSale.id, 'rejected');
                                                                 setActionModalVisible(false);
                                                                 fetchSales();
-                                                            } catch (error) {
+                                                            } catch (err) {
                                                                 Alert.alert('Error', 'Failed to reject sale.');
                                                             } finally {
                                                                 setActionLoading(false);
@@ -1639,7 +883,6 @@ export default function SubBranchDashboard() {
                                         }}
                                         disabled={actionLoading}
                                     >
-                                        <MaterialIcons name="block" size={20} color="#EF4444" />
                                         <Text style={styles.rejectBtnText}>Reject Sale</Text>
                                     </Pressable>
 
@@ -1756,27 +999,6 @@ export default function SubBranchDashboard() {
         </MeshBackground>
     );
 }
-
-const SortControls = ({ sortOrder, setSortOrder }: { sortOrder: 'newest' | 'oldest', setSortOrder: (order: 'newest' | 'oldest') => void }) => (
-    <View style={styles.sortContainer}>
-        <Pressable
-            onPress={() => setSortOrder('newest')}
-            style={[styles.sortBtn, sortOrder === 'newest' && styles.sortBtnActive]}
-        >
-            <MaterialIcons name="arrow-downward" size={16} color={sortOrder === 'newest' ? 'white' : THEME.colors.textSecondary} />
-            <Text style={[styles.sortBtnText, sortOrder === 'newest' && styles.sortBtnTextActive]}>Newest First</Text>
-        </Pressable>
-        <Pressable
-            onPress={() => setSortOrder('oldest')}
-            style={[styles.sortBtn, sortOrder === 'oldest' && styles.sortBtnActive]}
-        >
-            <MaterialIcons name="arrow-upward" size={16} color={sortOrder === 'oldest' ? 'white' : THEME.colors.textSecondary} />
-            <Text style={[styles.sortBtnText, sortOrder === 'oldest' && styles.sortBtnTextActive]}>Oldest First</Text>
-        </Pressable>
-    </View>
-);
-
-const handleTabPress = (tab: string) => { };
 
 const styles = StyleSheet.create({
     sortContainer: {

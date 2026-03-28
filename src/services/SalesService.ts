@@ -2,7 +2,9 @@ import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
 import { Platform } from 'react-native';
 import { OfflineQueueService } from './OfflineQueueService';
+import { useSyncStore } from '../store/SyncStore';
 import { SyncService } from './SyncService';
+import { logger } from '../core/logging/Logger';
 
 
 export interface Sale {
@@ -108,7 +110,7 @@ export const SalesService = {
 
         // Check if Supabase is configured
         if (!isSupabaseConfigured()) {
-            console.warn('Supabase not configured, using local storage');
+            logger.warn('SalesService', 'Supabase not configured, falling back to local storage', { warrantyId, index });
             return await SalesService.saveImageLocally(uri, warrantyId, index);
         }
 
@@ -118,7 +120,7 @@ export const SalesService = {
             const netState = await NetInfo.fetch();
 
             if (!netState.isConnected) {
-                console.warn('No network connection, saving locally');
+                logger.warn('SalesService', 'No network connection detected, saving image locally', { warrantyId, index });
                 return await SalesService.saveImageLocally(uri, warrantyId, index);
             }
 
@@ -149,14 +151,10 @@ export const SalesService = {
                     });
 
                     onProgress?.(30); // File read complete
-
-                    // Convert Base64 to ArrayBuffer (Uint8Array)
-                    // This is the most reliable way to upload on React Native Android with Supabase
                     const { Buffer } = require('buffer');
                     fileBody = Buffer.from(base64, 'base64');
-                } catch (readError) {
-                    console.warn('FileSystem read failed, trying fetch blob fallback...', readError);
-                    // Fallback to fetch blob (works well on iOS, sometimes flaky on Android)
+                } catch (readError: any) {
+                    logger.warn('SalesService', 'FileSystem legacy read failed, trying fetch fallback', { error: readError.message });
                     const response = await fetch(uri);
                     fileBody = await response.blob();
                 }
@@ -172,9 +170,7 @@ export const SalesService = {
                 });
 
             if (uploadError) {
-                console.error('Supabase upload error details:', uploadError);
-                // Fallback to local storage on upload error
-                console.warn('Upload failed, saving locally instead');
+                logger.error('SalesService', 'Supabase image bucket upload failed', { uploadError, filePath });
                 return await SalesService.saveImageLocally(uri, warrantyId, index);
             }
 
@@ -224,10 +220,10 @@ export const SalesService = {
                 to: localPath,
             });
 
-            console.log('Image saved locally:', localPath);
+            logger.info('SalesService', 'Image saved locally', { localPath });
             return localPath;
-        } catch (error) {
-            console.error('Local save error:', error);
+        } catch (error: any) {
+            logger.error('SalesService', 'Local save error', { error: error.message });
             // If local save fails, return original URI as last resort
             return uri;
         }
@@ -465,8 +461,27 @@ export const SalesService = {
             warrantyGenerated,
         };
 
-        const updatedSales = [newSale, ...sales];
+        const filteredSales = sales.filter(s => 
+            s.warrantyId !== warrantyId && 
+            s.id !== localId
+        );
+
+        if (filteredSales.length < sales.length) {
+            logger.info('SalesService', 'Local storage deduplicated before saving', {
+                details: `Removed existing duplicate for warranty: ${warrantyId}`,
+                table: 'sales',
+                localId: localId
+            });
+        }
+
+        const updatedSales = [newSale, ...filteredSales];
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
+
+        logger.info('SalesService', 'Optimistic local update completed', {
+            details: `Record saved to offline storage. WarrantyID: ${warrantyId}`,
+            table: 'sales',
+            localId: localId
+        });
         return newSale;
     },
 
