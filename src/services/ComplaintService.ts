@@ -1,6 +1,8 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
 import { Platform } from 'react-native';
+import { OfflineQueueService } from './OfflineQueueService';
+import { SyncService } from './SyncService';
 
 export interface Complaint {
     id?: string;
@@ -238,86 +240,70 @@ export const ComplaintService = {
 
     // Create new complaint
     createComplaint: async (complaint: Complaint): Promise<Complaint> => {
-        if (isSupabaseConfigured()) {
-            try {
-                const { data, error } = await supabase
-                    .from('complaints')
-                    .insert([{
-                        complaint_id: complaint.complaintId,
-                        invoice_no: complaint.invoiceNo,
-                        customer_name: complaint.customerName,
-                        customer_phone: complaint.customerPhone,
-                        customer_email: complaint.customerEmail,
-                        category: complaint.category,
-                        description: complaint.description,
-                        date_of_complaint: complaint.dateOfComplaint,
-                        assigned_department: complaint.assignedDepartment,
-                        assigned_officer: complaint.assignedOfficer,
-                        action_taken: complaint.actionTaken,
-                        resolution_date: complaint.resolutionDate,
-                        status: complaint.status,
-                        client_confirmation: complaint.clientConfirmation,
-                        client_feedback: complaint.clientFeedback,
-                        resolved_by_name: complaint.resolvedByName,
-                        resolved_by_designation: complaint.resolvedByDesignation,
-                        image_urls: complaint.imageUrls,
-                        warranty_card_attached: complaint.warrantyCardAttached,
-                        branch_id: complaint.branchId,
-                        city: complaint.city
-                    }])
-                    .select()
-                    .single();
+        const localId = complaint.id || Math.random().toString(36).substr(2, 9);
+        const dbData = {
+            complaint_id: complaint.complaintId,
+            invoice_no: complaint.invoiceNo,
+            customer_name: complaint.customerName,
+            customer_phone: complaint.customerPhone,
+            customer_email: complaint.customerEmail,
+            category: complaint.category,
+            description: complaint.description,
+            date_of_complaint: complaint.dateOfComplaint,
+            assigned_department: complaint.assignedDepartment,
+            assigned_officer: complaint.assignedOfficer,
+            action_taken: complaint.actionTaken,
+            resolution_date: complaint.resolutionDate,
+            status: complaint.status,
+            client_confirmation: complaint.clientConfirmation,
+            client_feedback: complaint.clientFeedback,
+            resolved_by_name: complaint.resolvedByName,
+            resolved_by_designation: complaint.resolvedByDesignation,
+            image_urls: complaint.imageUrls,
+            warranty_card_attached: complaint.warrantyCardAttached,
+            branch_id: complaint.branchId,
+            city: complaint.city
+        };
 
-                if (error) throw error;
-                return data;
-            } catch (error) {
-                console.error('Supabase createComplaint error:', error);
-                throw error;
-            }
-        }
+        await OfflineQueueService.enqueue('CREATE', 'complaints', dbData, localId, 'high');
+        SyncService.forceSync();
 
+        // Optimistic UI updates
         const complaints = await ComplaintService.getComplaints();
-        const newComplaint = { ...complaint, id: Math.random().toString(36).substr(2, 9) };
+        const newComplaint = { ...complaint, id: localId };
         await Storage.setItem(STORAGE_KEY, JSON.stringify([newComplaint, ...complaints]));
         return newComplaint;
     },
 
     // Update existing complaint
     updateComplaint: async (complaintId: string, updates: Partial<Complaint>): Promise<void> => {
-        if (isSupabaseConfigured()) {
-            try {
-                const { error } = await supabase
-                    .from('complaints')
-                    .update({
-                        invoice_no: updates.invoiceNo,
-                        customer_name: updates.customerName,
-                        customer_phone: updates.customerPhone,
-                        customer_email: updates.customerEmail,
-                        category: updates.category,
-                        description: updates.description,
-                        assigned_department: updates.assignedDepartment,
-                        assigned_officer: updates.assignedOfficer,
-                        action_taken: updates.actionTaken,
-                        resolution_date: updates.resolutionDate,
-                        status: updates.status,
-                        client_confirmation: updates.clientConfirmation,
-                        client_feedback: updates.clientFeedback,
-                        resolved_by_name: updates.resolvedByName,
-                        resolved_by_designation: updates.resolvedByDesignation,
-                        image_urls: updates.imageUrls,
-                        warranty_card_attached: updates.warrantyCardAttached,
-                        city: updates.city
-                    })
-                    .eq('complaint_id', complaintId);
+        const dbData = {
+            complaint_id: complaintId,
+            invoice_no: updates.invoiceNo,
+            customer_name: updates.customerName,
+            customer_phone: updates.customerPhone,
+            customer_email: updates.customerEmail,
+            category: updates.category,
+            description: updates.description,
+            assigned_department: updates.assignedDepartment,
+            assigned_officer: updates.assignedOfficer,
+            action_taken: updates.actionTaken,
+            resolution_date: updates.resolutionDate,
+            status: updates.status,
+            client_confirmation: updates.clientConfirmation,
+            client_feedback: updates.clientFeedback,
+            resolved_by_name: updates.resolvedByName,
+            resolved_by_designation: updates.resolvedByDesignation,
+            image_urls: updates.imageUrls,
+            warranty_card_attached: updates.warrantyCardAttached,
+            city: updates.city
+        };
 
-                if (error) throw error;
-            } catch (error) {
-                console.error('Supabase updateComplaint error:', error);
-                throw error;
-            }
-            return;
-        }
+        // Enqueue the update operation
+        await OfflineQueueService.enqueue('UPDATE', 'complaints', dbData, complaintId, 'high');
+        SyncService.forceSync();
 
+        // Optimistic UI update
         const complaints = await ComplaintService.getComplaints();
         const updated = complaints.map(c => c.complaintId === complaintId ? { ...c, ...updates } : c);
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
