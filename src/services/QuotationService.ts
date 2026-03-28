@@ -182,5 +182,26 @@ export const QuotationService = {
         page: number = 1
     ): Promise<{ data: Quotation[]; total: number; hasMore: boolean }> => {
         return QuotationService.getQuotationsPaginated(limit, page, branchId);
+    },
+
+    deleteQuotation: async (id: string): Promise<void> => {
+        try {
+            if (isSupabaseConfigured()) {
+                const { error } = await supabase
+                    .from('quotations')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+            }
+
+            // Also delete from local storage
+            const quotations = await QuotationService.getAllQuotations();
+            const updated = quotations.filter(q => q.id !== id);
+            await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (error) {
+            console.error('Error deleting quotation:', error);
+            throw error;
+        }
     }
 };

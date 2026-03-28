@@ -35,6 +35,7 @@ import { StockTab } from '../../components/dashboard/StockTab';
 import { PhotosTab } from '../../components/dashboard/PhotosTab';
 import { UsersTab } from '../../components/dashboard/UsersTab';
 import { SyncAuditLogsTab } from '../../components/dashboard/SyncAuditLogsTab';
+import { useSyncStore } from '../../store/SyncStore';
 
 // Import Constants and Helpers
 import {
@@ -198,6 +199,12 @@ export default function MainBranchDashboard() {
             setDataVersion(prev => prev + 1);
         } catch (error: any) {
             console.error('FetchData Error:', error);
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'MainDashboard',
+                message: 'Failed to fetch dashboard data',
+                details: error.message || 'Unknown error'
+            });
             Alert.alert("Failed to Update", `Failed to fetch data: ${error.message || 'Unknown error'}` + "\nPlease try again.");
         } finally {
             setLoading(false);
@@ -241,6 +248,12 @@ export default function MainBranchDashboard() {
             setEditingUser(null);
             Alert.alert('Success', 'User updated successfully');
         } catch (err: any) {
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'MainDashboard',
+                message: `Failed to update user profile: ${email}`,
+                details: err.message || 'Unknown error'
+            });
             Alert.alert("Failed to Update", `Failed to update user: ${err.message || 'Unknown error'}` + "\nPlease try again.");
         } finally {
             setIsUpdatingUser(false);
@@ -266,6 +279,12 @@ export default function MainBranchDashboard() {
                             fetchData(false);
                             Alert.alert('Success', 'User deleted successfully');
                         } catch (err: any) {
+                            useSyncStore.getState().addLog({
+                                level: 'error',
+                                module: 'MainDashboard',
+                                message: `Failed to delete user: ${email}`,
+                                details: err.message || 'Unknown error'
+                            });
                             Alert.alert("Failed to Update", `Failed to delete user: ${err.message || 'Unknown error'}` + "\nPlease try again.");
                         }
                     }
@@ -549,8 +568,14 @@ export default function MainBranchDashboard() {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Download error:', error);
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'MainDashboard',
+                message: 'Failed to generate complaint PDF',
+                details: error.message || 'Unknown error'
+            });
             Alert.alert("Failed to Update", 'Failed to generate complaint report' + "\nPlease try again.");
         }
     };
@@ -566,13 +591,26 @@ export default function MainBranchDashboard() {
             const html = generateFieldVisitHTML(visit, logoUri, signUri);
 
             if (Platform.OS === 'web') {
-                await Print.printAsync({ html });
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                }
             } else {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Download error:', error);
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'MainDashboard',
+                message: 'Failed to generate field visit PDF',
+                details: error.message || 'Unknown error'
+            });
             Alert.alert("Failed to Update", 'Failed to generate field visit report' + "\nPlease try again.");
         }
     };
@@ -605,11 +643,98 @@ export default function MainBranchDashboard() {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Download error:', error);
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'MainDashboard',
+                message: 'Failed to generate quotation PDF',
+                details: error.message || 'Unknown error'
+            });
             Alert.alert("Failed to Update", 'Failed to generate quotation PDF' + "\nPlease try again.");
         }
     };
+
+    const handleDeleteQuotation = async (q: any) => {
+        const performDelete = async () => {
+            setLoading(true);
+            try {
+                await QuotationService.deleteQuotation(q.id);
+                if (Platform.OS === 'web') {
+                    window.alert('✅ Quotation deleted successfully');
+                } else {
+                    Alert.alert('Success', 'Quotation deleted successfully');
+                }
+                await fetchData(false);
+            } catch (error) {
+                console.error('Delete error:', error);
+                const msg = 'Could not delete quotation. Please check your connection or permissions.';
+                if (Platform.OS === 'web') {
+                    window.alert('❌ ' + msg);
+                } else {
+                    Alert.alert("Deletion Failed", msg);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`Are you sure you want to delete quotation ${q.quotationNo || ''} for ${q.customerName}?`)) {
+                await performDelete();
+            }
+        } else {
+            Alert.alert(
+                'Delete Quotation',
+                `Are you sure you want to delete quotation ${q.quotationNo || ''}?`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: performDelete }
+                ]
+            );
+        }
+    };
+
+    const handleDeleteVisit = async (visit: any) => {
+        const performDelete = async () => {
+            setLoading(true);
+            try {
+                await FieldVisitService.deleteFieldVisit(visit.id);
+                if (Platform.OS === 'web') {
+                    window.alert('✅ Field Visit deleted successfully');
+                } else {
+                    Alert.alert('Success', 'Field Visit deleted successfully');
+                }
+                await fetchData(false);
+            } catch (error) {
+                console.error('Delete error:', error);
+                const msg = 'Could not delete visit record. Please check your connection or permissions.';
+                if (Platform.OS === 'web') {
+                    window.alert('❌ ' + msg);
+                } else {
+                    Alert.alert("Deletion Failed", msg);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`Are you sure you want to delete the visit record for ${visit.clientCompanyName || visit.siteName || 'this client'}?`)) {
+                await performDelete();
+            }
+        } else {
+            Alert.alert(
+                'Delete Visit Record',
+                'Are you sure you want to delete this field visit? This cannot be undone.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: performDelete }
+                ]
+            );
+        }
+    };
+
     const handleDownloadPhotos = async () => {
         if (selectedPhotos.length === 0) return;
         setIsDownloadingPhotos(true);
@@ -1215,9 +1340,19 @@ export default function MainBranchDashboard() {
                                                         <Text style={styles.listSub} numberOfLines={1} ellipsizeMode="tail">{(visit as any).branchId || visit.city}</Text>
                                                     </View>
                                                 </View>
-                                                <Pressable onPress={() => handleDownloadVisit(visit)} style={styles.downloadIconBtn}>
-                                                    <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
-                                                </Pressable>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Pressable onPress={() => handleDownloadVisit(visit)} style={styles.downloadIconBtn}>
+                                                        <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
+                                                    </Pressable>
+                                                    {user?.role === 'Super Admin' && (
+                                                        <Pressable
+                                                            onPress={() => handleDeleteVisit(visit)}
+                                                            style={[styles.downloadIconBtn, { backgroundColor: '#FEF2F2' }]}
+                                                        >
+                                                            <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
+                                                        </Pressable>
+                                                    )}
+                                                </View>
                                             </View>
                                         );
                                     })}
@@ -1314,9 +1449,17 @@ export default function MainBranchDashboard() {
                                                     </Text>
                                                     <Text style={{ fontSize: 10, color: THEME.colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{q.itemName}</Text>
                                                 </View>
-                                                <View style={[styles.downloadIconBtn, { width: 32, height: 32 }]}>
+                                                <Pressable onPress={() => handleDownloadQuotation(q)} style={[styles.downloadIconBtn, { width: 32, height: 32 }]}>
                                                     <MaterialCommunityIcons name="file-download-outline" size={18} color={THEME.colors.primary} />
-                                                </View>
+                                                </Pressable>
+                                                {user?.role === 'Super Admin' && (
+                                                    <Pressable
+                                                        onPress={() => handleDeleteQuotation(q)}
+                                                        style={[styles.downloadIconBtn, { width: 32, height: 32, backgroundColor: '#FEF2F2', borderRadius: 8 }]}
+                                                    >
+                                                        <MaterialCommunityIcons name="delete-outline" size={18} color="#EF4444" />
+                                                    </Pressable>
+                                                )}
                                                 <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
                                             </View>
                                         </Pressable>
@@ -1363,7 +1506,13 @@ export default function MainBranchDashboard() {
                                                 await AuthService.deleteUser(email);
                                                 fetchData(false);
                                                 Alert.alert('Success', 'User deleted successfully');
-                                            } catch (err) {
+                                            } catch (err: any) {
+                                                useSyncStore.getState().addLog({
+                                                    level: 'error',
+                                                    module: 'MainDashboard',
+                                                    message: `Failed to delete user via tab: ${email}`,
+                                                    details: err.message || 'Unknown error'
+                                                });
                                                 Alert.alert("Failed to Update", 'Failed to delete user' + "\nPlease try again.");
                                             }
                                         }
@@ -1375,6 +1524,8 @@ export default function MainBranchDashboard() {
                             setEditingUser(u);
                         }}
                     />
+                ) : activeTab === 'Logs' ? (
+                    <SyncAuditLogsTab />
                 ) : null}
             </ScrollView>
 
@@ -1396,7 +1547,13 @@ export default function MainBranchDashboard() {
                         await fetchData(false);
                         setEditingUser(null);
                         Alert.alert('Success', 'User updated successfully');
-                    } catch (err) {
+                    } catch (err: any) {
+                        useSyncStore.getState().addLog({
+                            level: 'error',
+                            module: 'MainDashboard',
+                            message: `Failed to update user via modal: ${email}`,
+                            details: err.message || 'Unknown error'
+                        });
                         Alert.alert("Failed to Update", 'Failed to update user' + "\nPlease try again.");
                     } finally {
                         setIsUpdatingUser(false);
@@ -1460,8 +1617,14 @@ const StockManagementContent = ({ allStock, onUpdate, scrollViewRef, officialReg
             setQuantity('');
             onUpdate();
             alert('Stock updated successfully');
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'MainDashboard',
+                message: `Failed to update stock for ${modelName} in ${selectedRegion}`,
+                details: error.message || 'Unknown error'
+            });
             alert('Failed to update stock');
         } finally {
             setUpdating(false);
@@ -1798,8 +1961,14 @@ const PhotosGalleryContent = ({
             } else {
                 alert('Download started for: ' + filename);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Download error:', error);
+            useSyncStore.getState().addLog({
+                level: 'error',
+                module: 'PhotosTab',
+                message: 'Failed to download photo',
+                details: error.message || 'Unknown error'
+            });
             Alert.alert("Failed to Update", 'Failed to download photo' + "\nPlease try again.");
         } finally {
             setIsDownloading(false);

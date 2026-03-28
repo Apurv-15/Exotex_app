@@ -483,30 +483,43 @@ export default function WarrantyCard() {
     };
 
     const handleDelete = async () => {
-        Alert.alert(
-            'Delete Warranty',
-            'Are you sure you want to delete this warranty? This action cannot be undone.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            await SalesService.deleteSale(sale.id);
-                            Alert.alert('Success', 'Warranty deleted successfully');
-                            handleGoHome();
-                        } catch (error) {
-                            console.error('Delete error:', error);
-                            Alert.alert("Failed to Update", 'Could not delete warranty' + "\nPlease try again.");
-                        } finally {
-                            setLoading(true);
-                        }
-                    }
+        const performDelete = async () => {
+            setLoading(true);
+            try {
+                await SalesService.deleteSale(sale.id);
+                if (Platform.OS === 'web') {
+                    window.alert('✅ Warranty deleted successfully');
+                } else {
+                    Alert.alert('Success', 'Warranty deleted successfully');
                 }
-            ]
-        );
+                handleGoHome();
+            } catch (error) {
+                console.error('Delete error:', error);
+                const msg = 'Could not delete warranty. Please check your connection or permissions.';
+                if (Platform.OS === 'web') {
+                    window.alert('❌ ' + msg);
+                } else {
+                    Alert.alert("Deletion Failed", msg);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm('Are you sure you want to delete this warranty? This action cannot be undone.')) {
+                await performDelete();
+            }
+        } else {
+            Alert.alert(
+                'Delete Warranty',
+                'Are you sure you want to delete this warranty? This action cannot be undone.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: performDelete }
+                ]
+            );
+        }
     };
 
     return (
@@ -644,14 +657,20 @@ export default function WarrantyCard() {
 
 
 
-                    {user?.role === 'Super Admin' && (
+                    {(user?.role === 'Super Admin' || user?.role === 'Admin') && (
                         <Pressable
-                            style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.7 }]}
+                            style={({ pressed }) => [styles.deleteButton, (pressed || loading) && { opacity: 0.7 }]}
                             onPress={handleDelete}
                             disabled={loading}
                         >
-                            <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
-                            <Text style={styles.deleteButtonText}>Delete Warranty</Text>
+                            {loading ? (
+                                <ActivityIndicator size="small" color="#EF4444" />
+                            ) : (
+                                <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
+                            )}
+                            <Text style={styles.deleteButtonText}>
+                                {loading ? 'Deleting...' : 'Delete Warranty'}
+                            </Text>
                         </Pressable>
                     )}
 
