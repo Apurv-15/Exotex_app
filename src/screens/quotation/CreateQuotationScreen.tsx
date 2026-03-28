@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 
 import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 import { QuotationService } from '../../services/QuotationService';
+import { useSyncStore } from '../../store/SyncStore';
 import { Asset } from 'expo-asset';
 // @ts-ignore
 import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.png';
@@ -133,8 +134,27 @@ export default function CreateQuotationScreen() {
         });
         // Play success sound after saving
         playNotifySound();
-      } catch (saveError) {
+      } catch (saveError: any) {
         console.error('Error saving quotation to DB:', saveError);
+        const errorMsg = saveError.message || 'Unknown network error';
+        
+        // Specific reassuring popup as requested by user
+        const displayMsg = `Your data wasn't able to show to the dashboard immediately due to: ${errorMsg}.\n\nDon't worry, your data is saved locally and our system will automatically sync it to the dashboard once the connection is stable. Your PDF is ready.`;
+        if (Platform.OS === 'web') {
+           window.alert(displayMsg);
+        } else {
+           Alert.alert("Dashboard Sync Problem", displayMsg);
+        }
+
+        // Automatically generate a log for the super admin page
+        useSyncStore.getState().addLog({
+           level: 'error',
+           module: 'QuotationScreen',
+           message: `Quotation save failed for ${formData.quotationNo}`,
+           details: errorMsg,
+           table: 'quotations',
+           localId: formData.quotationNo
+        });
       }
 
       // USES THE "TECH" - Calls the external template utility
