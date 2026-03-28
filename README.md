@@ -21,9 +21,15 @@ A premium, enterprise-grade mobile application designed for Exotex to manage pro
 - **Multi-Branch Filtering:** Regional and branch-based data isolation for Super Admins and Branch Managers.
 - **Quotation Builder:** Professional quotation generation for spare parts and services.
 
-### 🛰️ Offline-First & Sync Ready
-- **Form Recovery System:** Automatically saves drafts of warranties and field visits. Never lose progress due to connectivity issues or app restarts.
-- **Multi-Stage Asset Sync:** Robust image upload pipeline that retries failed uploads and provides local file system fallbacks.
+### 🛰️ Advanced Offline-First Architecture (10/10 Production-Ready)
+- **Zero Data Loss Guarantee:** All forms (Warranties, Complaints, Visits, Quotations) are instantly saved to a persistent **Local Sync Queue** (`AsyncStorage`) before Supabase transmission.
+- **Optimistic Dashboard:** Sub-Branch dashboards merge live server data with local pending operations, showing users their work immediately even with no internet.
+- **Intelligent Background Sync:** Auto-detects network restoration via `NetInfo` and `AppState` listeners to silently process the queue in the background.
+- **Exponential Backoff:** Robust retry logic (`2^retryCount` minutes) prevents server spamming while ensuring eventual data delivery.
+- **Global Sync Status UI:** 
+    - **Offline Entry Interceptor:** Modal popups warn users of slow/no internet while confirming data is safe.
+    - **Sync Progress Banner:** Real-time visibility of pending, syncing, and failed operations at the top of every screen.
+    - **Manual Queue Manager:** Dedicated interface to retry, inspect, or discard failed operations individually.
 
 ### 🎨 Premium User Experience
 - **iPad Optimized:** Fully responsive layouts tailored for both handheld mobile devices and technician tablets.
@@ -36,7 +42,9 @@ A premium, enterprise-grade mobile application designed for Exotex to manage pro
 
 - **Frontend:** React Native (Expo SDK 54)
 - **Backend:** Supabase (PostgreSQL, Auth, Storage)
-- **State & Storage:** AsyncStorage, Context API, Expo Secure Store
+- **State Management:** **Zustand** (Global Sync Store), Context API
+- **Offline Engine:** Custom `SyncService` with background task orchestration
+- **Storage:** `@react-native-async-storage/async-storage`, Expo Secure Store
 - **PDF Engine:** `expo-print` with custom HTML templates
 - **Release Pipeline:** EAS (Expo Application Services) with deterministic `package-lock.json` builds.
 
