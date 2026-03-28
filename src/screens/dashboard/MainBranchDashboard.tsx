@@ -34,6 +34,7 @@ import { QuotationsTab } from '../../components/dashboard/QuotationsTab';
 import { StockTab } from '../../components/dashboard/StockTab';
 import { PhotosTab } from '../../components/dashboard/PhotosTab';
 import { UsersTab } from '../../components/dashboard/UsersTab';
+import { SyncAuditLogsTab } from '../../components/dashboard/SyncAuditLogsTab';
 
 // Import Constants and Helpers
 import {
@@ -70,7 +71,7 @@ export default function MainBranchDashboard() {
     const [allSales, setAllSales] = useState<Sale[]>([]);
     const [allVisits, setAllVisits] = useState<any[]>([]);
     const [showAllSales, setShowAllSales] = useState(false);
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Complaints' | 'Visits' | 'Quotations' | 'Analytics' | 'Stock' | 'Photos' | 'Users'>('Dashboard');
+    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Complaints' | 'Visits' | 'Quotations' | 'Analytics' | 'Stock' | 'Photos' | 'Users' | 'Logs'>('Dashboard');
     const [allStock, setAllStock] = useState<Stock[]>([]);
     const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
     const [allQuotations, setAllQuotations] = useState<Quotation[]>([]);
@@ -731,6 +732,15 @@ export default function MainBranchDashboard() {
                                     style={[styles.tabButton, activeTab === 'Users' && styles.tabButtonActive]}
                                 >
                                     <Text style={[styles.tabButtonText, activeTab === 'Users' && styles.tabButtonTextActive]}>Users</Text>
+                                </Pressable>
+                            )}
+
+                            {user?.role === 'Super Admin' && (
+                                <Pressable
+                                    onPress={() => setActiveTab('Logs')}
+                                    style={[styles.tabButton, activeTab === 'Logs' && styles.tabButtonActive]}
+                                >
+                                    <Text style={[styles.tabButtonText, activeTab === 'Logs' && styles.tabButtonTextActive]}>Logs (Beta)</Text>
                                 </Pressable>
                             )}
                         </GlassPanel>
