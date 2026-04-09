@@ -3,6 +3,7 @@ import uuid from 'react-native-uuid';
 import { QueuedOperation } from '../types/sync';
 import { useSyncStore } from '../store/SyncStore';
 import { logger } from '../core/logging/Logger';
+import { ValidationHelper } from '../utils/ValidationHelper';
 
 const QUEUE_STORAGE_KEY = '@app_sync_queue_v1';
 const MAX_RETRIES = 5;
@@ -57,7 +58,27 @@ export class OfflineQueueService {
     localId: string,
     priority: 'high' | 'medium' | 'low' = 'medium',
     batchId?: string
-  ): Promise<QueuedOperation> {
+  ): Promise<QueuedOperation | null> {
+    const { isOfflineModeEnabled } = useSyncStore.getState();
+
+    if (!isOfflineModeEnabled) {
+       logger.info('OfflineQueue', 'Submission Recorded — BUT offline mode is currently DISABLED. Data will NOT be stored locally.', {
+         table,
+         type,
+         details: 'Syncing/Queueing is off in settings.'
+       });
+       return null;
+    }
+
+    // Validate the payload before enqueueing
+    if (type === 'CREATE' || type === 'UPDATE') {
+      const { valid, error } = ValidationHelper.isValidPayload(table, payload);
+      if (!valid) {
+        logger.error('OfflineQueueService', `Failed to enqueue ${type} for ${table}: ${error}`, { payload });
+        return null;
+      }
+    }
+
     const queue = await this.loadQueue();
     
     // Check for duplicates
@@ -85,13 +106,23 @@ export class OfflineQueueService {
     queue.push(newItem);
     await this.saveQueue(queue);
 
-    // Audit Log for Super Admin - Initial Enqueue (Offline Proof)
-    logger.info('OfflineQueue', `Enqueued ${type} for ${table}`, {
-      details: `Saved locally while offline. LocalID: ${localId}`,
-      operationId: newItem.id,
-      table: table,
-      localId: localId
-    });
+    // Audit Proof Log for Super Admin/Audit Log
+    const { isOnline } = useSyncStore.getState();
+    if (!isOnline) {
+      logger.info('OfflineQueue', `OFFLINE DATA CAPTURE: Enqueued ${type} for ${table}`, {
+        details: `Proof of offline save. Record stored in device queue while user was disconnected. ID: ${newItem.id}`,
+        table,
+        localId,
+        operationId: newItem.id
+      });
+    } else {
+      logger.info('OfflineQueue', `System Enqueued: ${type} for ${table}`, {
+        details: `Network available. Record stored locally and queued for immediate server sync.`,
+        table,
+        localId,
+        operationId: newItem.id
+      });
+    }
 
     return newItem;
   }
