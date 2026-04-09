@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { AuthResponse, User } from '../types';
 import { Storage } from '../utils/storage';
+import { logger } from '../core/logging/Logger';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
@@ -15,7 +16,12 @@ export const AuthService = {
             });
 
             if (authError || !authData.user) {
-                console.error('Supabase Auth Login error:', authError);
+                logger.error('AuthService', 'Supabase Auth Login error', { details: authError });
+                
+                // FEATURE 1 & 2: Track failure and capture exception
+                logger.trackEvent('user_login', { success: false, error: authError?.message });
+                logger.captureException(authError || new Error('Auth Login Failed'), { email });
+
                 if (authError?.message?.includes('Aborted')) {
                     throw new Error('Login request aborted. Please check your internet connection or if the Supabase project is active.');
                 }
@@ -39,23 +45,23 @@ export const AuthService = {
                 branchId: profile?.branch_id || authData.user.user_metadata?.branch_id || 'default'
             };
 
+            // FEATURE 2: Track successful login
+            logger.trackEvent('user_login', { success: true, role: user.role, branchId: user.branchId });
+
             return {
                 token: authData.session?.access_token || '',
                 user
             };
         } catch (error: any) {
-            console.error('AuthService.login error FULL DETAILS:', {
-                message: error.message,
-                name: error.name,
-                status: error.status,
-                code: error.code,
-                details: error.details
-            });
+            logger.error('AuthService', 'Login exception', { details: error });
             throw error;
         }
     },
 
     logout: async () => {
+        // FEATURE 2: Track logout
+        logger.trackEvent('user_logout');
+        
         await supabase.auth.signOut();
         await Storage.deleteItem(TOKEN_KEY);
         await Storage.deleteItem(USER_KEY);

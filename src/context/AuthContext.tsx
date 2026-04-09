@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext, ReactNode, useCa
 import { User, AuthResponse } from '../types';
 import { AuthService } from '../services/AuthService';
 import { supabase } from '../config/supabase';
+import { logger } from '../core/logging/Logger';
 
 interface AuthContextData {
     user: User | null;
@@ -61,6 +62,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             subscription.unsubscribe();
         };
     }, []);
+
+    // FEATURE 1: Sync user identity with Sentry/Logger
+    useEffect(() => {
+        logger.setUser(user);
+    }, [user]);
 
     // Helper to load profile data manually if needed (already handled by listener)
     async function loadStorageData() {
