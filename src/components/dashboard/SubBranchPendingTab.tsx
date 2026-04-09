@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../GlassPanel';
@@ -28,6 +28,7 @@ export const SubBranchPendingTab = React.memo(({
         const countdown = calculateDaysRemaining(item.saleDate);
         return (
             <Pressable
+                key={item.id || item.invoiceNumber}
                 style={styles.listItem}
                 onPress={() => onUpdatePayment(item)}
             >
@@ -92,12 +93,9 @@ export const SubBranchPendingTab = React.memo(({
                         <Text style={styles.emptyText}>All sales are processed!</Text>
                     </View>
                 ) : (
-                    <FlatList
-                        data={pendingSales}
-                        renderItem={renderPendingItem}
-                        keyExtractor={(item) => item.id || item.invoiceNumber}
-                        scrollEnabled={false}
-                    />
+                    <View>
+                        {pendingSales.map((item) => renderPendingItem({ item }))}
+                    </View>
                 )}
             </GlassPanel>
         </View>

@@ -240,10 +240,10 @@ export const PhotosTab = React.memo(({
                     <Text style={styles.emptyText}>No registered warranties with photos</Text>
                 </GlassPanel>
             ) : (
-                <FlashList
-                    data={salesWithPhotos}
-                    renderItem={({ item: sale }) => (
+                <View style={{ gap: 12 }}>
+                    {salesWithPhotos.map((sale) => (
                         <Pressable
+                            key={sale.id}
                             onPress={() => setViewingSale(sale)}
                             style={({ pressed }) => [
                                 styles.saleListItem,
@@ -266,10 +266,8 @@ export const PhotosTab = React.memo(({
                                 </View>
                             </GlassPanel>
                         </Pressable>
-                    )}
-                    keyExtractor={(item) => item.id}
-                    ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-                />
+                    ))}
+                </View>
             )}
         </View>
     );
