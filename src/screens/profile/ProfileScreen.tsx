@@ -17,6 +17,7 @@ import { THEME } from '../../constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import GlassPanel from '../../components/GlassPanel';
 import MeshBackground from '../../components/MeshBackground';
+import { logger } from '../../core/logging/Logger';
 
 export default function ProfileScreen() {
     const { user, updateProfile, updatePassword, loading } = useAuth();
@@ -68,6 +69,17 @@ export default function ProfileScreen() {
         } catch (error: any) {
             Alert.alert("Failed to Update", error.message || 'Failed to update password' + "\nPlease try again.");
         }
+    };
+
+    const handleTestLogger = () => {
+        logger.error('SentryTester', 'Sentry Verification Error: Connection Successful', {
+             timestamp: new Date().toISOString(),
+             test: true,
+             message: 'If you see this, Sentry is properly connected!'
+        });
+        
+        // 🚨 FORCING A REAL CRASH TO ENSURE IT SHOWS IN YOUR SENTRY DASHBOARD
+        throw new Error("🚀 SENTRY TEST CRASH: This should appear in your 'Errors & Outages' tab!");
     };
 
     return (
@@ -206,6 +218,9 @@ export default function ProfileScreen() {
                     )}
 
                     <View style={styles.footer}>
+                        <Pressable onPress={handleTestLogger} style={{ marginBottom: 10 }}>
+                            <Text style={{ color: THEME.colors.primary, fontSize: 12 }}>Test Logger</Text>
+                        </Pressable>
                         <Text style={styles.footerText}>Role: {user?.role}</Text>
                         <Text style={styles.footerText}>Branch: {user?.branchId || 'N/A'}</Text>
                     </View>
