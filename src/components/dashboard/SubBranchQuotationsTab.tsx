@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../GlassPanel';
@@ -25,6 +25,7 @@ export const SubBranchQuotationsTab = React.memo(({
     const renderQuotationItem = ({ item, index }: { item: any, index: number }) => {
         return (
             <Pressable
+                key={item.id || index.toString()}
                 style={({ pressed }) => [
                     styles.listItem,
                     pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
@@ -107,12 +108,9 @@ export const SubBranchQuotationsTab = React.memo(({
                         <Text style={styles.emptyText}>No quotations found</Text>
                     </View>
                 ) : (
-                    <FlatList
-                        data={quotations}
-                        renderItem={renderQuotationItem}
-                        keyExtractor={(item, index) => item.id || index.toString()}
-                        scrollEnabled={false}
-                    />
+                    <View>
+                        {quotations.map((item, index) => renderQuotationItem({ item, index }))}
+                    </View>
                 )}
             </GlassPanel>
         </View>

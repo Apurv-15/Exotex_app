@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
 import { OfflineQueueService } from './OfflineQueueService';
 import { SyncService } from './SyncService';
+import { logger } from '../core/logging/Logger';
 
 export interface Quotation {
     id: string;
@@ -74,23 +75,28 @@ const quotationToDb = (q: Partial<Quotation>) => ({
 
 export const QuotationService = {
     createQuotation: async (data: Omit<Quotation, 'id' | 'createdAt'>): Promise<Quotation> => {
-        const localId = Math.random().toString(36).substr(2, 9);
-        const dbData = quotationToDb(data);
+        try {
+            const localId = Math.random().toString(36).substr(2, 9);
+            const dbData = quotationToDb(data);
 
-        await OfflineQueueService.enqueue('CREATE', 'quotations', dbData, localId, 'medium');
-        SyncService.forceSync();
+            await OfflineQueueService.enqueue('CREATE', 'quotations', dbData, localId, 'medium');
+            SyncService.forceSync();
 
-        // Fallback to local storage (Optimistic UI)
-        const quotations = await QuotationService.getAllQuotations();
-        const newQuotation: Quotation = {
-            ...data,
-            id: localId,
-            createdAt: new Date().toISOString(),
-        };
+            // Fallback to local storage (Optimistic UI)
+            const quotations = await QuotationService.getAllQuotations();
+            const newQuotation: Quotation = {
+                ...data,
+                id: localId,
+                createdAt: new Date().toISOString(),
+            };
 
-        const updated = [newQuotation, ...quotations];
-        await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        return newQuotation;
+            const updated = [newQuotation, ...quotations];
+            await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            return newQuotation;
+        } catch (error: any) {
+            logger.error('QuotationService', 'createQuotation failed', { error: error.message || error });
+            throw error;
+        }
     },
 
     getAllQuotations: async (): Promise<Quotation[]> => {
@@ -104,7 +110,7 @@ export const QuotationService = {
                 if (error) throw error;
                 return (data || []).map(dbToQuotation);
             } catch (error) {
-                console.error('Supabase error getting quotations, falling back to local storage:', error);
+                logger.error('QuotationService', 'getAllQuotations Supabase error', { error });
             }
         }
 
@@ -124,7 +130,7 @@ export const QuotationService = {
                 if (error) throw error;
                 return (data || []).map(dbToQuotation);
             } catch (error) {
-                console.error('Supabase error getting quotations by branch, falling back to local storage:', error);
+                logger.error('QuotationService', 'getQuotationsByBranch Supabase error', { branchId, error });
             }
         }
 
@@ -170,8 +176,8 @@ export const QuotationService = {
                 total,
                 hasMore
             };
-        } catch (error) {
-            console.error('Error fetching paginated quotations:', error);
+        } catch (error: any) {
+            logger.error('QuotationService', 'getQuotationsPaginated failed', { error: error.message || error });
             throw error;
         }
     },
@@ -199,8 +205,8 @@ export const QuotationService = {
             const quotations = await QuotationService.getAllQuotations();
             const updated = quotations.filter(q => q.id !== id);
             await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        } catch (error) {
-            console.error('Error deleting quotation:', error);
+        } catch (error: any) {
+            logger.error('QuotationService', 'deleteQuotation failed', { id, error: error.message || error });
             throw error;
         }
     }
