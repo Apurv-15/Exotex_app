@@ -1,6 +1,7 @@
 import { useSyncStore } from '../../store/SyncStore';
 import { supabase } from '../../config/supabase';
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS';
 
@@ -87,7 +88,7 @@ class Logger {
       if (!logLocation) logLocation = this.extractLocationFromStack(details.stack);
     }
 
-    // 1. Console Output (Dev only or critical)
+    // 1. Console Output (Dev only)
     if (this.isDev && !silent) {
       const color = this.getLogColor(level);
       console.log(
@@ -120,14 +121,78 @@ class Logger {
       }
     }
 
-    // 3. INTEGRATION: Push to Sentry/Crashlytics in Production
-    if (!this.isDev && (level === 'ERROR' || level === 'WARN')) {
-      // Sentry logic here...
+    // 3. PRODUCTION OBSERVABILITY: Push to Sentry
+    // Note: Temporarily enabled in DEV so you can see it in your dashboard
+    if (level === 'ERROR') {
+      this.captureException(details || new Error(message), {
+        module,
+        message,
+        location: logLocation,
+        ...options
+      });
+    } else if (level !== 'DEBUG' && !silent) {
+      // Send Info/Warn/Success messages to Sentry
+      Sentry.captureMessage(message, {
+        level: this.mapToSentryLevel(level),
+        extra: { module, details, location: logLocation, ...options },
+        tags: { module }
+      });
     }
 
     // 4. SUPABASE: Sync to Database (Production & Important Dev logs)
     this.syncToSupabase(level, module, message, { 
       details, table, localId, operationId, location: logLocation, stack: logStack, timestamp 
+    });
+  }
+
+  /**
+   * INTEGRATION 1: Sentry Exception Capture
+   * Captures a real exception in production to be tracked by Sentry.
+   */
+  public captureException(error: any, metadata: any = {}) {
+    if (this.isDev) {
+      console.warn('[LOGGER] 🐞 Exception Captured:', error, metadata);
+    } else {
+      Sentry.captureException(error, {
+        extra: metadata || {},
+        tags: {
+          module: metadata?.module || 'Unknown',
+          location: metadata?.location || 'Unknown'
+        }
+      });
+    }
+  }
+
+  /**
+   * Helper to set user context in Sentry
+   */
+  public setUser(user: { id: string, email: string, [key: string]: any } | null) {
+    if (this.isDev) {
+      console.log('[LOGGER] 👤 User context set:', user?.email);
+    }
+    
+    if (user) {
+      Sentry.setUser({
+        ...user,
+        id: user.id,
+        email: user.email,
+        username: user.name || user.email
+      });
+    } else {
+      Sentry.setUser(null);
+    }
+  }
+
+  /**
+   * INTEGRATION 2: User Action Tracking
+   * Tracks a meaningful user-facing action for business analytics.
+   */
+  public trackEvent(event: any, properties: any = {}) {
+    // We import analytics dynamically to avoid circular dependencies if any
+    import('../analytics/Analytics').then(({ analytics }) => {
+      analytics.track(event, properties);
+    }).catch(err => {
+      if (this.isDev) console.warn('Failed to track event', err);
     });
   }
 
@@ -178,6 +243,20 @@ class Logger {
         });
     } catch (err) {
       // Complete silence on sync failure to avoid infinite logging loops
+    }
+  }
+
+  /**
+   * Maps internal LogLevel to Sentry severity level
+   */
+  private mapToSentryLevel(level: LogLevel): Sentry.SeverityLevel {
+    switch (level) {
+      case 'DEBUG': return 'debug';
+      case 'INFO': return 'info';
+      case 'SUCCESS': return 'info';
+      case 'WARN': return 'warning';
+      case 'ERROR': return 'error';
+      default: return 'info';
     }
   }
 
