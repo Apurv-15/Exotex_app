@@ -3,6 +3,7 @@ import { Storage } from '../utils/storage';
 import { Platform } from 'react-native';
 import { OfflineQueueService } from './OfflineQueueService';
 import { SyncService } from './SyncService';
+import { logger } from '../core/logging/Logger';
 
 export interface FieldVisit {
     id: string;
@@ -454,10 +455,7 @@ export const FieldVisitService = {
 
             return urlData.publicUrl;
         } catch (error: any) {
-            console.error('Image upload error:', error);
-
-            // Fallback to local storage on any error
-            console.warn('Error during upload, saving locally');
+            logger.error('FieldVisitService', 'Image upload failed', { error: error.message, visitId, index });
             return await FieldVisitService.saveImageLocally(uri, visitId, index);
         }
     },
@@ -486,11 +484,10 @@ export const FieldVisitService = {
                 to: localPath,
             });
 
-            console.log('Field visit image saved locally:', localPath);
+            logger.info('FieldVisitService', 'Image saved locally', { localPath });
             return localPath;
-        } catch (error) {
-            console.error('Local save error:', error);
-            // If local save fails, return original URI as last resort
+        } catch (error: any) {
+            logger.error('FieldVisitService', 'Local image save failed', { error: error.message, visitId, index });
             return uri;
         }
     },
@@ -520,7 +517,7 @@ export const FieldVisitService = {
                     pending: pending || 0
                 };
             } catch (error) {
-                console.error('Supabase visit stats error:', error);
+                logger.error('FieldVisitService', 'getFieldVisitStats Supabase error', { branchId, error });
             }
         }
 
@@ -556,7 +553,7 @@ export const FieldVisitService = {
 
                 return Object.values(grouped).sort((a, b) => b.total - a.total);
             } catch (error) {
-                console.error('Supabase visit region stats error:', error);
+                logger.error('FieldVisitService', 'getFieldVisitRegionStats Supabase error', { error });
             }
         }
 
@@ -590,7 +587,7 @@ export const FieldVisitService = {
                 if (error) throw error;
                 return (data || []).map(dbToFieldVisit);
             } catch (error) {
-                console.error('Supabase error, falling back to local storage:', error);
+                logger.error('FieldVisitService', 'getFieldVisits Supabase error', { error });
             }
         }
 
@@ -612,7 +609,7 @@ export const FieldVisitService = {
                 if (error) throw error;
                 return (data || []).map(dbToFieldVisit);
             } catch (error) {
-                console.error('Supabase error, falling back to local storage:', error);
+                logger.error('FieldVisitService', 'getFieldVisitsByBranch Supabase error', { branchId, error });
             }
         }
 
@@ -627,64 +624,74 @@ export const FieldVisitService = {
         imageUris?: string[],
         onProgress?: (progress: number) => void
     ): Promise<FieldVisit> => {
-        const visitId = `FV-${Math.floor(100000 + Math.random() * 900000)}`;
+        try {
+            const visitId = `FV-${Math.floor(100000 + Math.random() * 900000)}`;
 
-        // Upload images sequentially with progress tracking
-        let imageUrls: string[] = [];
-        if (imageUris && imageUris.length > 0) {
-            for (let i = 0; i < imageUris.length; i++) {
-                const progressPerImage = 80 / imageUris.length; // Reserve 80% for uploads
-                const baseProgress = i * progressPerImage;
+            // Upload images sequentially with progress tracking
+            let imageUrls: string[] = [];
+            if (imageUris && imageUris.length > 0) {
+                for (let i = 0; i < imageUris.length; i++) {
+                    const progressPerImage = 80 / imageUris.length;
+                    const baseProgress = i * progressPerImage;
 
-                const url = await FieldVisitService.uploadImage(
-                    imageUris[i],
-                    visitId,
-                    i,
-                    (imgProgress) => {
-                        const totalProgress = baseProgress + (imgProgress * progressPerImage / 100);
-                        onProgress?.(Math.round(totalProgress));
-                    }
-                );
-                imageUrls.push(url);
+                    const url = await FieldVisitService.uploadImage(
+                        imageUris[i],
+                        visitId,
+                        i,
+                        (imgProgress) => {
+                            const totalProgress = baseProgress + (imgProgress * progressPerImage / 100);
+                            onProgress?.(Math.round(totalProgress));
+                        }
+                    );
+                    imageUrls.push(url);
+                }
+                onProgress?.(80);
             }
-            onProgress?.(80); // All uploads complete
+
+            const dbData = fieldVisitToDb({
+                ...visitData,
+                status: 'completed',
+                imageUrls,
+            });
+
+            await OfflineQueueService.enqueue('CREATE', 'field_visits', dbData, visitId, 'high');
+            SyncService.forceSync();
+
+            // Optimistic UI fallback to local storage
+            const visits = await FieldVisitService.getFieldVisits();
+            const newVisit: FieldVisit = {
+                ...visitData,
+                id: visitId,
+                status: 'completed',
+                imageUrls,
+            };
+
+            const updatedVisits = [newVisit, ...visits];
+            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
+            return newVisit;
+        } catch (error: any) {
+            logger.error('FieldVisitService', 'createFieldVisit failed', { error: error.message || error });
+            throw error;
         }
-
-        const dbData = fieldVisitToDb({
-            ...visitData,
-            status: 'completed',
-            imageUrls,
-        });
-
-        await OfflineQueueService.enqueue('CREATE', 'field_visits', dbData, visitId, 'high');
-        SyncService.forceSync();
-
-        // Optimistic UI fallback to local storage
-        const visits = await FieldVisitService.getFieldVisits();
-        const newVisit: FieldVisit = {
-            ...visitData,
-            id: visitId,
-            status: 'completed',
-            imageUrls,
-        };
-
-        const updatedVisits = [newVisit, ...visits];
-        await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
-        return newVisit;
     },
 
     // Update field visit status
     updateFieldVisitStatus: async (visitId: string, status: FieldVisit['status']): Promise<void> => {
-        const payload = { id: visitId, status };
+        try {
+            const payload = { id: visitId, status };
 
-        // Enqueue update to Supabase
-        await OfflineQueueService.enqueue('UPDATE', 'field_visits', payload, visitId, 'medium');
-        SyncService.forceSync();
+            // Enqueue update to Supabase
+            await OfflineQueueService.enqueue('UPDATE', 'field_visits', payload, visitId, 'medium');
+            SyncService.forceSync();
 
-        // Fallback for local storage (Optimistic UI)
-        const visits = await FieldVisitService.getFieldVisits();
-        const updatedVisits = visits.map(v => v.id === visitId ? { ...v, status } : v);
-        await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
+            // Fallback for local storage (Optimistic UI)
+            const visits = await FieldVisitService.getFieldVisits();
+            const updatedVisits = visits.map(v => v.id === visitId ? { ...v, status } : v);
+            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
+        } catch (error: any) {
+            logger.error('FieldVisitService', 'updateFieldVisitStatus failed', { visitId, status, error: error.message || error });
+            throw error;
+        }
     },
 
     deleteFieldVisit: async (id: string) => {
@@ -704,8 +711,8 @@ export const FieldVisitService = {
             await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
 
             return true;
-        } catch (error) {
-            console.error('Error deleting field visit:', error);
+        } catch (error: any) {
+            logger.error('FieldVisitService', 'deleteFieldVisit failed', { id, error: error.message || error });
             throw error;
         }
     },
@@ -751,8 +758,8 @@ export const FieldVisitService = {
                 total,
                 hasMore
             };
-        } catch (error) {
-            console.error('Error fetching paginated field visits:', error);
+        } catch (error: any) {
+            logger.error('FieldVisitService', 'getFieldVisitsPaginated failed', { error: error.message || error });
             throw error;
         }
     },

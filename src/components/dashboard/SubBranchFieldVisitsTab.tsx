@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../GlassPanel';
@@ -27,7 +27,7 @@ export const SubBranchFieldVisitsTab = React.memo(({
         const type = item.propertyType || item.visitType || 'Inspection';
         
         return (
-            <View style={styles.listItem}>
+            <View key={item.id || index.toString()} style={styles.listItem}>
                 <View style={[styles.listIcon, { backgroundColor: THEME.colors.mintLight }]}>
                     <MaterialCommunityIcons
                         name={type === 'Residential' ? 'home-outline' : 'factory'}
@@ -104,12 +104,9 @@ export const SubBranchFieldVisitsTab = React.memo(({
                         <Text style={styles.emptyText}>No field visits found</Text>
                     </View>
                 ) : (
-                    <FlatList
-                        data={visits}
-                        renderItem={renderVisitItem}
-                        keyExtractor={(item, index) => item.id || index.toString()}
-                        scrollEnabled={false} // Since it's inside an outer ScrollView in SubBranchDashboard
-                    />
+                    <View>
+                        {visits.map((item, index) => renderVisitItem({ item, index }))}
+                    </View>
                 )}
             </GlassPanel>
         </View>
