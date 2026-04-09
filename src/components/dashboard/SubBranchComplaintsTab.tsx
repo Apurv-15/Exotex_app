@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, FlatList } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../GlassPanel';
@@ -102,12 +102,9 @@ export const SubBranchComplaintsTab = React.memo(({
                         <Text style={styles.emptyText}>No complaints found</Text>
                     </View>
                 ) : (
-                    <FlatList
-                        data={complaints}
-                        renderItem={renderComplaintItem}
-                        keyExtractor={(item, index) => item.id || index.toString()}
-                        scrollEnabled={false}
-                    />
+                    <View>
+                        {complaints.map((item, index) => renderComplaintItem({ item, index }))}
+                    </View>
                 )}
             </GlassPanel>
         </View>

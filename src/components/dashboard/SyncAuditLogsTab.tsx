@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, ScrollView, Modal, TouchableOpacity, Platform, Animated } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TouchableOpacity, Platform, Dimensions, Alert } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
@@ -9,32 +9,16 @@ import { THEME } from '../../constants/theme';
 import { supabase } from '../../config/supabase';
 import GlassPanel from '../GlassPanel';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 export const SyncAuditLogsTab: React.FC = () => {
     const { logs, clearLogs } = useSyncStore();
-    const [selectedLog, setSelectedLog] = React.useState<any>(null);
-    const [isAuthorized, setIsAuthorized] = React.useState(false);
-    const [password, setPassword] = React.useState('');
-    const [error, setError] = React.useState('');
-    const [syncStatus, setSyncStatus] = React.useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
-    const [isCopied, setIsCopied] = React.useState(false);
-    const pulseAnim = React.useRef(new Animated.Value(1)).current;
-
-    React.useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 0.4,
-                    duration: 1000,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 1000,
-                    useNativeDriver: true,
-                })
-            ])
-        ).start();
-    }, []);
+    const [selectedLog, setSelectedLog] = useState<any>(null);
+    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [syncStatus, setSyncStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
+    const [isCopied, setIsCopied] = useState(false);
 
     const handleCopy = async () => {
         if (!selectedLog) return;
@@ -44,8 +28,13 @@ export const SyncAuditLogsTab: React.FC = () => {
         setTimeout(() => setIsCopied(false), 2000);
     };
 
+    const copyToClipboard = async (text: string, type: string) => {
+        await Clipboard.setStringAsync(text);
+        // We can reuse the isCopied or have a specific toast
+        Alert.alert('Copied!', `${type} has been copied to clipboard.`);
+    };
+
     const handleLogin = () => {
-        // Obfuscated check for '99203'
         const x = [57, 57, 50, 48, 51].map(c => String.fromCharCode(c)).join('');
         if (password === x) {
             setIsAuthorized(true);
@@ -101,28 +90,26 @@ export const SyncAuditLogsTab: React.FC = () => {
     const renderFormattedJson = (json: any) => {
         if (!json) return null;
         const jsonString = typeof json === 'string' ? json : JSON.stringify(json, null, 2);
-        
+
         return (
             <View style={styles.jsonLinesContainer}>
                 {jsonString.split('\n').map((line, lineIdx) => {
-                    // Split by properties, strings, numbers, booleans
                     const lineParts = line.split(/(".*?"|true|false|null|\d+)/);
                     return (
                         <View key={lineIdx} style={styles.jsonLine}>
                             <Text style={styles.jsonBaseText}>
                                 {lineParts.map((part, partIdx) => {
-                                    let color = '#94A3B8'; // Default slate gray
-                                    
+                                    let color = '#94A3B8';
+
                                     if (part.startsWith('"') && part.endsWith('"')) {
-                                        // Check if it's a key (followed by :)
                                         const nextPart = lineParts[partIdx + 1] || '';
                                         if (nextPart.includes(':')) {
-                                            color = '#F472B6'; // Pink for keys
+                                            color = '#F472B6';
                                         } else {
-                                            color = '#B7E4C7'; // Emerald for values
+                                            color = '#B7E4C7';
                                         }
                                     } else if (/^\d+$/.test(part) || part === 'true' || part === 'false') {
-                                        color = '#B7E4C7'; // Emerald
+                                        color = '#B7E4C7';
                                     }
 
                                     return <Text key={partIdx} style={{ color }}>{part}</Text>;
@@ -136,7 +123,8 @@ export const SyncAuditLogsTab: React.FC = () => {
     };
 
     const renderLogItem = ({ item }: { item: any }) => (
-        <Pressable 
+        <Pressable
+            key={item.id}
             style={({ pressed }) => [
                 styles.logItem,
                 pressed && { opacity: 0.7, backgroundColor: 'rgba(255,255,255,0.1)' }
@@ -145,10 +133,10 @@ export const SyncAuditLogsTab: React.FC = () => {
         >
             <View style={styles.logHeader}>
                 <View style={[styles.levelBadge, { backgroundColor: getLevelColor(item.level) + '20' }]}>
-                    <MaterialCommunityIcons 
-                        name={getLevelIcon(item.level) as any} 
-                        size={14} 
-                        color={getLevelColor(item.level)} 
+                    <MaterialCommunityIcons
+                        name={getLevelIcon(item.level) as any}
+                        size={14}
+                        color={getLevelColor(item.level)}
                     />
                     <Text style={[styles.levelText, { color: getLevelColor(item.level) }]}>
                         {item.level.toUpperCase()}
@@ -160,7 +148,7 @@ export const SyncAuditLogsTab: React.FC = () => {
             </View>
 
             <Text style={styles.message}>{item.message}</Text>
-            
+
             {item.location && (
                 <View style={styles.locationRow}>
                     <MaterialCommunityIcons name="file-code-outline" size={12} color={THEME.colors.primary} />
@@ -185,7 +173,7 @@ export const SyncAuditLogsTab: React.FC = () => {
                 <MaterialCommunityIcons name="shield-lock" size={64} color={THEME.colors.primary} style={{ marginBottom: 24 }} />
                 <Text style={styles.authTitle}>SYSTEM AUTHORIZATION</Text>
                 <Text style={styles.authSubtitle}>ENTER LOG ACCESS KEY</Text>
-                
+
                 <View style={styles.inputContainer}>
                     <View style={styles.passwordInputWrapper}>
                         <MaterialCommunityIcons name="key-variant" size={20} color="rgba(255,255,255,0.4)" />
@@ -195,11 +183,11 @@ export const SyncAuditLogsTab: React.FC = () => {
                             </Text>
                         </View>
                     </View>
-                    
+
                     <View style={styles.keypad}>
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, 'OK'].map((key) => (
-                            <TouchableOpacity 
-                                key={key.toString()} 
+                            <TouchableOpacity
+                                key={key.toString()}
                                 style={[styles.key, key === 'OK' && { backgroundColor: THEME.colors.primary }]}
                                 onPress={() => {
                                     if (key === 'OK') handleLogin();
@@ -226,7 +214,7 @@ export const SyncAuditLogsTab: React.FC = () => {
                     <View style={styles.statusRow}>
                         <View style={[styles.statusDot, { backgroundColor: syncStatus === 'success' ? THEME.colors.success : syncStatus === 'failed' ? THEME.colors.error : syncStatus === 'testing' ? THEME.colors.warning : 'rgba(255,255,255,0.2)' }]} />
                         <Text style={styles.subtitle}>
-                            {syncStatus === 'testing' ? 'Testing Cloud Sync...' : 
+                            {syncStatus === 'testing' ? 'Testing Cloud Sync...' :
                              syncStatus === 'success' ? 'Cloud Sync Active' :
                              syncStatus === 'failed' ? 'Cloud Sync Failed (Check Table)' :
                              'Real-time tracking of data uploads & errors'}
@@ -236,10 +224,10 @@ export const SyncAuditLogsTab: React.FC = () => {
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                     <Pressable onPress={testCloudSync}>
                         <GlassPanel style={[styles.clearBtn, syncStatus === 'testing' && { opacity: 0.5 }]}>
-                            <MaterialCommunityIcons 
-                                name={syncStatus === 'success' ? 'cloud-check' : syncStatus === 'failed' ? 'cloud-off' : 'cloud-sync'} 
-                                size={20} 
-                                color={syncStatus === 'success' ? THEME.colors.success : syncStatus === 'failed' ? THEME.colors.error : THEME.colors.primary} 
+                            <MaterialCommunityIcons
+                                name={syncStatus === 'success' ? 'cloud-check' : syncStatus === 'failed' ? 'cloud-off' : 'cloud-sync'}
+                                size={20}
+                                color={syncStatus === 'success' ? THEME.colors.success : syncStatus === 'failed' ? THEME.colors.error : THEME.colors.primary}
                             />
                         </GlassPanel>
                     </Pressable>
@@ -257,26 +245,21 @@ export const SyncAuditLogsTab: React.FC = () => {
                     <Text style={styles.emptyText}>No logs recorded yet</Text>
                 </View>
             ) : (
-                <FlatList
-                    data={logs}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderLogItem}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                />
-            )}
-
-            <Modal
+                <View style={styles.listContent}>
+                    {logs.map((item) => renderLogItem({ item }))}
+                </View>
+            )}            <Modal
                 visible={!!selectedLog}
                 transparent
                 animationType="fade"
                 onRequestClose={() => setSelectedLog(null)}
             >
-                <Pressable 
-                    style={styles.modalOverlay} 
-                    onPress={() => setSelectedLog(null)}
-                >
-                    <View style={StyleSheet.absoluteFill}>
+                <View style={styles.modalOverlay}>
+                    {/* 1. BACKGROUND LAYER (Tap to close) */}
+                    <Pressable 
+                        style={StyleSheet.absoluteFill} 
+                        onPress={() => setSelectedLog(null)}
+                    >
                         <LinearGradient
                             colors={['rgba(6, 78, 59, 1)', 'rgba(2, 6, 23, 1)']}
                             start={{ x: 0.5, y: 0 }}
@@ -284,30 +267,30 @@ export const SyncAuditLogsTab: React.FC = () => {
                             style={StyleSheet.absoluteFill}
                         />
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    </View>
+                    </Pressable>
 
-                    <Pressable 
-                        style={styles.modalContent} 
-                        onPress={(e) => {
-                            if (Platform.OS === 'web') {
-                                (e as any).stopPropagation();
-                            }
-                        }}
-                    >
+                    {/* 2. MODAL CONTENT LAYER */}
+                    <View style={styles.modalContent}>
                         <View style={styles.brandingAccent} />
                         
                         <GlassPanel style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.85)' }}>
-                            <ScrollView 
-                                style={{ flex: 1 }} 
-                                contentContainerStyle={{ padding: 24 }}
-                                showsVerticalScrollIndicator={false}
+                            <ScrollView
+                                style={{ flex: 1 }}
+                                contentContainerStyle={{ padding: 24, paddingBottom: 60 }}
+                                showsVerticalScrollIndicator={true}
+                                nestedScrollEnabled={true}
+                                bounces={true}
+                                overScrollMode="always"
                             >
+                                {/* MODAL HEADER */}
                                 <View style={styles.modalHeader}>
                                     <View style={styles.headerTagContainer}>
-                                        <Animated.View style={[styles.pulseDot, { opacity: pulseAnim }]} />
-                                        <Text style={styles.headerTagText}>SYSTEM EVENT</Text>
+                                        <View style={[styles.pulseDot, { backgroundColor: getLevelColor(selectedLog?.level || 'info') }]} />
+                                        <Text style={[styles.headerTagText, { color: getLevelColor(selectedLog?.level || 'info') }]}>
+                                            {(selectedLog?.level || 'info').toUpperCase()} EVENT
+                                        </Text>
                                     </View>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.closeIconBtn}
                                         onPress={() => setSelectedLog(null)}
                                     >
@@ -315,68 +298,124 @@ export const SyncAuditLogsTab: React.FC = () => {
                                     </TouchableOpacity>
                                 </View>
 
+                                {/* MESSAGE + TIMESTAMP */}
                                 <Text style={styles.modalTitle}>{selectedLog?.message || 'System Log'}</Text>
                                 <Text style={styles.modalTimestamp}>
                                     {selectedLog && new Date(selectedLog.timestamp).toLocaleString()}
                                 </Text>
 
+                                {/* METADATA PILLS */}
+                                <View style={styles.metaRow}>
+                                    {selectedLog?.module && (
+                                        <TouchableOpacity 
+                                            activeOpacity={0.7}
+                                            style={styles.metaPill}
+                                            onPress={() => copyToClipboard(selectedLog.module, 'Module name')}
+                                        >
+                                            <MaterialCommunityIcons name="cube-outline" size={12} color={THEME.colors.primary} />
+                                            <Text style={styles.metaPillText}>{selectedLog.module}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {selectedLog?.table && (
+                                        <TouchableOpacity 
+                                            activeOpacity={0.7}
+                                            style={styles.metaPill}
+                                            onPress={() => copyToClipboard(selectedLog.table, 'Table name')}
+                                        >
+                                            <MaterialCommunityIcons name="table" size={12} color="#818CF8" />
+                                            <Text style={[styles.metaPillText, { color: '#818CF8' }]}>{selectedLog.table}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {selectedLog?.operationId && (
+                                        <TouchableOpacity 
+                                            activeOpacity={0.7}
+                                            style={styles.metaPill}
+                                            onPress={() => copyToClipboard(selectedLog.operationId, 'Operation ID')}
+                                        >
+                                            <MaterialCommunityIcons name="identifier" size={12} color="#94A3B8" />
+                                            <Text style={[styles.metaPillText, { color: '#94A3B8' }]} numberOfLines={1}>{selectedLog.operationId}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                {/* SOURCE LOCATION */}
                                 {selectedLog?.location && (
                                     <View style={styles.sectionContainer}>
-                                        <Text style={styles.sectionTitle}>SOURCE LOCATION</Text>
-                                        <View style={styles.locationPill}>
+                                        <Text style={styles.sectionTitle}>SOURCE LOCATION (TAP TO COPY)</Text>
+                                        <TouchableOpacity 
+                                            activeOpacity={0.7}
+                                            style={styles.locationPill}
+                                            onPress={() => copyToClipboard(selectedLog.location, 'Location')}
+                                        >
+                                            <MaterialCommunityIcons name="file-code-outline" size={14} color={THEME.colors.primary} />
                                             <Text style={styles.locationPillText}>{selectedLog.location}</Text>
+                                            <MaterialCommunityIcons name="content-copy" size={14} color="rgba(255,255,255,0.2)" />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {/* DETAILS SECTION */}
+                                {selectedLog?.details && (
+                                    <View style={styles.sectionContainer}>
+                                        <Text style={styles.sectionTitle}>DETAILS</Text>
+                                        <View style={styles.jsonContainer}>
+                                            <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled>
+                                                {renderFormattedJson(
+                                                    typeof selectedLog.details === 'string'
+                                                        ? (() => { try { return JSON.parse(selectedLog.details); } catch { return selectedLog.details; } })()
+                                                        : selectedLog.details
+                                                )}
+                                            </ScrollView>
                                         </View>
                                     </View>
                                 )}
 
-                                <View style={styles.sectionContainer}>
-                                    <View style={styles.sectionHeaderRow}>
-                                        <Text style={styles.sectionTitle}>FULL LOG DATA</Text>
-                                        <TouchableOpacity 
-                                            style={styles.copyBtn}
-                                            onPress={handleCopy}
-                                        >
-                                            <MaterialCommunityIcons 
-                                                name={isCopied ? "check" : "content-copy"} 
-                                                size={12} 
-                                                color={isCopied ? THEME.colors.primary : "rgba(255,255,255,0.4)"} 
-                                            />
-                                            <Text style={[
-                                                styles.copyBtnText, 
-                                                isCopied && { color: THEME.colors.primary }
-                                            ]}>
-                                                {isCopied ? 'COPIED!' : 'COPY JSON'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View style={styles.jsonContainer}>
-                                        {renderFormattedJson(selectedLog)}
-                                    </View>
-                                </View>
-
+                                {/* STACK TRACE */}
                                 {selectedLog?.stack && (
                                     <View style={styles.sectionContainer}>
                                         <Text style={styles.sectionTitle}>STACK TRACE</Text>
                                         <View style={styles.stackContainer}>
-                                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                            <ScrollView horizontal showsHorizontalScrollIndicator={true} nestedScrollEnabled>
                                                 <Text style={styles.stackText}>{selectedLog.stack}</Text>
                                             </ScrollView>
                                         </View>
                                     </View>
                                 )}
 
+                                {/* FULL RAW LOG */}
+                                <View style={styles.sectionContainer}>
+                                    <View style={styles.sectionHeaderRow}>
+                                        <Text style={styles.sectionTitle}>FULL RAW LOG</Text>
+                                        <TouchableOpacity style={styles.copyBtn} onPress={handleCopy}>
+                                            <MaterialCommunityIcons
+                                                name={isCopied ? "check" : "content-copy"}
+                                                size={12}
+                                                color={isCopied ? THEME.colors.primary : "rgba(255,255,255,0.4)"}
+                                            />
+                                            <Text style={[styles.copyBtnText, isCopied && { color: THEME.colors.primary }]}>
+                                                {isCopied ? 'COPIED!' : 'COPY JSON'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={styles.jsonContainer}>
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled>
+                                            {renderFormattedJson(selectedLog)}
+                                        </ScrollView>
+                                    </View>
+                                </View>
+
                                 <View style={styles.modalFooter}>
                                     <TouchableOpacity 
-                                        style={styles.resolveBtn}
+                                        style={styles.resolveBtn} 
                                         onPress={() => setSelectedLog(null)}
                                     >
-                                        <Text style={styles.resolveBtnText}>Resolve Issue</Text>
+                                        <Text style={styles.resolveBtnText}>Dismiss</Text>
                                     </TouchableOpacity>
                                 </View>
                             </ScrollView>
                         </GlassPanel>
-                    </Pressable>
-                </Pressable>
+                    </View>
+                </View>
             </Modal>
         </View>
     );
@@ -492,23 +531,27 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     modalContent: {
-        width: '100%',
-        maxWidth: 500,
-        maxHeight: '85%',
-        borderRadius: 24,
+        width: SCREEN_WIDTH > 600 ? 500 : '92%',
+        height: '80%', // Definitive height to prevent collapse
+        borderRadius: 28,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
         backgroundColor: '#020617',
+        elevation: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
     },
     brandingAccent: {
         position: 'absolute',
         top: 0,
         left: 0,
-        width: '100%',
+        right: 0,
         height: 4,
-        backgroundColor: 'rgba(183, 228, 199, 0.3)',
-        zIndex: 10,
+        backgroundColor: THEME.colors.primary,
+        zIndex: 100,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -579,13 +622,17 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.4)',
     },
     locationPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
         backgroundColor: 'rgba(2, 6, 23, 0.5)',
         borderRadius: 8,
-        padding: 16,
+        padding: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(183,228,199,0.15)',
     },
     locationPillText: {
+        flex: 1,
         fontSize: 12,
         fontFamily: 'monospace',
         color: 'rgba(183, 228, 199, 0.9)',
@@ -597,6 +644,28 @@ const styles = StyleSheet.create({
         padding: 20,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
+    },
+    metaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 24,
+    },
+    metaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(183, 228, 199, 0.08)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(183, 228, 199, 0.15)',
+    },
+    metaPillText: {
+        fontSize: 11,
+        fontFamily: THEME.fonts.semiBold,
+        color: THEME.colors.primary,
     },
     jsonLinesContainer: {
         width: '100%',
@@ -682,7 +751,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
         marginBottom: 32,
-        gap: 12,
     },
     passwordText: {
         color: 'white',
@@ -697,9 +765,9 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     key: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: SCREEN_WIDTH > 400 ? 80 : 60,
+        height: SCREEN_WIDTH > 400 ? 80 : 60,
+        borderRadius: SCREEN_WIDTH > 400 ? 40 : 30,
         backgroundColor: 'rgba(255,255,255,0.05)',
         justifyContent: 'center',
         alignItems: 'center',
@@ -708,7 +776,7 @@ const styles = StyleSheet.create({
     },
     keyText: {
         color: 'white',
-        fontSize: 22,
+        fontSize: SCREEN_WIDTH > 400 ? 22 : 18,
         fontFamily: THEME.fonts.bold,
     },
     authError: {
