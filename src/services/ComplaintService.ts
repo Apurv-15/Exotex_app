@@ -3,6 +3,7 @@ import { Storage } from '../utils/storage';
 import { Platform } from 'react-native';
 import { OfflineQueueService } from './OfflineQueueService';
 import { SyncService } from './SyncService';
+import { logger } from '../core/logging/Logger';
 
 export interface Complaint {
     id?: string;
@@ -81,7 +82,7 @@ export const ComplaintService = {
                     createdAt: row.created_at
                 }));
             } catch (error) {
-                console.error('Supabase getComplaints error:', error);
+                logger.error('ComplaintService', 'getComplaints Supabase error', { error });
             }
         }
 
@@ -110,7 +111,7 @@ export const ComplaintService = {
             const netState = await NetInfo.fetch();
 
             if (!netState.isConnected) {
-                console.warn('No network connection, saving locally');
+                logger.warn('ComplaintService', 'No network connection, saving image locally', { complaintId, index });
                 return await ComplaintService.saveImageLocally(uri, complaintId, index);
             }
 
@@ -200,8 +201,7 @@ export const ComplaintService = {
 
             return urlData.publicUrl;
         } catch (error: any) {
-            console.error('Image upload error:', error);
-            console.warn('Error during upload, saving locally');
+            logger.error('ComplaintService', 'Image upload failed', { error: error.message, complaintId, index });
             return await ComplaintService.saveImageLocally(uri, complaintId, index);
         }
     },
@@ -230,83 +230,93 @@ export const ComplaintService = {
                 to: localPath,
             });
 
-            console.log('Image saved locally:', localPath);
+            logger.info('ComplaintService', 'Image saved locally', { localPath });
             return localPath;
-        } catch (error) {
-            console.error('Local save error:', error);
-            return uri; // Return original uri
+        } catch (error: any) {
+            logger.error('ComplaintService', 'Local image save failed', { error: error.message, complaintId });
+            return uri;
         }
     },
 
     // Create new complaint
     createComplaint: async (complaint: Complaint): Promise<Complaint> => {
-        const localId = complaint.id || Math.random().toString(36).substr(2, 9);
-        const dbData = {
-            complaint_id: complaint.complaintId,
-            invoice_no: complaint.invoiceNo,
-            customer_name: complaint.customerName,
-            customer_phone: complaint.customerPhone,
-            customer_email: complaint.customerEmail,
-            category: complaint.category,
-            description: complaint.description,
-            date_of_complaint: complaint.dateOfComplaint,
-            assigned_department: complaint.assignedDepartment,
-            assigned_officer: complaint.assignedOfficer,
-            action_taken: complaint.actionTaken,
-            resolution_date: complaint.resolutionDate,
-            status: complaint.status,
-            client_confirmation: complaint.clientConfirmation,
-            client_feedback: complaint.clientFeedback,
-            resolved_by_name: complaint.resolvedByName,
-            resolved_by_designation: complaint.resolvedByDesignation,
-            image_urls: complaint.imageUrls,
-            warranty_card_attached: complaint.warrantyCardAttached,
-            branch_id: complaint.branchId,
-            city: complaint.city
-        };
+        try {
+            const localId = complaint.id || Math.random().toString(36).substr(2, 9);
+            const dbData = {
+                complaint_id: complaint.complaintId,
+                invoice_no: complaint.invoiceNo,
+                customer_name: complaint.customerName,
+                customer_phone: complaint.customerPhone,
+                customer_email: complaint.customerEmail,
+                category: complaint.category,
+                description: complaint.description,
+                date_of_complaint: complaint.dateOfComplaint,
+                assigned_department: complaint.assignedDepartment,
+                assigned_officer: complaint.assignedOfficer,
+                action_taken: complaint.actionTaken,
+                resolution_date: complaint.resolutionDate,
+                status: complaint.status,
+                client_confirmation: complaint.clientConfirmation,
+                client_feedback: complaint.clientFeedback,
+                resolved_by_name: complaint.resolvedByName,
+                resolved_by_designation: complaint.resolvedByDesignation,
+                image_urls: complaint.imageUrls,
+                warranty_card_attached: complaint.warrantyCardAttached,
+                branch_id: complaint.branchId,
+                city: complaint.city
+            };
 
-        await OfflineQueueService.enqueue('CREATE', 'complaints', dbData, localId, 'high');
-        SyncService.forceSync();
+            await OfflineQueueService.enqueue('CREATE', 'complaints', dbData, localId, 'high');
+            SyncService.forceSync();
 
-        // Optimistic UI updates
-        const complaints = await ComplaintService.getComplaints();
-        const newComplaint = { ...complaint, id: localId };
-        await Storage.setItem(STORAGE_KEY, JSON.stringify([newComplaint, ...complaints]));
-        return newComplaint;
+            // Optimistic UI updates
+            const complaints = await ComplaintService.getComplaints();
+            const newComplaint = { ...complaint, id: localId };
+            await Storage.setItem(STORAGE_KEY, JSON.stringify([newComplaint, ...complaints]));
+            return newComplaint;
+        } catch (error: any) {
+            logger.error('ComplaintService', 'createComplaint failed', { error: error.message || error });
+            throw error;
+        }
     },
 
     // Update existing complaint
     updateComplaint: async (complaintId: string, updates: Partial<Complaint>): Promise<void> => {
-        const dbData = {
-            complaint_id: complaintId,
-            invoice_no: updates.invoiceNo,
-            customer_name: updates.customerName,
-            customer_phone: updates.customerPhone,
-            customer_email: updates.customerEmail,
-            category: updates.category,
-            description: updates.description,
-            assigned_department: updates.assignedDepartment,
-            assigned_officer: updates.assignedOfficer,
-            action_taken: updates.actionTaken,
-            resolution_date: updates.resolutionDate,
-            status: updates.status,
-            client_confirmation: updates.clientConfirmation,
-            client_feedback: updates.clientFeedback,
-            resolved_by_name: updates.resolvedByName,
-            resolved_by_designation: updates.resolvedByDesignation,
-            image_urls: updates.imageUrls,
-            warranty_card_attached: updates.warrantyCardAttached,
-            city: updates.city
-        };
+        try {
+            const dbData = {
+                complaint_id: complaintId,
+                invoice_no: updates.invoiceNo,
+                customer_name: updates.customerName,
+                customer_phone: updates.customerPhone,
+                customer_email: updates.customerEmail,
+                category: updates.category,
+                description: updates.description,
+                assigned_department: updates.assignedDepartment,
+                assigned_officer: updates.assignedOfficer,
+                action_taken: updates.actionTaken,
+                resolution_date: updates.resolutionDate,
+                status: updates.status,
+                client_confirmation: updates.clientConfirmation,
+                client_feedback: updates.clientFeedback,
+                resolved_by_name: updates.resolvedByName,
+                resolved_by_designation: updates.resolvedByDesignation,
+                image_urls: updates.imageUrls,
+                warranty_card_attached: updates.warrantyCardAttached,
+                city: updates.city
+            };
 
-        // Enqueue the update operation
-        await OfflineQueueService.enqueue('UPDATE', 'complaints', dbData, complaintId, 'high');
-        SyncService.forceSync();
+            // Enqueue the update operation
+            await OfflineQueueService.enqueue('UPDATE', 'complaints', dbData, complaintId, 'high');
+            SyncService.forceSync();
 
-        // Optimistic UI update
-        const complaints = await ComplaintService.getComplaints();
-        const updated = complaints.map(c => c.complaintId === complaintId ? { ...c, ...updates } : c);
-        await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
+            // Optimistic UI update
+            const complaints = await ComplaintService.getComplaints();
+            const updated = complaints.map(c => c.complaintId === complaintId ? { ...c, ...updates } : c);
+            await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (error: any) {
+            logger.error('ComplaintService', 'updateComplaint failed', { complaintId, error: error.message || error });
+            throw error;
+        }
     },
 
     // ============================================
@@ -373,8 +383,8 @@ export const ComplaintService = {
                 total,
                 hasMore
             };
-        } catch (error) {
-            console.error('Error fetching paginated complaints:', error);
+        } catch (error: any) {
+            logger.error('ComplaintService', 'getComplaintsPaginated failed', { error: error.message || error });
             throw error;
         }
     },
@@ -434,8 +444,8 @@ export const ComplaintService = {
                 total,
                 hasMore
             };
-        } catch (error) {
-            console.error('Error fetching paginated complaints by status:', error);
+        } catch (error: any) {
+            logger.error('ComplaintService', 'getComplaintsByStatusPaginated failed', { status, error: error.message || error });
             throw error;
         }
     }

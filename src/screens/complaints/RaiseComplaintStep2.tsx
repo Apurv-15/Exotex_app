@@ -172,7 +172,16 @@ export default function RaiseComplaintStep2() {
     };
 
     const handleSubmit = async () => {
-        if (!formData.description) {
+        if (!clientData || !clientData.invoiceNumber) {
+            Alert.alert('Missing Data', 'Client information is missing. Please go back to Step 1.');
+            return;
+        }
+
+        if (!formData.category) {
+            Alert.alert('Required', 'Please select a complaint category.');
+            return;
+        }
+        if (!formData.description.trim()) {
             Alert.alert('Required', 'Please enter a complaint description.');
             return;
         }
