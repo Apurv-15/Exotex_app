@@ -31,6 +31,10 @@ interface SyncState {
   logs: SyncLog[];
   addLog: (log: Omit<SyncLog, 'id' | 'timestamp'>) => void;
   clearLogs: () => void;
+
+  // Global Sync Settings
+  isOfflineModeEnabled: boolean;
+  setIsOfflineModeEnabled: (enabled: boolean) => void;
 }
 
 export const useSyncStore = create<SyncState>((set) => ({
@@ -88,34 +92,52 @@ export const useSyncStore = create<SyncState>((set) => ({
     const updated = [newLog, ...state.logs].slice(0, 100);
     return { logs: updated };
   }),
-  clearLogs: () => set({ logs: [] })
+  clearLogs: () => set({ logs: [] }),
+
+  // Settings
+  isOfflineModeEnabled: true,
+  setIsOfflineModeEnabled: (enabled: boolean) => set({ isOfflineModeEnabled: enabled }),
 }));
 
 // Setup persistence mapping manually to avoid Webpack/Metro `import.meta` ESM crashing on web
 const STORE_KEY = 'sync-store-native-db';
+
+let isHydrated = false;
 
 const initializeStore = async () => {
     try {
         const stored = await Storage.getItem(STORE_KEY);
         if (stored) {
             const parsed = JSON.parse(stored);
+            const currentLogs = useSyncStore.getState().logs;
+            const currentQueue = useSyncStore.getState().queue;
+
             useSyncStore.setState({
-                logs: parsed.logs || [],
+                // Merge live (startup) logs with persisted ones
+                logs: [...currentLogs, ...(parsed.logs || [])].slice(0, 100),
                 stats: parsed.stats || useSyncStore.getState().stats,
-                queue: parsed.queue || []
+                // Only use persisted queue if current live queue is empty
+                queue: currentQueue.length > 0 ? currentQueue : (parsed.queue || []),
+                isOfflineModeEnabled: parsed.isOfflineModeEnabled ?? true
             });
         }
     } catch(e) {
         console.warn("Failed to mount persistence store", e);
+    } finally {
+        isHydrated = true;
     }
 };
 
 initializeStore();
 
 useSyncStore.subscribe((state) => {
+    // Prevent data loss: Only persist IF we are hydrated or we have data
+    if (!isHydrated) return;
+
     Storage.setItem(STORE_KEY, JSON.stringify({
         logs: state.logs,
         stats: state.stats,
-        queue: state.queue
+        queue: state.queue,
+        isOfflineModeEnabled: state.isOfflineModeEnabled
     })).catch(() => {});
 });

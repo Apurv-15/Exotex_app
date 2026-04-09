@@ -5,6 +5,7 @@ import { useSyncStore } from '../store/SyncStore';
 import { QueuedOperation } from '../types/sync';
 import { NetworkService } from './NetworkService';
 import { logger } from '../core/logging/Logger';
+import { Platform } from 'react-native';
 
 class SyncServiceBase {
   private processing = false;
@@ -75,8 +76,18 @@ class SyncServiceBase {
       // Update global last sync time
       useSyncStore.getState().updateStats({ lastSyncTime: new Date().toISOString() });
 
+      // FEATURE 2: Track batch completion
+      logger.trackEvent('sync_completed', { 
+        count: pendingOps.length,
+        network: useSyncStore.getState().isOnline ? 'online' : 'offline'
+      });
+
     } catch (error: any) {
       logger.error('SyncService', 'Core sync error during batch processing', { error: error.message || error });
+      
+      // FEATURE 1: Capture core engine failures
+      logger.captureException(error, { context: 'batch_processing' });
+      
     } finally {
       this.processing = false;
       useSyncStore.getState().setIsSyncing(false);
@@ -90,13 +101,17 @@ class SyncServiceBase {
       // Mark processing
       await OfflineQueueService.updateOperation(op.id, { status: 'processing' });
 
+      // ---- NEW: Ensure image attachments are uploaded to Supabase Storage first ----
+      // This handles images captured while offline (stored as file:// URIs)
+      const enrichedPayload = await this.ensureImagesSynced(op.table, op.payload);
+
       // Execute against Supabase
       let error = null;
       if (op.type === 'CREATE') {
-        const { error: insertError } = await supabase.from(op.table).insert([op.payload]);
+        const { error: insertError } = await supabase.from(op.table).insert([enrichedPayload]);
         error = insertError;
       } else if (op.type === 'UPDATE') {
-         const { error: updateError } = await supabase.from(op.table).update(op.payload).eq('id', op.payload.id);
+         const { error: updateError } = await supabase.from(op.table).update(enrichedPayload).eq('id', enrichedPayload.id);
          error = updateError;
       } else if (op.type === 'DELETE') {
          const { error: deleteError } = await supabase.from(op.table).delete().eq('id', op.payload.id || op.localId);
@@ -137,6 +152,18 @@ class SyncServiceBase {
         table: op.table,
         localId: op.localId
       });
+
+      // FEATURE 1 & 2: Capture operation failure
+      logger.trackEvent('sync_failed', { 
+        table: op.table, 
+        type: op.type, 
+        error: error.message || 'Unknown' 
+      });
+      
+      if (!(error?.message?.includes('network') || error?.message?.includes('offline'))) {
+        // High priority: Capture non-network errors (logic errors/validations)
+        logger.captureException(error, { op_id: op.id, table: op.table });
+      }
       
       // Retry via Queue Service (which handles Exponential Backoff)
       await OfflineQueueService.handleFailure(op.id, error.message || 'Unknown network error');
@@ -170,6 +197,101 @@ class SyncServiceBase {
         localId: op.localId,
         fullError: error
       });
+    }
+  }
+
+  /**
+   * Scans payload for local file URIs (file://) and uploads them to Supabase Storage
+   * returns a new payload with cloud URLs replaced
+   */
+  private async ensureImagesSynced(table: string, payload: any): Promise<any> {
+    if (!payload) return payload;
+    
+    // Most tables use 'image_urls' or 'imageUrls'
+    const imageFields = ['image_urls', 'imageUrls'];
+    const newPayload = { ...payload };
+
+    for (const field of imageFields) {
+        if (Array.isArray(newPayload[field]) && newPayload[field].length > 0) {
+            const currentUrls = [...newPayload[field]];
+            const newUrls: string[] = [];
+            let modificationsMade = false;
+            
+            for (let i = 0; i < currentUrls.length; i++) {
+                const url = currentUrls[i];
+                if (typeof url === 'string' && (url.startsWith('file://') || url.startsWith('/'))) {
+                    try {
+                        logger.info('SyncService', `Uploading local attachment for ${table}`, { url });
+                        const cloudUrl = await this.uploadLocalAttachment(url, table, i);
+                        newUrls.push(cloudUrl);
+                        modificationsMade = true;
+                    } catch (uploadErr: any) {
+                        logger.warn('SyncService', 'Failed to upload offline attachment, keeping local URI', { error: uploadErr.message });
+                        newUrls.push(url);
+                    }
+                } else {
+                    newUrls.push(url);
+                }
+            }
+            
+            if (modificationsMade) {
+                newPayload[field] = newUrls;
+            }
+        }
+    }
+
+    return newPayload;
+  }
+
+  private async uploadLocalAttachment(localUri: string, table: string, index: number): Promise<string> {
+    if (Platform.OS === 'web') return localUri;
+
+    try {
+        // 1. Determine Bucket and Path based on table
+        let bucket = 'warranty-images';
+        let pathPrefix = 'misc-images';
+        
+        if (table === 'sales') {
+            bucket = 'warranty-images';
+            pathPrefix = 'sales-images';
+        } else if (table === 'complaints') {
+            bucket = 'complaint-images';
+            pathPrefix = 'complaint_images';
+        } else if (table === 'field_visits') {
+            bucket = 'warranty-images';
+            pathPrefix = 'field-visit-images';
+        }
+
+        const fileName = `${Date.now()}_idx${index}_sync.jpg`;
+        const filePath = `${pathPrefix}/${fileName}`;
+
+        // 2. Read the local file
+        const FileSystem = require('expo-file-system/legacy');
+        const base64 = await FileSystem.readAsStringAsync(localUri, {
+            encoding: FileSystem.EncodingType.Base64,
+        });
+        
+        const { Buffer } = require('buffer');
+        const fileBody = Buffer.from(base64, 'base64');
+
+        // 3. Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+            .from(bucket)
+            .upload(filePath, fileBody, {
+                contentType: 'image/jpeg',
+                upsert: false,
+            });
+
+        if (uploadError) throw uploadError;
+
+        // 4. Get Public URL
+        const { data: urlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(filePath);
+
+        return urlData.publicUrl;
+    } catch (err) {
+        throw err;
     }
   }
 
