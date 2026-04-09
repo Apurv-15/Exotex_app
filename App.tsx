@@ -15,18 +15,27 @@ import {
   Nunito_900Black
 } from '@expo-google-fonts/nunito';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Sentry from '@sentry/react-native';
 import { SyncService } from './src/services/SyncService';
 import { GlobalOfflinePopup } from './src/components/sync/GlobalOfflinePopup';
 import { registerGlobalHandlers } from './src/core/errors/GlobalHandlers';
 import { GlobalErrorBoundary } from './src/core/errors/GlobalErrorBoundary';
 import { logger } from './src/core/logging/Logger';
 
+// 🚀 SENTRY INITIALIZATION
+// Connects the app to real-time error monitoring
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  debug: __DEV__,
+  enableLogs: true, 
+});
+
 // Register system-level listeners (JS & Native unhandled crashes)
 registerGlobalHandlers();
 
 SplashScreen.preventAutoHideAsync();
 
-export default function App() {
+function App() {
   const [fontsLoaded, fontError] = useFonts({
     'Nunito-Regular': Nunito_400Regular,
     'Nunito-SemiBold': Nunito_600SemiBold,
@@ -37,7 +46,6 @@ export default function App() {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    logger.info('App', 'VMS System Starting...');
     async function handleCheckUpdates() {
       if (__DEV__) return;
       try {
@@ -115,3 +123,5 @@ export default function App() {
     </GlobalErrorBoundary>
   );
 }
+
+export default Sentry.wrap(App);

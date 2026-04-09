@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ekotex",
     "slug": "Warranty_manage_app",
-    "version": "1.1.1",
+    "version": "1.2.0",
     "orientation": "portrait",
     "assetBundlePatterns": [
       "assets/**/*"
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/company_logo.jpeg",
         "backgroundColor": "#ffffff"
@@ -37,7 +37,14 @@
     "plugins": [
       "expo-secure-store",
       "expo-font",
-      "expo-audio"
+      "expo-audio",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "aryan-bx2",
+          "project": "react-native"
+        }
+      ]
     ],
     "extra": {
       "eas": {
@@ -45,7 +52,7 @@
       }
     },
     "owner": "apurv1525",
-    "runtimeVersion": "1.1.1",
+    "runtimeVersion": "1.2.0",
     "updates": {
       "url": "https://u.expo.dev/a4d861aa-0106-4a73-8b4f-d557bea966f9"
     }
