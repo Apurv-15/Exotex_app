@@ -1,7 +1,5 @@
 import { Asset } from 'expo-asset';
-// Must use legacy API: the new expo-file-system v2 default export does not expose
-// cacheDirectory, EncodingType, readAsStringAsync, getInfoAsync, or downloadAsync.
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 
 /**

@@ -266,7 +266,7 @@ class SyncServiceBase {
         const filePath = `${pathPrefix}/${fileName}`;
 
         // 2. Read the local file
-        const FileSystem = require('expo-file-system/legacy');
+        const FileSystem = require('expo-file-system');
         const base64 = await FileSystem.readAsStringAsync(localUri, {
             encoding: FileSystem.EncodingType.Base64,
         });
