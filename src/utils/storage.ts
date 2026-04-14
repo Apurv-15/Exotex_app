@@ -18,14 +18,15 @@ const getFileUri = (key: string) => {
 export const Storage = {
     getItem: async (key: string): Promise<string | null> => {
         if (Platform.OS === 'web') {
+            if (SECURE_KEYS.includes(key)) {
+                return sessionStorage.getItem(key);
+            }
             return localStorage.getItem(key);
         }
 
-        // 1. If it's a forced secure key, check SecureStore then fallbacks
+        // 1. If it's a forced secure key, check SecureStore only
         if (SECURE_KEYS.includes(key)) {
-            const secureValue = await SecureStore.getItemAsync(key);
-            if (secureValue) return secureValue;
-            // Fallback: Check if it was stored in FileSystem or AsyncStorage because it was too large
+            return await SecureStore.getItemAsync(key);
         }
 
         // 2. Try FileSystem (preferred for large data or fallbacks)
@@ -51,12 +52,19 @@ export const Storage = {
 
     setItem: async (key: string, value: string): Promise<void> => {
         if (Platform.OS === 'web') {
-            localStorage.setItem(key, value);
+            if (SECURE_KEYS.includes(key)) {
+                sessionStorage.setItem(key, value);
+            } else {
+                localStorage.setItem(key, value);
+            }
             return;
         }
 
-        // 1. If it's a secure key AND small enough, use SecureStore
-        if (SECURE_KEYS.includes(key) && value.length <= 2048) {
+        // 1. If it's a secure key, require SecureStore and do not allow cleartext fallbacks
+        if (SECURE_KEYS.includes(key)) {
+            if (value.length > 2048) {
+                throw new Error(`Storage: Secure value for key "${key}" exceeds SecureStore size limits`);
+            }
             await SecureStore.setItemAsync(key, value);
             // Clean up fallbacks if they exist
             const fileUri = getFileUri(key);
@@ -65,7 +73,7 @@ export const Storage = {
             return;
         }
 
-        // 2. For large secure keys or normal keys, use FileSystem (more reliable for > 2KB)
+        // 2. For normal keys, use FileSystem (more reliable for > 2KB)
         try {
             const fileUri = getFileUri(key);
             if (!fileUri) {
@@ -73,11 +81,6 @@ export const Storage = {
                 return;
             }
             await FileSystem.writeAsStringAsync(fileUri, value);
-            
-            // If it was a secure key, it was too large for SecureStore, so remove any old small version
-            if (SECURE_KEYS.includes(key)) {
-                await SecureStore.deleteItemAsync(key).catch(() => { });
-            }
         } catch (e) {
             console.error(`Storage: Failed to write ${key} to FS`, e);
             // Last resort fallback
@@ -87,7 +90,11 @@ export const Storage = {
 
     deleteItem: async (key: string): Promise<void> => {
         if (Platform.OS === 'web') {
-            localStorage.removeItem(key);
+            if (SECURE_KEYS.includes(key)) {
+                sessionStorage.removeItem(key);
+            } else {
+                localStorage.removeItem(key);
+            }
             return;
         }
 
