@@ -98,4 +98,23 @@ eas update --auto
 This application implements strict **Row Level Security (RLS)** in Supabase to ensure data privacy between different organizational branches. All mission-critical data requires authenticated access, while complaint submissions are available publicly to facilitate customer feedback.
 
 ---
+---
+
+## 🔐 Play Store Compliance (Android 14+)
+
+To comply with Google Play's strict policies for Android 14 (Target SDK 34), this project implements:
+- **Permission Stripping:** Uses `expo-build-properties` to explicitly block `FOREGROUND_SERVICE` and its subtypes (`DATA_SYNC`, `MEDIA_PLAYBACK`) from the production manifest. This prevents generic rejections for apps that do not require persistent background notifications for core functionality.
+- **Optimized Sound Management:** Standardized notification sounds to occur within the app lifecycle, removing the need for privileged background audio permissions.
+
+---
+
+## 📜 Version History
+
+### **v1.2.1 (Build 6) - April 2026**
+- **FIX:** Resolved Google Play Console rejections regarding **Foreground Service Permissions**.
+- **Added:** `expo-build-properties` integration to manage manifest permissions.
+- **Refinement:** Audited `SoundManager` for safe, crash-free foreground-only execution.
+
+---
+
 *Developed for Exotex by Apurv*
