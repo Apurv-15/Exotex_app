@@ -24,7 +24,7 @@ import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 import { supabase } from '../../config/supabase';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
 import { getAssetBase64 } from '../../utils/AssetUtils';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from "expo-file-system/legacy";
 
 // Import Dashboard Components
 import { DashboardTab } from '../../components/dashboard/DashboardTab';

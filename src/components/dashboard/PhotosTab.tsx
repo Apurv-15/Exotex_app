@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../GlassPanel';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from 'expo-sharing';
 
 const screenWidth = Dimensions.get('window').width;

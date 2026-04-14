@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Keys that MUST be stored securely
 const SECURE_KEYS = ['auth_token', 'supabase.auth.token', 'supabase-auth-token'];
@@ -24,8 +24,18 @@ export const Storage = {
             return localStorage.getItem(key);
         }
 
-        // 1. If it's a forced secure key, check SecureStore only
+        // 1. If it's a forced secure key, check for sharded or single SecureStore value
         if (SECURE_KEYS.includes(key)) {
+            const meta = await SecureStore.getItemAsync(`_secure_meta_${key}`);
+            if (meta) {
+                const count = parseInt(meta, 10);
+                const parts = [];
+                for (let i = 0; i < count; i++) {
+                    const part = await SecureStore.getItemAsync(`_secure_part_${key}_${i}`);
+                    if (part) parts.push(part);
+                }
+                return parts.join('');
+            }
             return await SecureStore.getItemAsync(key);
         }
 
@@ -60,12 +70,32 @@ export const Storage = {
             return;
         }
 
-        // 1. If it's a secure key, require SecureStore and do not allow cleartext fallbacks
+        // 1. If it's a secure key, require SecureStore sharded as needed
         if (SECURE_KEYS.includes(key)) {
-            if (value.length > 2048) {
-                throw new Error(`Storage: Secure value for key "${key}" exceeds SecureStore size limits`);
+            // Clear any old metadata/parts first
+            const oldMeta = await SecureStore.getItemAsync(`_secure_meta_${key}`);
+            if (oldMeta) {
+                const count = parseInt(oldMeta, 10);
+                for (let i = 0; i < count; i++) {
+                    await SecureStore.deleteItemAsync(`_secure_part_${key}_${i}`).catch(() => { });
+                }
+                await SecureStore.deleteItemAsync(`_secure_meta_${key}`).catch(() => { });
             }
-            await SecureStore.setItemAsync(key, value);
+
+            if (value.length <= 2000) {
+                await SecureStore.setItemAsync(key, value);
+            } else {
+                // Sharding for values > 2KB
+                const partsCount = Math.ceil(value.length / 2000);
+                for (let i = 0; i < partsCount; i++) {
+                    const part = value.substring(i * 2000, (i + 1) * 2000);
+                    await SecureStore.setItemAsync(`_secure_part_${key}_${i}`, part);
+                }
+                await SecureStore.setItemAsync(`_secure_meta_${key}`, partsCount.toString());
+                // Clear the main key to avoid confusion
+                await SecureStore.deleteItemAsync(key).catch(() => { });
+            }
+
             // Clean up fallbacks if they exist
             const fileUri = getFileUri(key);
             if (fileUri) await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => { });

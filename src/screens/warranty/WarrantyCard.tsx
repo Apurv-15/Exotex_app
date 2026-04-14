@@ -14,7 +14,7 @@ import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // @ts-ignore
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from "expo-file-system/legacy";
 import PizZip from 'pizzip';
 import { Buffer } from 'buffer';
 
