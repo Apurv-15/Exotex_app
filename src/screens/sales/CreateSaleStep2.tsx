@@ -54,6 +54,13 @@ export default function CreateSaleStep2() {
         }
 
         try {
+            // Explicitly request permissions before launching library
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                showAlert('Permission Required', 'We need access to your gallery to upload warranty photos.');
+                return;
+            }
+
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 allowsMultipleSelection: true,

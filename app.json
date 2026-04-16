@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ekotex",
     "slug": "Warranty_manage_app",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "orientation": "portrait",
     "assetBundlePatterns": [
       "assets/**/*"
@@ -20,14 +20,23 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 6,
+      "versionCode": 8,
+      "permissions": [
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_DATA_SYNC",
+        "CAMERA"
+      ],
+      "softwareKeyboardLayoutMode": "pan",
+      "resizeableActivity": true,
+      "navigationBar": {
+        "visible": "always",
+        "backgroundColor": "#00000000",
+        "barStyle": "dark-content"
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/company_logo.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": [
-        "CAMERA"
-      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -42,11 +51,7 @@
         "expo-build-properties",
         {
           "android": {
-            "blockPermissions": [
-              "android.permission.FOREGROUND_SERVICE",
-              "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-              "android.permission.FOREGROUND_SERVICE_DATA_SYNC"
-            ]
+            "usesCleartextTraffic": true
           }
         }
       ],
