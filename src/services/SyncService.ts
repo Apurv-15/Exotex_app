@@ -25,12 +25,10 @@ class SyncServiceBase {
         this.debouncedProcessQueue();
     });
 
-    // Start background processor interval (Fallback check every 60s)
-    setInterval(() => {
-      if (useSyncStore.getState().isOnline) {
-        this.processQueue();
-      }
-    }, 60000);
+    // Monitor Network, trigger sync on online
+    NetworkService.startMonitoring(() => {
+        this.debouncedProcessQueue();
+    });
 
     // Initial load
     OfflineQueueService.loadQueue().then(() => {

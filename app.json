@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ekotex",
     "slug": "Warranty_manage_app",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "orientation": "portrait",
     "assetBundlePatterns": [
       "assets/**/*"
@@ -20,17 +20,13 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 7,
+      "versionCode": 8,
       "permissions": [
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_DATA_SYNC",
-        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "CAMERA"
       ],
       "softwareKeyboardLayoutMode": "pan",
-      "resizeableActivity": true,
+      "resizableActivity": true,
       "navigationBar": {
-        "visible": "always",
         "backgroundColor": "#00000000",
         "barStyle": "dark-content"
       },
@@ -45,6 +41,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withRemoveForegroundService",
       "expo-secure-store",
       "expo-font",
       "expo-audio",
@@ -52,14 +49,11 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true,
-            "foregroundServiceTypes": {
-              "dataSync": true,
-              "mediaPlayback": true
-            }
+            "usesCleartextTraffic": true
           }
         }
       ],
+
       [
         "@sentry/react-native",
         {

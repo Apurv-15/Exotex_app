@@ -17,7 +17,9 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import * as Sentry from '@sentry/react-native';
 import { SyncService } from './src/services/SyncService';
+import { registerBackgroundSync } from './src/services/BackgroundSyncTask';
 import { GlobalOfflinePopup } from './src/components/sync/GlobalOfflinePopup';
+
 import { registerGlobalHandlers } from './src/core/errors/GlobalHandlers';
 import { GlobalErrorBoundary } from './src/core/errors/GlobalErrorBoundary';
 import { logger } from './src/core/logging/Logger';
@@ -72,8 +74,9 @@ function App() {
         // 1. Check for OTA Updates on mount
         await handleCheckUpdates();
 
-        // 2. Initialize Background Sync Service
+        // 2. Initialize Sync Services
         SyncService.init();
+        registerBackgroundSync();
 
         // 3. Wait for fonts
         if (fontsLoaded || fontError) {
