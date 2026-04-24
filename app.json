@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": [
         "CAMERA"
       ],
@@ -41,7 +41,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "./plugins/withRemoveForegroundService",
       "expo-secure-store",
       "expo-font",
       "expo-audio",
@@ -53,14 +52,14 @@
           }
         }
       ],
-
       [
         "@sentry/react-native",
         {
           "organization": "aryan-bx2",
           "project": "react-native"
         }
-      ]
+      ],
+      "./plugins/withRemoveForegroundService"
     ],
     "extra": {
       "eas": {
