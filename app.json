@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 9,
+      "versionCode": 8,
       "permissions": [
         "CAMERA"
       ],
