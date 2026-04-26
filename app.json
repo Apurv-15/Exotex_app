@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ekotex",
     "slug": "Warranty_manage_app",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "orientation": "portrait",
     "assetBundlePatterns": [
       "assets/**/*"
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.exotex.warrantymanager",
-      "versionCode": 9,
+      "versionCode": 10,
       "permissions": [
         "CAMERA"
       ],
@@ -43,7 +43,6 @@
     "plugins": [
       "expo-secure-store",
       "expo-font",
-      "expo-audio",
       [
         "expo-build-properties",
         {
@@ -67,7 +66,7 @@
       }
     },
     "owner": "apurv1525",
-    "runtimeVersion": "1.2.1",
+    "runtimeVersion": "1.2.5",
     "updates": {
       "url": "https://u.expo.dev/a4d861aa-0106-4a73-8b4f-d557bea966f9"
     }
