@@ -38,6 +38,11 @@ export function useSyncQueue() {
     await SyncService.forceSync();
   };
   
+  const clearQueue = async () => {
+    await OfflineQueueService.clearQueue();
+    await OfflineQueueService.loadQueue(); // Refresh state
+  };
+
   const retryFailed = async (id: string) => {
      await OfflineQueueService.updateOperation(id, {
          status: 'pending',
@@ -60,6 +65,7 @@ export function useSyncQueue() {
     clearFailed,
     removeOperation,
     forceSync,
+    clearQueue,
     retryFailed
   };
 }

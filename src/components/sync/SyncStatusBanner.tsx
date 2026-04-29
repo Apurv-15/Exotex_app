@@ -6,7 +6,7 @@ import { useSyncQueue } from '../../hooks/useSyncQueue';
 
 export const SyncStatusBanner = () => {
   const { isOnline, isSyncing } = useNetworkStatus();
-  const { pendingCount, failedCount, forceSync } = useSyncQueue();
+  const { pendingCount, failedCount, forceSync, clearQueue } = useSyncQueue();
   const [expanded, setExpanded] = React.useState(false);
 
   // Auto-collapse if empty
@@ -52,6 +52,25 @@ export const SyncStatusBanner = () => {
                  <Pressable style={styles.syncButton} onPress={forceSync}>
                      <Text style={styles.syncButtonText}>Sync Now</Text>
                  </Pressable>
+             )}
+             {(pendingCount > 0 || failedCount > 0) && (
+                 <Pressable 
+                    style={[styles.syncButton, { backgroundColor: '#FEE2E2', marginLeft: 8 }]} 
+                    onPress={() => {
+                        import('react-native').then(({ Alert }) => {
+                            Alert.alert(
+                                "Clear Sync Queue",
+                                "Are you sure you want to clear all pending and failed sync items? This action cannot be undone and your unsynced data will be lost.",
+                                [
+                                    { text: "Cancel", style: "cancel" },
+                                    { text: "Clear All", style: "destructive", onPress: clearQueue }
+                                ]
+                            );
+                        });
+                    }}
+                >
+                    <Text style={[styles.syncButtonText, { color: '#EF4444' }]}>Clear Queue</Text>
+                </Pressable>
              )}
          </View>
       )}
