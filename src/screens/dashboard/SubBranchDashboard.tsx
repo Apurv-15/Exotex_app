@@ -42,6 +42,7 @@ import { SubBranchComplaintsTab } from '../../components/dashboard/SubBranchComp
 import { SubBranchQuotationsTab } from '../../components/dashboard/SubBranchQuotationsTab';
 import { SubBranchPendingTab } from '../../components/dashboard/SubBranchPendingTab';
 import { SubBranchAnalyticsTab } from '../../components/dashboard/SubBranchAnalyticsTab';
+import { SyncStatusBanner } from '../../components/sync/SyncStatusBanner';
 
 const { width } = Dimensions.get('window');
 
@@ -79,7 +80,12 @@ const parseDateSafe = (dateStr: string | null | undefined): Date => {
 const toISODate = (d: string | null | undefined) => {
     if (!d) return '';
     try {
-        return parseDateSafe(d).toISOString().split('T')[0];
+        const date = parseDateSafe(d);
+        if (isNaN(date.getTime())) return '';
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     } catch {
         return '';
     }
@@ -357,7 +363,7 @@ export default function SubBranchDashboard() {
     };
 
     // Data generation based on period
-    const getChartData = () => {
+    const visitGraphData = useMemo(() => {
         let labels = [];
         let warrantyData = [];
         let fieldVisitData = [];
@@ -367,7 +373,10 @@ export default function SubBranchDashboard() {
             for (let i = daysToStep - 1; i >= 0; i--) {
                 const date = new Date();
                 date.setDate(date.getDate() - i);
-                const dateStr = date.toISOString().split('T')[0];
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                const dateStr = `${y}-${m}-${d}`;
                 labels.push(period === 'Today' ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' }));
                 warrantyData.push(sales.filter(s => toISODate(s.saleDate) === dateStr && s.warrantyId).length);
                 fieldVisitData.push(fieldVisits.filter(v => toISODate(v.visitDate || v.dateOfVisit) === dateStr).length);
@@ -379,15 +388,17 @@ export default function SubBranchDashboard() {
                 date.setDate(date.getDate() - (i * 5));
                 labels.push(date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }));
 
-                // Simplified aggregation for dummy/real
                 let wCount = 0;
                 let vCount = 0;
                 for (let j = 0; j < 5; j++) {
                     const d = new Date();
                     d.setDate(d.getDate() - (i * 5 + j));
-                    const ds = d.toISOString().split('T')[0];
-                    wCount += sales.filter(s => s.saleDate === ds && s.warrantyId).length;
-                    vCount += fieldVisits.filter(v => v.visitDate === ds).length;
+                    const dy = d.getFullYear();
+                    const dm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const ds = `${dy}-${dm}-${dd}`;
+                    wCount += sales.filter(s => toISODate(s.saleDate) === ds && s.warrantyId).length;
+                    vCount += fieldVisits.filter(v => toISODate(v.visitDate || v.dateOfVisit) === ds).length;
                 }
                 warrantyData.push(wCount);
                 fieldVisitData.push(vCount);
@@ -402,11 +413,11 @@ export default function SubBranchDashboard() {
                 const month = date.getMonth();
                 const year = date.getFullYear();
                 warrantyData.push(sales.filter(s => {
-                    const sd = new Date(s.saleDate);
+                    const sd = parseDateSafe(s.saleDate);
                     return sd.getMonth() === month && sd.getFullYear() === year && s.warrantyId;
                 }).length);
                 fieldVisitData.push(fieldVisits.filter(v => {
-                    const vd = new Date(v.visitDate);
+                    const vd = parseDateSafe(v.visitDate || v.dateOfVisit);
                     return vd.getMonth() === month && vd.getFullYear() === year;
                 }).length);
             }
@@ -428,9 +439,7 @@ export default function SubBranchDashboard() {
             ],
             legend: ['Warranties', 'Field Visits']
         };
-    };
-
-    const chartData = getChartData();
+    }, [sales, fieldVisits, period]);
 
     const handleDownloadVisit = async (visit: any) => {
         try {
@@ -608,7 +617,7 @@ export default function SubBranchDashboard() {
             .slice(0, 5);
     }, [sales]);
 
-    const visitGraphData = useMemo(() => chartData, [chartData]);
+
 
     return (
         <MeshBackground>
@@ -662,6 +671,8 @@ export default function SubBranchDashboard() {
                         </Pressable>
                     </View>
                 </View>
+
+                <SyncStatusBanner />
 
                 {/* Tab Switcher */}
                 <View style={[styles.tabContainer, { marginBottom: 20 }]}>

@@ -24,7 +24,7 @@ import { generateQuotationHTML } from '../../utils/QuotationTemplate';
 import { supabase } from '../../config/supabase';
 import { useTabletLayout } from '../../hooks/useTabletLayout';
 import { getAssetBase64 } from '../../utils/AssetUtils';
-import * as FileSystem from "expo-file-system/legacy";
+import { Paths, File } from 'expo-file-system';
 
 // Import Dashboard Components
 import { DashboardTab } from '../../components/dashboard/DashboardTab';
@@ -36,6 +36,7 @@ import { PhotosTab } from '../../components/dashboard/PhotosTab';
 import { UsersTab } from '../../components/dashboard/UsersTab';
 import { SyncAuditLogsTab } from '../../components/dashboard/SyncAuditLogsTab';
 import { useSyncStore } from '../../store/SyncStore';
+import { SyncStatusBanner } from '../../components/sync/SyncStatusBanner';
 
 // Import Constants and Helpers
 import {
@@ -58,6 +59,39 @@ const normalizeRegion = (name: string) => {
     if (!trimmed) return '';
     // Title Case normalization
     return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
+// Robust date parsing for different formats (DD/MM/YYYY or YYYY-MM-DD)
+const parseDateSafe = (dateStr: string | null | undefined): Date => {
+    if (!dateStr) return new Date(0);
+    if (typeof dateStr !== 'string') return new Date(dateStr);
+    
+    // Handle DD/MM/YYYY format
+    if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            const [d, m, y] = parts.map(Number);
+            // JS Date constructor is 0-indexed for month
+            return new Date(y, m - 1, d);
+        }
+    }
+    // Handle YYYY-MM-DD format or ISO
+    return new Date(dateStr);
+};
+
+const toISODate = (d: string | null | undefined) => {
+    if (!d) return '';
+    try {
+        const date = parseDateSafe(d);
+        if (isNaN(date.getTime())) return '';
+        // Use local date parts to avoid UTC timezone shifts
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    } catch {
+        return '';
+    }
 };
 
 export default function MainBranchDashboard() {
@@ -107,12 +141,12 @@ export default function MainBranchDashboard() {
 
             // Prepare the correct fetch promises
             const salesFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userBranch)
-                ? SalesService.getSalesPaginated(50, 1)
-                : SalesService.getSalesByBranchPaginated(userBranch, 50, 1);
+                ? SalesService.getSalesPaginated(200, 1)
+                : SalesService.getSalesByBranchPaginated(userBranch, 200, 1);
 
             const visitsFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userBranch)
-                ? FieldVisitService.getFieldVisitsPaginated(50, 1)
-                : FieldVisitService.getFieldVisitsByBranchPaginated(userBranch, 50, 1);
+                ? FieldVisitService.getFieldVisitsPaginated(200, 1)
+                : FieldVisitService.getFieldVisitsByBranchPaginated(userBranch, 200, 1);
 
             const complaintsFetch = (user?.role === 'Super Admin' || user?.role === 'Admin' || !userBranch)
                 ? ComplaintService.getComplaintsPaginated(50, 1)
@@ -354,44 +388,62 @@ export default function MainBranchDashboard() {
 
     // Real data for visit analytics graph
     const visitGraphData = useMemo(() => {
-        // Get last 7 days
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const today = new Date();
         const labels: string[] = [];
-        const counts: number[] = [];
+        const visitCounts: number[] = [];
+        const warrantyCounts: number[] = [];
 
-        // Apply region filter if selected
+        // Only filter by user-selected region — don't filter by officialRegions
+        // (officialRegions is for UI display only; filtering by it drops records
+        //  whose branchId is empty/null/non-normalised and produces zero graphs)
         const baseVisits = selectedRegion
-            ? filteredVisits.filter(v => (v as any).branchId === selectedRegion)
-            : filteredVisits;
+            ? allVisits.filter(v => normalizeRegion((v as any).branchId || '') === selectedRegion)
+            : allVisits;
+
+        const baseSales = selectedRegion
+            ? allSales.filter(s => normalizeRegion(s.branchId || '') === selectedRegion)
+            : allSales;
 
         for (let i = 6; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             labels.push(days[date.getDay()]);
 
-            // Count visits for this day
-            const dayVisits = baseVisits.filter(visit => {
-                const vDate = visit.visitDate || (visit as any).dateOfVisit;
-                if (!vDate) return false;
-                const vD = new Date(vDate);
-                return vD.getFullYear() === date.getFullYear() &&
-                    vD.getMonth() === date.getMonth() &&
-                    vD.getDate() === date.getDate();
-            }).length;
+            // Use local date parts to avoid UTC timezone shift
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${day}`;
 
-            counts.push(dayVisits);
+            const vCount = baseVisits.filter(v =>
+                toISODate(v.visitDate || (v as any).dateOfVisit) === dateStr
+            ).length;
+            visitCounts.push(vCount);
+
+            const wCount = baseSales.filter(s =>
+                toISODate(s.saleDate) === dateStr && s.warrantyId
+            ).length;
+            warrantyCounts.push(wCount);
         }
 
         return {
             labels,
-            datasets: [{
-                data: counts,
-                color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-                strokeWidth: 2
-            }]
+            datasets: [
+                {
+                    data: warrantyCounts.length > 0 ? warrantyCounts : [0, 0, 0, 0, 0, 0, 0],
+                    color: (opacity = 1) => `rgba(116, 198, 157, ${opacity})`,
+                    strokeWidth: 2
+                },
+                {
+                    data: visitCounts.length > 0 ? visitCounts : [0, 0, 0, 0, 0, 0, 0],
+                    color: (opacity = 1) => `rgba(124, 58, 237, ${opacity})`,
+                    strokeWidth: 2
+                }
+            ],
+            legend: ['Warranties', 'Visits']
         };
-    }, [allVisits, selectedRegion]); // Refresh when visits or selection changes
+    }, [allVisits, allSales, selectedRegion]);
 
     // Calculate top selling models from filtered sales
     const topSellingModels = useMemo(() => {
@@ -742,8 +794,8 @@ export default function MainBranchDashboard() {
         try {
             for (const url of selectedPhotos) {
                 const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
-                const fileUri = `${(FileSystem as any).cacheDirectory}${filename}`;
-                const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
+                const cacheFile = new File(Paths.cache, filename);
+                const downloadedFile = await File.downloadFileAsync(url, cacheFile);
 
                 if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
                     await Sharing.shareAsync(downloadedFile.uri);
@@ -811,6 +863,8 @@ export default function MainBranchDashboard() {
                         </Pressable>
                     </View>
                 </View>
+                
+                <SyncStatusBanner />
 
                 <View style={styles.tabContainer}>
                     <ScrollView
@@ -938,22 +992,39 @@ export default function MainBranchDashboard() {
                             <Text style={styles.sectionTitle}>Visit Analytics</Text>
                         </View>
                         <GlassPanel style={styles.graphCard}>
+                            {/* Legend */}
+                            <View style={{ flexDirection: 'row', gap: 16, marginBottom: 8, paddingHorizontal: 8 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: 'rgba(116, 198, 157, 1)' }} />
+                                    <Text style={{ fontSize: 11, color: '#6B7280', fontWeight: '600' }}>Warranties</Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: 'rgba(124, 58, 237, 1)' }} />
+                                    <Text style={{ fontSize: 11, color: '#6B7280', fontWeight: '600' }}>Visits</Text>
+                                </View>
+                            </View>
                             <LineChart
                                 data={visitGraphData}
                                 width={screenWidth - 80}
                                 height={180}
                                 fromZero={true}
+                                withDots={true}
+                                withShadow={false}
                                 chartConfig={{
                                     backgroundColor: 'transparent',
                                     backgroundGradientFrom: '#ffffff',
                                     backgroundGradientTo: '#ffffff',
+                                    backgroundGradientFromOpacity: 0,
+                                    backgroundGradientToOpacity: 0,
                                     decimalPlaces: 0,
                                     color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
                                     labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
                                     propsForDots: {
-                                        r: '4',
+                                        r: '5',
                                         strokeWidth: '2',
-                                        stroke: '#10B981'
+                                    },
+                                    propsForBackgroundLines: {
+                                        stroke: 'rgba(0,0,0,0.05)',
                                     },
                                     style: {
                                         borderRadius: 16
@@ -1106,22 +1177,22 @@ export default function MainBranchDashboard() {
                                                     />
                                                 </View>
                                             </View>
-                                            <View style={[styles.listContent, { marginRight: 8 }]}>
+                                            <View style={{ flex: 1, marginRight: 8 }}>
                                                 <Text style={styles.listTitle} numberOfLines={1}>{s.customerName}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                                                     <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">{s.productModel}</Text>
                                                     <View style={[styles.countdownBadge, { backgroundColor: countdown.color + '20' }]}>
-                                                        <Text style={[styles.countdownText, { color: countdown.color }]}>
+                                                        <Text style={[styles.countdownText, { color: countdown.color, fontSize: 9 }]}>
                                                             {countdown.label}
                                                         </Text>
                                                     </View>
                                                 </View>
                                             </View>
-                                            <View style={[styles.listRight, { minWidth: 60 }]}>
-                                                <Text style={styles.listDate}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                                                <Text style={styles.listCity} numberOfLines={1}>{s.branchId || s.city}</Text>
+                                            <View style={{ alignItems: 'flex-end', minWidth: 65, paddingRight: 4 }}>
+                                                <Text style={[styles.listDate, { fontSize: 11 }]}>{new Date(s.saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                                                <Text style={[styles.listCity, { fontSize: 10 }]} numberOfLines={1}>{s.branchId || s.city}</Text>
                                             </View>
-                                            <MaterialCommunityIcons name="chevron-right" size={20} color={THEME.colors.textSecondary} style={{ marginLeft: 8 }} />
+                                            <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
                                         </Pressable>
                                     );
                                 })}
@@ -1319,7 +1390,7 @@ export default function MainBranchDashboard() {
                                     {displayVisits.map((visit, idx) => {
                                         const isDone = visit.status === 'completed' || visit.status === 'Done';
                                         return (
-                                            <View key={visit.id || idx} style={[styles.listItem, idx === allVisits.length - 1 && { borderBottomWidth: 0 }]}>
+                                            <View key={visit.id || idx} style={[styles.listItem, { paddingHorizontal: 4 }, idx === displayVisits.length - 1 && { borderBottomWidth: 0 }]}>
                                                 <View style={[styles.listIcon, { backgroundColor: isDone ? THEME.colors.mintLight : '#FEF3C7' }]}>
                                                     <MaterialCommunityIcons
                                                         name={isDone ? "check-circle" : "clock-outline"}
@@ -1327,29 +1398,29 @@ export default function MainBranchDashboard() {
                                                         color={isDone ? THEME.colors.success : THEME.colors.warning}
                                                     />
                                                 </View>
-                                                <View style={[styles.listContent, { marginRight: 8 }]}>
+                                                <View style={{ flex: 1, marginRight: 12 }}>
                                                     <Text style={styles.listTitle} numberOfLines={1}>
                                                         {visit.clientCompanyName || visit.contactPersonName || visit.siteName || visit.companyBuildingName || 'Unknown Site'}
                                                     </Text>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                                                         <View style={[styles.tag, { backgroundColor: isDone ? THEME.colors.success + '20' : THEME.colors.warning + '20' }]}>
-                                                            <Text style={[styles.tagText, { color: isDone ? THEME.colors.success : THEME.colors.warning }]}>
+                                                            <Text style={[styles.tagText, { color: isDone ? THEME.colors.success : THEME.colors.warning, fontSize: 9 }]}>
                                                                 {isDone ? 'Completed' : 'Pending'}
                                                             </Text>
                                                         </View>
-                                                        <Text style={styles.listSub} numberOfLines={1} ellipsizeMode="tail">{(visit as any).branchId || visit.city}</Text>
+                                                        <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1}>{(visit as any).branchId || visit.city}</Text>
                                                     </View>
                                                 </View>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                    <Pressable onPress={() => handleDownloadVisit(visit)} style={styles.downloadIconBtn}>
-                                                        <MaterialCommunityIcons name="file-download-outline" size={22} color={THEME.colors.primary} />
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <Pressable onPress={() => handleDownloadVisit(visit)} style={[styles.downloadIconBtn, { width: 32, height: 32, padding: 0, justifyContent: 'center', alignItems: 'center' }]}>
+                                                        <MaterialCommunityIcons name="file-download-outline" size={20} color={THEME.colors.primary} />
                                                     </Pressable>
                                                     {user?.role === 'Super Admin' && (
                                                         <Pressable
                                                             onPress={() => handleDeleteVisit(visit)}
-                                                            style={[styles.downloadIconBtn, { backgroundColor: '#FEF2F2' }]}
+                                                            style={[styles.downloadIconBtn, { width: 32, height: 32, padding: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: 6 }]}
                                                         >
-                                                            <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
+                                                            <MaterialCommunityIcons name="delete-outline" size={18} color="#EF4444" />
                                                         </Pressable>
                                                     )}
                                                 </View>
@@ -1418,6 +1489,7 @@ export default function MainBranchDashboard() {
                                             key={q.id || idx}
                                             style={({ pressed }) => [
                                                 styles.listItem,
+                                                { paddingHorizontal: 4 },
                                                 pressed && { backgroundColor: 'rgba(255,255,255,0.4)' },
                                                 idx === displayQuotations.length - 1 && { borderBottomWidth: 0 }
                                             ]}
@@ -1426,41 +1498,52 @@ export default function MainBranchDashboard() {
                                             <View style={[styles.listIcon, { backgroundColor: '#E0F2FE' }]}>
                                                 <MaterialCommunityIcons name="receipt" size={20} color="#0EA5E9" />
                                             </View>
-                                            <View style={[styles.listContent, { marginRight: 8 }]}>
-                                                <Text style={styles.listTitle} numberOfLines={1}>{q.customerName}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                    <View style={[styles.tag, { backgroundColor: '#E0F2FE' }]}>
-                                                        <Text style={[styles.tagText, { color: '#0EA5E9' }]}>{q.quotationNo}</Text>
+                                            
+                                            <View style={{ flex: 1, marginRight: 8 }}>
+                                                <Text style={[styles.listTitle, { fontSize: 14 }]} numberOfLines={1}>
+                                                    {q.customerName}
+                                                </Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                                    <View style={[styles.tag, { backgroundColor: '#E0F2FE', paddingHorizontal: 4 }]}>
+                                                        <Text style={[styles.tagText, { color: '#0EA5E9', fontSize: 9 }]}>
+                                                            {q.quotationNo || 'EST-N/A'}
+                                                        </Text>
                                                     </View>
-                                                    <Text style={styles.listSub} numberOfLines={1}>{q.region}</Text>
+                                                    <Text style={[styles.listSub, { flex: 1 }]} numberOfLines={1}>
+                                                        {q.region}
+                                                    </Text>
                                                 </View>
                                             </View>
-                                            <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8 }}>
-                                                <View style={{ alignItems: 'flex-end', minWidth: 70 }}>
-                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.colors.text }} numberOfLines={1}>
-                                                        ₹{(() => {
-                                                            const rate = parseFloat(q.rate) || 0;
-                                                            const qty = parseFloat(q.qty) || 0;
-                                                            const disc = parseFloat(q.discountPerc) || 0;
-                                                            const discounted = rate * (1 - disc / 100);
-                                                            const total = Math.round((discounted * qty) * 1.18);
-                                                            return total.toLocaleString('en-IN');
-                                                        })()}
-                                                    </Text>
-                                                    <Text style={{ fontSize: 10, color: THEME.colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{q.itemName}</Text>
-                                                </View>
-                                                <Pressable onPress={() => handleDownloadQuotation(q)} style={[styles.downloadIconBtn, { width: 32, height: 32 }]}>
+
+                                            <View style={{ alignItems: 'flex-end', justifyContent: 'center', paddingRight: 4 }}>
+                                                <Text style={{ fontSize: 13, fontWeight: '800', color: THEME.colors.text }} numberOfLines={1}>
+                                                    ₹{(() => {
+                                                        const rate = parseFloat(q.rate) || 0;
+                                                        const qty = parseFloat(q.qty) || 0;
+                                                        const disc = parseFloat(q.discountPerc) || 0;
+                                                        const discounted = rate * (1 - disc / 100);
+                                                        const total = Math.round((discounted * qty) * 1.18);
+                                                        return total.toLocaleString('en-IN');
+                                                    })()}
+                                                </Text>
+                                                <Text style={{ fontSize: 9, color: THEME.colors.textSecondary, marginTop: 1 }} numberOfLines={1}>
+                                                    {q.itemName}
+                                                </Text>
+                                            </View>
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                <Pressable onPress={() => handleDownloadQuotation(q)} style={[styles.downloadIconBtn, { width: 30, height: 30, padding: 0, justifyContent: 'center', alignItems: 'center' }]}>
                                                     <MaterialCommunityIcons name="file-download-outline" size={18} color={THEME.colors.primary} />
                                                 </Pressable>
                                                 {user?.role === 'Super Admin' && (
                                                     <Pressable
                                                         onPress={() => handleDeleteQuotation(q)}
-                                                        style={[styles.downloadIconBtn, { width: 32, height: 32, backgroundColor: '#FEF2F2', borderRadius: 8 }]}
+                                                        style={[styles.downloadIconBtn, { width: 30, height: 30, padding: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: 6 }]}
                                                     >
-                                                        <MaterialCommunityIcons name="delete-outline" size={18} color="#EF4444" />
+                                                        <MaterialCommunityIcons name="delete-outline" size={16} color="#EF4444" />
                                                     </Pressable>
                                                 )}
-                                                <MaterialCommunityIcons name="chevron-right" size={18} color={THEME.colors.textSecondary} />
+                                                <MaterialCommunityIcons name="chevron-right" size={16} color={THEME.colors.textSecondary} />
                                             </View>
                                         </Pressable>
                                     ))}
@@ -1953,8 +2036,8 @@ const PhotosGalleryContent = ({
         setIsDownloading(true);
         try {
             const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
-            const fileUri = `${(FileSystem as any).cacheDirectory}${filename}`;
-            const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
+            const cacheFile = new File(Paths.cache, filename);
+            const downloadedFile = await File.downloadFileAsync(url, cacheFile);
 
             if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(downloadedFile.uri);
