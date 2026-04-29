@@ -1,17 +1,24 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Paths, File } from 'expo-file-system';
 
 // Keys that MUST be stored securely
 const SECURE_KEYS = ['auth_token', 'supabase.auth.token', 'supabase-auth-token'];
 
-// Helper to get safe filename
-const getFileUri = (key: string) => {
-    const safeKey = key.replace(/[^a-z0-9]/gi, '_');
-    const directory = (FileSystem as any).documentDirectory;
-    if (!directory) return null;
-    return `${directory}storage_${safeKey}.json`;
+/**
+ * Helper to get a File instance for a specific key.
+ * Uses the new Expo FileSystem v19+ API.
+ */
+const getFileHandle = (key: string): File | null => {
+    try {
+        const safeKey = key.replace(/[^a-z0-9]/gi, '_');
+        // Paths.document provides a Directory instance for the app's document folder
+        return new File(Paths.document, `storage_${safeKey}.json`);
+    } catch (e) {
+        console.error('Storage: Failed to initialize File handle', e);
+        return null;
+    }
 };
 
 // Cross-platform storage that works on both native and web
@@ -26,27 +33,28 @@ export const Storage = {
 
         // 1. If it's a forced secure key, check for sharded or single SecureStore value
         if (SECURE_KEYS.includes(key)) {
-            const meta = await SecureStore.getItemAsync(`_secure_meta_${key}`);
-            if (meta) {
-                const count = parseInt(meta, 10);
-                const parts = [];
-                for (let i = 0; i < count; i++) {
-                    const part = await SecureStore.getItemAsync(`_secure_part_${key}_${i}`);
-                    if (part) parts.push(part);
+            try {
+                const meta = await SecureStore.getItemAsync(`_secure_meta_${key}`);
+                if (meta) {
+                    const count = parseInt(meta, 10);
+                    const parts = [];
+                    for (let i = 0; i < count; i++) {
+                        const part = await SecureStore.getItemAsync(`_secure_part_${key}_${i}`);
+                        if (part) parts.push(part);
+                    }
+                    return parts.join('');
                 }
-                return parts.join('');
+                return await SecureStore.getItemAsync(key);
+            } catch (e) {
+                console.warn(`Storage: SecureStore read failed for ${key}`, e);
             }
-            return await SecureStore.getItemAsync(key);
         }
 
         // 2. Try FileSystem (preferred for large data or fallbacks)
         try {
-            const fileUri = getFileUri(key);
-            if (fileUri) {
-                const info = await FileSystem.getInfoAsync(fileUri);
-                if (info.exists) {
-                    return await FileSystem.readAsStringAsync(fileUri);
-                }
+            const file = getFileHandle(key);
+            if (file && file.exists) {
+                return await file.text();
             }
         } catch (e) {
             console.warn(`Storage: Request to read ${key} from FS failed`, e);
@@ -72,50 +80,54 @@ export const Storage = {
 
         // 1. If it's a secure key, require SecureStore sharded as needed
         if (SECURE_KEYS.includes(key)) {
-            // Clear any old metadata/parts first
-            const oldMeta = await SecureStore.getItemAsync(`_secure_meta_${key}`);
-            if (oldMeta) {
-                const count = parseInt(oldMeta, 10);
-                for (let i = 0; i < count; i++) {
-                    await SecureStore.deleteItemAsync(`_secure_part_${key}_${i}`).catch(() => { });
+            try {
+                // Clear any old metadata/parts first
+                const oldMeta = await SecureStore.getItemAsync(`_secure_meta_${key}`);
+                if (oldMeta) {
+                    const count = parseInt(oldMeta, 10);
+                    for (let i = 0; i < count; i++) {
+                        await SecureStore.deleteItemAsync(`_secure_part_${key}_${i}`).catch(() => { });
+                    }
+                    await SecureStore.deleteItemAsync(`_secure_meta_${key}`).catch(() => { });
                 }
-                await SecureStore.deleteItemAsync(`_secure_meta_${key}`).catch(() => { });
-            }
 
-            if (value.length <= 2000) {
-                await SecureStore.setItemAsync(key, value);
-            } else {
-                // Sharding for values > 2KB
-                const partsCount = Math.ceil(value.length / 2000);
-                for (let i = 0; i < partsCount; i++) {
-                    const part = value.substring(i * 2000, (i + 1) * 2000);
-                    await SecureStore.setItemAsync(`_secure_part_${key}_${i}`, part);
+                if (value.length <= 2000) {
+                    await SecureStore.setItemAsync(key, value);
+                } else {
+                    // Sharding for values > 2KB
+                    const partsCount = Math.ceil(value.length / 2000);
+                    for (let i = 0; i < partsCount; i++) {
+                        const part = value.substring(i * 2000, (i + 1) * 2000);
+                        await SecureStore.setItemAsync(`_secure_part_${key}_${i}`, part);
+                    }
+                    await SecureStore.setItemAsync(`_secure_meta_${key}`, partsCount.toString());
+                    // Clear the main key to avoid confusion
+                    await SecureStore.deleteItemAsync(key).catch(() => { });
                 }
-                await SecureStore.setItemAsync(`_secure_meta_${key}`, partsCount.toString());
-                // Clear the main key to avoid confusion
-                await SecureStore.deleteItemAsync(key).catch(() => { });
-            }
 
-            // Clean up fallbacks if they exist
-            const fileUri = getFileUri(key);
-            if (fileUri) await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => { });
-            await AsyncStorage.removeItem(key).catch(() => { });
-            return;
+                // Clean up fallbacks if they exist
+                const file = getFileHandle(key);
+                if (file && file.exists) file.delete();
+                await AsyncStorage.removeItem(key).catch(() => { });
+                return;
+            } catch (e) {
+                console.error(`Storage: SecureStore write failed for ${key}`, e);
+            }
         }
 
         // 2. For normal keys, use FileSystem (more reliable for > 2KB)
         try {
-            const fileUri = getFileUri(key);
-            if (!fileUri) {
-                await AsyncStorage.setItem(key, value);
+            const file = getFileHandle(key);
+            if (file) {
+                await file.write(value);
                 return;
             }
-            await FileSystem.writeAsStringAsync(fileUri, value);
         } catch (e) {
             console.error(`Storage: Failed to write ${key} to FS`, e);
-            // Last resort fallback
-            await AsyncStorage.setItem(key, value).catch(() => { });
         }
+
+        // Last resort fallback
+        await AsyncStorage.setItem(key, value).catch(() => { });
     },
 
     deleteItem: async (key: string): Promise<void> => {
@@ -132,11 +144,20 @@ export const Storage = {
         // 1. SecureStore
         await SecureStore.deleteItemAsync(key).catch(() => { });
 
+        const meta = await SecureStore.getItemAsync(`_secure_meta_${key}`).catch(() => null);
+        if (meta) {
+            const count = parseInt(meta, 10);
+            for (let i = 0; i < count; i++) {
+                await SecureStore.deleteItemAsync(`_secure_part_${key}_${i}`).catch(() => { });
+            }
+            await SecureStore.deleteItemAsync(`_secure_meta_${key}`).catch(() => { });
+        }
+
         // 2. FileSystem
         try {
-            const fileUri = getFileUri(key);
-            if (fileUri) {
-                await FileSystem.deleteAsync(fileUri, { idempotent: true });
+            const file = getFileHandle(key);
+            if (file && file.exists) {
+                file.delete();
             }
         } catch (e) { }
 

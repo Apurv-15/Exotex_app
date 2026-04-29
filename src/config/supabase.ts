@@ -6,12 +6,15 @@ import { Storage } from '../utils/storage';
 // Supabase Configuration
 // These values come from environment variables (.env file)
 // The anon key is safe to expose in client-side code
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Supabase Configuration
+// These values come from environment variables (.env file)
+// The anon key is safe to expose in client-side code
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder-project.supabase.co';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
 
 // Validate configuration
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn('⚠️ Supabase credentials not found. Please check your .env file.');
+if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
+    console.warn('⚠️ Supabase credentials not found or incomplete. Please check your .env file or build secrets.');
 }
 
 // Custom storage adapter for Supabase to work with expo-secure-store/localStorage
@@ -29,6 +32,7 @@ const supabaseStorage = {
 };
 
 // Create Supabase client
+// We use fallbacks to prevent the entire app from crashing if env vars are missing
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         storage: supabaseStorage,
