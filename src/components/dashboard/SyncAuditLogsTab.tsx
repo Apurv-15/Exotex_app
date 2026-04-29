@@ -248,7 +248,8 @@ export const SyncAuditLogsTab: React.FC = () => {
                 <View style={styles.listContent}>
                     {logs.map((item) => renderLogItem({ item }))}
                 </View>
-            )}            <Modal
+            )}
+            <Modal
                 visible={!!selectedLog}
                 transparent
                 animationType="fade"

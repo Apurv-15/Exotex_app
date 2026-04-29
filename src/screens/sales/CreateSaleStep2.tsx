@@ -203,7 +203,7 @@ export default function CreateSaleStep2() {
                         <View style={styles.progressHeader}>
                             <Text style={styles.progressLabel}>Warranty Photos (Min: 2)</Text>
                             <Text style={[styles.progressValue, images.length >= 2 && { color: '#10B981' }]}>
-                                {images.length}/6 Files {images.length >= 2 && '(Ready)'}
+                                {images.length}/6 Files {images.length >= 2 ? '(Ready)' : ''}
                             </Text>
                         </View>
                         <View style={styles.progressBar}>

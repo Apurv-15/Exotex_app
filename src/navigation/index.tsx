@@ -198,7 +198,11 @@ export default function RootNavigator() {
     return (
         <NavigationContainer ref={navigationRef}>
             {user ? (
-                (user.role === 'Admin' || user.role === 'Super Admin') ? <AdminStack /> : <UserStack />
+                user.role === 'Admin' || user.role === 'Super Admin' ? (
+                    <AdminStack />
+                ) : (
+                    <UserStack />
+                )
             ) : (
                 <AuthStack />
             )}
