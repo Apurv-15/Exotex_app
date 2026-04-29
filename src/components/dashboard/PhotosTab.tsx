@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../GlassPanel';
-import * as FileSystem from "expo-file-system/legacy";
+import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 const screenWidth = Dimensions.get('window').width;
@@ -122,9 +122,8 @@ export const PhotosTab = React.memo(({
         setIsDownloading(true);
         try {
             const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
-            const cacheDir = (FileSystem as any).cacheDirectory || '';
-            const fileUri = `${cacheDir}${filename}`;
-            const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
+            const cacheFile = new File(Paths.cache, filename);
+            const downloadedFile = await File.downloadFileAsync(url, cacheFile);
 
             if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(downloadedFile.uri);

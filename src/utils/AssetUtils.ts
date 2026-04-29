@@ -1,5 +1,5 @@
 import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Paths, File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 /**
@@ -42,24 +42,22 @@ export const getAssetBase64 = async (assetModule: any): Promise<string> => {
         let localUri = asset.localUri;
         const isValidLocalUri = localUri && localUri.startsWith('file://');
 
+        let file: File;
         if (!isValidLocalUri) {
             // Download the asset to a guaranteed local cache location
-            const cacheUri = `${FileSystem.cacheDirectory}asset_${asset.hash || Date.now()}.${extension || 'png'}`;
+            const cacheFile = new File(Paths.cache, `asset_${asset.hash || Date.now()}.${extension || 'png'}`);
             
             // Check if already cached from a previous call
-            const fileInfo = await FileSystem.getInfoAsync(cacheUri);
-            if (!fileInfo.exists) {
+            if (!cacheFile.exists) {
                 // asset.uri can be a CDN https:// URL or a bundled asset:// URI
-                await FileSystem.downloadAsync(asset.uri, cacheUri);
+                await File.downloadFileAsync(asset.uri, cacheFile);
             }
-            localUri = cacheUri;
+            file = cacheFile;
+        } else {
+            file = new File(localUri!);
         }
 
-        if (!localUri) throw new Error('Could not resolve a local URI for the asset');
-
-        const base64 = await FileSystem.readAsStringAsync(localUri, {
-            encoding: FileSystem.EncodingType.Base64,
-        });
+        const base64 = await file.base64();
         
         return `data:${mimeType};base64,${base64}`;
     } catch (error) {
