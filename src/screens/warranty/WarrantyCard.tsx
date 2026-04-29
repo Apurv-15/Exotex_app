@@ -14,7 +14,7 @@ import LogoImage from '../../assets/Warranty_pdf_template/logo/Logo_transparent.
 // @ts-ignore
 import SignStampImage from '../../assets/Warranty_pdf_template/Sign_stamp/Sign_stamp.png';
 // @ts-ignore
-import * as FileSystem from "expo-file-system/legacy";
+import { Paths, File } from 'expo-file-system';
 import PizZip from 'pizzip';
 import { Buffer } from 'buffer';
 
@@ -383,9 +383,8 @@ export default function WarrantyCard() {
 
             // 1. Read the Main File (Warranty Card)
             console.log('📖 Reading main file:', mainFileUri);
-            const mainFileContent = await FileSystem.readAsStringAsync(mainFileUri, {
-                encoding: 'base64',
-            });
+            const mainFile = new File(mainFileUri);
+            const mainFileContent = await mainFile.base64();
 
             // 2. Read the User Manual
             console.log('📖 Reading User Manual asset...');
@@ -394,9 +393,8 @@ export default function WarrantyCard() {
             const manualUri = manualAsset.localUri || manualAsset.uri;
             console.log('Manual URI:', manualUri);
 
-            const manualContent = await FileSystem.readAsStringAsync(manualUri, {
-                encoding: 'base64',
-            });
+            const manualFile = new File(manualUri);
+            const manualContent = await manualFile.base64();
 
             // 3. Create ZIP
             console.log('📦 Creating ZIP bundle...');
@@ -407,18 +405,17 @@ export default function WarrantyCard() {
             // 4. Generate ZIP file
             const zipContent = zip.generate({ type: "base64" });
             const zipFileName = `Warranty_Bundle_${sale.warrantyId}.zip`;
-            const docDir = (FileSystem as any).cacheDirectory;
-            const zipFileUri = `${docDir}${zipFileName}`;
+            const zipFile = new File(Paths.cache, zipFileName);
 
             // 5. Save ZIP
-            console.log('💾 Saving ZIP to:', zipFileUri);
-            await FileSystem.writeAsStringAsync(zipFileUri, zipContent, {
+            console.log('💾 Saving ZIP to:', zipFile.uri);
+            await zipFile.write(zipContent, {
                 encoding: 'base64',
             });
 
             // 6. Share ZIP
             console.log('📤 Sharing ZIP...');
-            await Sharing.shareAsync(zipFileUri, {
+            await Sharing.shareAsync(zipFile.uri, {
                 mimeType: 'application/zip',
                 UTI: 'public.zip-archive',
             });

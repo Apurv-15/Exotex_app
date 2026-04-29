@@ -48,6 +48,8 @@ function App() {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function handleCheckUpdates() {
       if (__DEV__) return;
       try {
@@ -71,21 +73,28 @@ function App() {
 
     async function prepare() {
       try {
-        // 1. Check for OTA Updates on mount
-        await handleCheckUpdates();
-
-        // 2. Initialize Sync Services
+        // 1. Initialize Sync Services & Background Tasks (Non-blocking)
         SyncService.init();
         registerBackgroundSync();
 
-        // 3. Wait for fonts
+        // 2. Start update check in background (Don't block the app from opening)
+        handleCheckUpdates();
+
+        // 3. Wait for fonts to be ready
+        // If fonts are already loaded or have errored, we can proceed
         if (fontsLoaded || fontError) {
-          await SplashScreen.hideAsync();
-          setAppReady(true);
+          if (isMounted) {
+            setAppReady(true);
+            // Hide splash screen AFTER setting appReady to ensure the UI is rendered
+            await SplashScreen.hideAsync();
+          }
         }
       } catch (e) {
-        console.warn('Error preparing app:', e);
-        setAppReady(true);
+        console.error('CRITICAL: Error preparing app:', e);
+        if (isMounted) {
+          setAppReady(true);
+          await SplashScreen.hideAsync().catch(() => {});
+        }
       }
     }
 
@@ -99,6 +108,7 @@ function App() {
     prepare();
 
     return () => {
+      isMounted = false;
       subscription.remove();
     };
   }, [fontsLoaded, fontError]);
