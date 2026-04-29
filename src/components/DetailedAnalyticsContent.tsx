@@ -16,11 +16,22 @@ export default function DetailedAnalyticsContent({ sales }: DetailedAnalyticsCon
     const [filter, setFilter] = useState<'All' | 'Today' | 'Month' | 'Year'>('All');
     const chartWidth = Platform.OS === 'web' ? Math.min(screenWidth - 40, 600) : screenWidth - 40;
 
+    // Robust date parsing for different formats
+    const parseDateSafe = (dateStr: string | null | undefined): Date => {
+        if (!dateStr) return new Date(0);
+        if (typeof dateStr !== 'string') return new Date(dateStr);
+        if (dateStr.includes('/')) {
+            const [d, m, y] = dateStr.split('/').map(Number);
+            return new Date(y, m - 1, d);
+        }
+        return new Date(dateStr);
+    };
+
     const filteredSales = useMemo(() => {
         const now = new Date();
         return sales.filter(s => {
             if (filter === 'All') return true;
-            const saleDate = new Date(s.saleDate);
+            const saleDate = parseDateSafe(s.saleDate);
             if (filter === 'Today') return saleDate.toDateString() === now.toDateString();
             if (filter === 'Month') return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
             if (filter === 'Year') return saleDate.getFullYear() === now.getFullYear();

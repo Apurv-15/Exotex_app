@@ -62,23 +62,40 @@ export const SubBranchAnalyticsTab = React.memo(({
             {/* Visit Trends Chart */}
             <Text style={styles.subHeader}>Field Visit Trends (Last 7 Days)</Text>
             <GlassPanel style={styles.chartPanel}>
-                <LineChart
-                    data={visitChartData}
-                    width={screenWidth - 48}
-                    height={200}
-                    chartConfig={{
-                        backgroundColor: 'transparent',
-                        backgroundGradientFrom: '#ffffff',
-                        backgroundGradientTo: '#ffffff',
-                        decimalPlaces: 0,
-                        color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-                        labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                        style: { borderRadius: 16 },
-                        propsForDots: { r: '4', strokeWidth: '2', stroke: '#10B981' }
-                    }}
-                    bezier
-                    style={{ marginVertical: 8, borderRadius: 16 }}
-                />
+            {/* Legend */}
+            <View style={{ flexDirection: 'row', gap: 16, marginBottom: 4, paddingHorizontal: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(116, 198, 157, 1)' }} />
+                    <Text style={{ fontSize: 11, color: '#6B7280', fontWeight: '600' }}>Warranties</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'rgba(124, 58, 237, 1)' }} />
+                    <Text style={{ fontSize: 11, color: '#6B7280', fontWeight: '600' }}>Field Visits</Text>
+                </View>
+            </View>
+            <LineChart
+                data={visitChartData}
+                width={screenWidth - 48}
+                height={200}
+                fromZero
+                withDots={true}
+                withShadow={false}
+                chartConfig={{
+                    backgroundColor: 'transparent',
+                    backgroundGradientFrom: '#ffffff',
+                    backgroundGradientTo: '#ffffff',
+                    backgroundGradientFromOpacity: 0,
+                    backgroundGradientToOpacity: 0,
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    propsForDots: { r: '4', strokeWidth: '2' },
+                    propsForBackgroundLines: { stroke: 'rgba(0,0,0,0.05)' }
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16 }}
+            />
             </GlassPanel>
 
             {/* Top Products */}
