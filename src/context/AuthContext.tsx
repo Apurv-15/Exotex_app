@@ -23,24 +23,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [isLoadingStorage, setIsLoadingStorage] = useState<boolean>(true);
 
     useEffect(() => {
-        // Initial session check
-        const initAuth = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                    const profile = await AuthService.getUser();
-                    if (profile) setUser(profile);
-                }
-            } catch (err) {
-                console.log('Initial auth check failed', err);
-            } finally {
-                setIsLoadingStorage(false);
-            }
-        };
+        // This flag prevents the initAuth fallback from running if
+        // onAuthStateChange already resolved the session (avoids double network call on cold start)
+        let authStateChangeFired = false;
 
-        // Listen for auth changes
+        // Listen for auth changes FIRST so we capture the initial session event
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth State Changed:', event);
+            authStateChangeFired = true;
             try {
                 if (session?.user) {
                     const profile = await AuthService.getUser();
@@ -56,9 +45,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        initAuth();
+        // Fallback: if the auth state change listener didn't fire within 1.5s
+        // (can happen on slow cold-starts in production), resolve manually.
+        const fallbackTimer = setTimeout(async () => {
+            if (authStateChangeFired) return; // Already handled
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    const profile = await AuthService.getUser();
+                    setUser(profile);
+                }
+            } catch (err) {
+                console.log('Fallback auth check failed:', err);
+            } finally {
+                setIsLoadingStorage(false);
+            }
+        }, 1500);
 
         return () => {
+            clearTimeout(fallbackTimer);
             subscription.unsubscribe();
         };
     }, []);

@@ -47,15 +47,53 @@ function App() {
 
   const [appReady, setAppReady] = useState(false);
 
+  // Step 1: Initialize services once on mount (NOT tied to font state)
+  useEffect(() => {
+    SyncService.init();
+    registerBackgroundSync();
+  }, []);
+
+  // Step 2: Hide splash only when fonts are definitively done loading
   useEffect(() => {
     let isMounted = true;
 
+    if (!fontsLoaded && !fontError) {
+      // Fonts still loading — keep waiting
+      return;
+    }
+
+    async function finishLoading() {
+      try {
+        if (isMounted) {
+          setAppReady(true);
+        }
+        // Always attempt to hide splash, even if already hidden
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        // SplashScreen.hideAsync can throw if splash was already hidden — safe to ignore
+        console.warn('SplashScreen.hideAsync error (non-critical):', e);
+      }
+    }
+
+    finishLoading();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fontsLoaded, fontError]);
+
+  // Step 3: Check for OTA updates ONLY after app is fully interactive
+  useEffect(() => {
+    if (!appReady) return;
+    if (__DEV__) return;
+
+    let isMounted = true;
+
     async function handleCheckUpdates() {
-      if (__DEV__) return;
       try {
         const Updates = require('expo-updates');
         const update = await Updates.checkForUpdateAsync();
-        if (update.isAvailable) {
+        if (update.isAvailable && isMounted) {
           await Updates.fetchUpdateAsync();
           Alert.alert(
             'Important Update Available',
@@ -71,47 +109,22 @@ function App() {
       }
     }
 
-    async function prepare() {
-      try {
-        // 1. Initialize Sync Services & Background Tasks (Non-blocking)
-        SyncService.init();
-        registerBackgroundSync();
+    // Delay initial check by 3s to avoid blocking the freshly-rendered UI
+    const initialCheckTimer = setTimeout(handleCheckUpdates, 3000);
 
-        // 2. Start update check in background (Don't block the app from opening)
-        handleCheckUpdates();
-
-        // 3. Wait for fonts to be ready
-        // If fonts are already loaded or have errored, we can proceed
-        if (fontsLoaded || fontError) {
-          if (isMounted) {
-            setAppReady(true);
-            // Hide splash screen AFTER setting appReady to ensure the UI is rendered
-            await SplashScreen.hideAsync();
-          }
-        }
-      } catch (e) {
-        console.error('CRITICAL: Error preparing app:', e);
-        if (isMounted) {
-          setAppReady(true);
-          await SplashScreen.hideAsync().catch(() => {});
-        }
-      }
-    }
-
-    // Listener for foreground updates
+    // Listen for foreground updates only after app is ready
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
+      if (nextAppState === 'active' && isMounted) {
         handleCheckUpdates();
       }
     });
 
-    prepare();
-
     return () => {
       isMounted = false;
+      clearTimeout(initialCheckTimer);
       subscription.remove();
     };
-  }, [fontsLoaded, fontError]);
+  }, [appReady]);
 
   // Show error if fonts failed to load
   if (fontError) {
