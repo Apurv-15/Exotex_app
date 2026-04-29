@@ -1,7 +1,12 @@
 import { registerRootComponent } from 'expo';
 
 // Register background tasks before the app starts
-import './src/services/BackgroundSyncTask';
+// Wrapped in try-catch to prevent startup freeze if native modules are missing
+try {
+  require('./src/services/BackgroundSyncTask');
+} catch (e) {
+  console.error('[index] Failed to load BackgroundSyncTask:', e);
+}
 
 import App from './App';
 

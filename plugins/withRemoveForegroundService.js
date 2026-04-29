@@ -16,7 +16,6 @@ module.exports = function withRemoveForegroundService(config) {
           name.includes('expo.modules.audio.BackgroundAudioService') ||
           name.includes('expo.modules.audio.service.AudioRecordingService') || 
           name.includes('expo.modules.audio.service.AudioControlsService') ||
-          name.includes('expo.modules.updates.UpdatesService') ||
           name.includes('com.google.android.gms.metadata.ModuleDependencies');
 
         if (isOffending) console.log(`Removing offending service: ${name}`);

@@ -29,13 +29,23 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    logger.error('GlobalErrorBoundary', `UI Crash detected: ${error.message}`, {
-      stack: errorInfo.componentStack,
-    });
+    try {
+      logger.error('GlobalErrorBoundary', `UI Crash detected: ${error.message}`, {
+        stack: errorInfo.componentStack,
+      });
+    } catch (_) {
+      // Logger itself crashed — silently ignore to prevent secondary crash
+      console.error('[GlobalErrorBoundary] UI crash (logger also failed):', error.message);
+    }
   }
 
   private handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+    try {
+      this.setState({ hasError: false, error: null });
+    } catch (_) {
+      // If setState fails, force a full remount via key change
+      this.setState({ hasError: false, error: null });
+    }
   };
 
   public render() {

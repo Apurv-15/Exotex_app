@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { View, Text, ActivityIndicator, LogBox, Alert, AppState, AppStateStatus } from 'react-native';
+import { View, ActivityIndicator, LogBox, Alert, AppState, AppStateStatus } from 'react-native';
 
 // Ignore specific deprecation warnings from dependencies
 LogBox.ignoreLogs(['TouchableMixin is deprecated']);
@@ -24,18 +24,30 @@ import { registerGlobalHandlers } from './src/core/errors/GlobalHandlers';
 import { GlobalErrorBoundary } from './src/core/errors/GlobalErrorBoundary';
 import { logger } from './src/core/logging/Logger';
 
-// 🚀 SENTRY INITIALIZATION
-// Connects the app to real-time error monitoring
-Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  debug: __DEV__,
-  enableLogs: true, 
-});
+// 🚀 SENTRY INITIALIZATION — wrapped in try/catch: a bad DSN must never freeze the app
+try {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    debug: __DEV__,
+    enableLogs: true,
+  });
+} catch (e) {
+  console.warn('[App] Sentry init failed (non-fatal):', e);
+}
 
-// Register system-level listeners (JS & Native unhandled crashes)
-registerGlobalHandlers();
+// Register system-level listeners — wrapped so setup failure never blocks startup
+try {
+  registerGlobalHandlers();
+} catch (e) {
+  console.warn('[App] registerGlobalHandlers failed (non-fatal):', e);
+}
 
-SplashScreen.preventAutoHideAsync();
+// Prevent auto-hide — wrapped because this can throw if native module not ready
+try {
+  SplashScreen.preventAutoHideAsync();
+} catch (e) {
+  console.warn('[App] SplashScreen.preventAutoHideAsync failed (non-fatal):', e);
+}
 
 function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -49,8 +61,8 @@ function App() {
 
   // Step 1: Initialize services once on mount (NOT tied to font state)
   useEffect(() => {
-    SyncService.init();
-    registerBackgroundSync();
+    try { SyncService.init(); } catch (e) { console.warn('[App] SyncService.init failed:', e); }
+    try { registerBackgroundSync(); } catch (e) { console.warn('[App] registerBackgroundSync failed:', e); }
   }, []);
 
   // Step 2: Hide splash only when fonts are definitively done loading
@@ -58,8 +70,19 @@ function App() {
     let isMounted = true;
 
     if (!fontsLoaded && !fontError) {
-      // Fonts still loading — keep waiting
-      return;
+      // Fonts still loading — keep waiting, but add an absolute safety timeout
+      // so the app never stays on the splash screen forever if fonts hang.
+      const fontTimeout = setTimeout(() => {
+        if (isMounted) {
+          console.warn('[App] Font loading timed out after 8s, forcing app ready.');
+          setAppReady(true);
+          SplashScreen.hideAsync().catch(() => {});
+        }
+      }, 8000);
+      return () => {
+        isMounted = false;
+        clearTimeout(fontTimeout);
+      };
     }
 
     async function finishLoading() {
@@ -67,7 +90,6 @@ function App() {
         if (isMounted) {
           setAppReady(true);
         }
-        // Always attempt to hide splash, even if already hidden
         await SplashScreen.hideAsync();
       } catch (e) {
         // SplashScreen.hideAsync can throw if splash was already hidden — safe to ignore
