@@ -25,11 +25,6 @@ class SyncServiceBase {
         this.debouncedProcessQueue();
     });
 
-    // Monitor Network, trigger sync on online
-    NetworkService.startMonitoring(() => {
-        this.debouncedProcessQueue();
-    });
-
     // Initial load
     OfflineQueueService.loadQueue().then(() => {
        if (useSyncStore.getState().isOnline) {
@@ -264,10 +259,9 @@ class SyncServiceBase {
         const filePath = `${pathPrefix}/${fileName}`;
 
         // 2. Read the local file
-        const FileSystem = require('expo-file-system');
-        const base64 = await FileSystem.readAsStringAsync(localUri, {
-            encoding: FileSystem.EncodingType.Base64,
-        });
+        const { File } = require('expo-file-system');
+        const file = new File(localUri);
+        const base64 = await file.base64();
         
         const { Buffer } = require('buffer');
         const fileBody = Buffer.from(base64, 'base64');

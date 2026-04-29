@@ -206,4 +206,12 @@ export class OfflineQueueService {
     const updatedQueue = queue.filter(item => item.status !== 'failed');
     await this.saveQueue(updatedQueue);
   }
+
+  /**
+   * Clear the entire queue (Emergency reset)
+   */
+  static async clearQueue(): Promise<void> {
+    await this.saveQueue([]);
+    logger.warn('OfflineQueue', 'Entire sync queue cleared manually by user');
+  }
 }
