@@ -33,4 +33,4 @@ We reserve the right to restrict access to the application if any misuse is dete
 We may update this Privacy Policy from time to time to reflect changes in our practices. Any updates will be posted on this page with an updated "Last Updated" date.
 
 ## 6. Contact Information
-If you have any questions or concerns regarding this Privacy Policy, please contact your system administrator or email us at: [Your Contact Email]
+If you have any questions or concerns regarding this Privacy Policy, please contact your system administrator or email us at: Ankesh.karn89@gmail.com

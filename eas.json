@@ -29,7 +29,18 @@
         }
     },
     "submit": {
-        "production": {},
-        "playstore": {}
+        "production": {
+            "android": {
+                "serviceAccountKeyPath": "./gen-lang-client-0518706559-bfb18a77269d.json",
+                "track": "internal"
+            }
+        },
+        "playstore": {
+            "android": {
+                "serviceAccountKeyPath": "./gen-lang-client-0518706559-bfb18a77269d.json",
+                "track": "production",
+                "releaseStatus": "draft"
+            }
+        }
     }
 }
