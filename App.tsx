@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, LogBox, Alert, AppState, AppStateStatus } from 'react-native';
+import { View, LogBox, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
 import * as SplashScreen from 'expo-splash-screen';
@@ -17,17 +17,24 @@ import RootNavigator from './src/navigation';
 import { GlobalOfflinePopup } from './src/components/sync/GlobalOfflinePopup';
 import { GlobalErrorBoundary } from './src/core/errors/GlobalErrorBoundary';
 import { registerGlobalHandlers } from './src/core/errors/GlobalHandlers';
+import { SyncService } from './src/services/SyncService';
+import { registerBackgroundSync } from './src/services/BackgroundSyncTask';
 
-// Keep splash screen visible while we fetch resources
+// 1. Keep splash visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// Initialize Global Handlers (JS-level error swallowing)
+// 2. Initialize Sentry with the DSN from environment
+// This prevents Sentry.wrap from hanging or crashing
+if (!__DEV__) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || 'https://c95856cca23d9890608273aa4f3821de@o4511118236647424.ingest.us.sentry.io/4511118241300480',
+    enableNative: true,
+  });
+}
+
+// 3. Register system-level listeners (JS & Native unhandled crashes)
 registerGlobalHandlers();
 
-/**
- * App - Entry Point
- * Hardened with try/catch and safety timeouts for production stability.
- */
 function App() {
   const [appReady, setAppReady] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
@@ -37,102 +44,65 @@ function App() {
     'Nunito-Black': Nunito_900Black,
   });
 
-  // Step 1: Initialize services once on mount
   useEffect(() => {
     let isMounted = true;
-    
-    const initApp = async () => {
+
+    const prepare = async () => {
       try {
-        // Suppress noisy logs in production
-        LogBox.ignoreAllLogs();
+        // Suppress noisy logs in production, but keep visible in Dev for debugging
+        if (!__DEV__) {
+          LogBox.ignoreAllLogs();
+        }
         
-        // Wrap Sentry initialization in try-catch
-        try {
-          // Note: DSN is provided via environment or kept as-is
-          // Sentry.init({ dsn: 'YOUR_DSN' });
-        } catch (sentryErr) {
-          console.warn('[App] Sentry init failed:', sentryErr);
+        // 1. Initialize Sync Services
+        SyncService.init();
+        
+        // 2. Register Background Task (Non-blocking)
+        registerBackgroundSync().catch(e => {
+           console.warn('[App] Background task registration failed:', e);
+        });
+
+        // 3. Handle Font Resolution
+        if (fontsLoaded || fontError) {
+          if (fontError) {
+            console.error('[App] Font loading failed:', fontError);
+          }
+          
+          // Small delay to ensure everything is mounted
+          setTimeout(async () => {
+            if (isMounted) {
+              setAppReady(true);
+              await SplashScreen.hideAsync().catch(() => {});
+            }
+          }, 100);
         }
       } catch (err) {
-        console.error('[App] Root initialization error:', err);
+        console.error('[App] Critical Initialization Error:', err);
+        // Fallback: force app start so it doesn't freeze on splash
+        if (isMounted) {
+          setAppReady(true);
+          await SplashScreen.hideAsync().catch(() => {});
+        }
       }
     };
 
-    initApp();
+    prepare();
 
-    // Font loading safety timeout: force ready after 8 seconds
-    // prevents permanent splash screen freeze on low-end devices
-    const fontTimeout = setTimeout(() => {
+    // 4. Global Safety Timeout: force app to interactive state after 7 seconds
+    // This is the "kill switch" for the splash screen freeze.
+    const safetyTimeout = setTimeout(async () => {
       if (isMounted && !appReady) {
-        console.warn('[App] Font loading timeout, forcing app start.');
-        finishLoading();
+        console.warn('[App] Font/Service loading timeout. Forcing app start.');
+        setAppReady(true);
+        await SplashScreen.hideAsync().catch(() => {});
       }
-    }, 8000);
+    }, 7000);
 
     return () => {
       isMounted = false;
-      clearTimeout(fontTimeout);
+      clearTimeout(safetyTimeout);
     };
-  }, []);
-
-  // Step 2: Handle font resolution
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      finishLoading();
-    }
   }, [fontsLoaded, fontError]);
-
-  const finishLoading = () => {
-    setAppReady(true);
-    SplashScreen.hideAsync().catch(() => {});
-  };
-
-  // Step 3: Check for OTA updates ONLY after app is interactive
-  useEffect(() => {
-    if (!appReady) return;
-
-    const checkUpdates = async () => {
-      try {
-        const Updates = require('expo-updates');
-        const update = await Updates.checkForUpdateAsync();
-        if (update.isAvailable) {
-          Alert.alert(
-            'Update Available',
-            'A new version is ready. Restart now to apply?',
-            [
-              { text: 'Later', style: 'cancel' },
-              { text: 'Restart', style: 'default', onPress: () => Updates.reloadAsync() }
-            ]
-          );
-        }
-      } catch (e) {
-        // Silent: update check failures shouldn't bother user
-      }
-    };
-
-    // Check 2 seconds after ready
-    const timer = setTimeout(checkUpdates, 2000);
-    return () => clearTimeout(timer);
-  }, [appReady]);
-
-  // Register background sync only after the UI is already visible.
-  // This keeps startup lighter in release builds and avoids blocking the splash screen.
-  useEffect(() => {
-    if (!appReady) return;
-
-    const timer = setTimeout(() => {
-      try {
-        const { registerBackgroundSync } = require('./src/services/BackgroundSyncTask');
-        registerBackgroundSync().catch((err: any) => {
-          console.warn('[App] Background sync registration failed:', err?.message || err);
-        });
-      } catch (err: any) {
-        console.warn('[App] Background sync module unavailable:', err?.message || err);
-      }
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [appReady]);
 
   if (!appReady) {
     return null;

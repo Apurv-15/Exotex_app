@@ -3,16 +3,29 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View, BackHandler, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import LoginScreen from '../screens/auth/LoginScreen';
+import MainBranchDashboard from '../screens/dashboard/MainBranchDashboard';
+import SubBranchDashboard from '../screens/dashboard/SubBranchDashboard';
+import CreateSaleStep1 from '../screens/sales/CreateSaleStep1';
+import CreateSaleStep2 from '../screens/sales/CreateSaleStep2';
+import WarrantyCard from '../screens/warranty/WarrantyCard';
+import AnalyticsScreen from '../screens/analytics/AnalyticsScreen';
+import TemplateManagement from '../screens/admin/TemplateManagement';
+import FieldVisitForm from '../screens/fieldvisit/FieldVisitForm';
+import RaiseComplaintStep1 from '../screens/complaints/RaiseComplaintStep1';
+import RaiseComplaintStep2 from '../screens/complaints/RaiseComplaintStep2';
+import ComplaintSuccess from '../screens/complaints/ComplaintSuccess';
+import FieldVisitSuccess from '../screens/fieldvisit/FieldVisitSuccess';
+import ProfileScreen from '../screens/profile/ProfileScreen';
+import CreateQuotationScreen from '../screens/quotation/CreateQuotationScreen';
 import { THEME } from '../constants/config';
 
 const Stack = createNativeStackNavigator();
 
-const loadScreen = (path: string) => () => require(path).default;
-
 function AuthStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Login" getComponent={loadScreen('../screens/auth/LoginScreen')} />
+            <Stack.Screen name="Login" component={LoginScreen} />
         </Stack.Navigator>
     );
 }
@@ -22,52 +35,52 @@ function AdminStack() {
         <Stack.Navigator>
             <Stack.Screen
                 name="MainDashboard"
-                getComponent={loadScreen('../screens/dashboard/MainBranchDashboard')}
+                component={MainBranchDashboard}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="AnalyticsScreen"
-                getComponent={loadScreen('../screens/analytics/AnalyticsScreen')}
+                component={AnalyticsScreen}
                 options={{ title: 'Detailed Analytics' }}
             />
             <Stack.Screen
                 name="TemplateManagement"
-                getComponent={loadScreen('../screens/admin/TemplateManagement')}
+                component={TemplateManagement}
                 options={{ title: 'Warranty Template' }}
             />
             <Stack.Screen
                 name="WarrantyCard"
-                getComponent={loadScreen('../screens/warranty/WarrantyCard')}
+                component={WarrantyCard}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="RaiseComplaintStep1"
-                getComponent={loadScreen('../screens/complaints/RaiseComplaintStep1')}
+                component={RaiseComplaintStep1}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="RaiseComplaintStep2"
-                getComponent={loadScreen('../screens/complaints/RaiseComplaintStep2')}
+                component={RaiseComplaintStep2}
                 options={{ headerShown: false }}
             />
             <Stack.Screen
                 name="ComplaintSuccess"
-                getComponent={loadScreen('../screens/complaints/ComplaintSuccess')}
+                component={ComplaintSuccess}
                 options={{ headerShown: false, gestureEnabled: false }}
             />
             <Stack.Screen
                 name="FieldVisitSuccess"
-                getComponent={loadScreen('../screens/fieldvisit/FieldVisitSuccess')}
+                component={FieldVisitSuccess}
                 options={{ headerShown: false, gestureEnabled: false }}
             />
             <Stack.Screen
                 name="Profile"
-                getComponent={loadScreen('../screens/profile/ProfileScreen')}
+                component={ProfileScreen}
                 options={{ title: 'Profile Settings' }}
             />
             <Stack.Screen
                 name="CreateQuotationScreen"
-                getComponent={loadScreen('../screens/quotation/CreateQuotationScreen')}
+                component={CreateQuotationScreen}
                 options={{ headerShown: false }}
             />
         </Stack.Navigator>
@@ -79,56 +92,56 @@ function UserStack() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen
                 name="SubDashboard"
-                getComponent={loadScreen('../screens/dashboard/SubBranchDashboard')}
+                component={SubBranchDashboard}
             />
             <Stack.Screen
                 name="CreateSaleStep1"
-                getComponent={loadScreen('../screens/sales/CreateSaleStep1')}
+                component={CreateSaleStep1}
             />
             <Stack.Screen
                 name="CreateSaleStep2"
-                getComponent={loadScreen('../screens/sales/CreateSaleStep2')}
+                component={CreateSaleStep2}
             />
             <Stack.Screen
                 name="WarrantyCard"
-                getComponent={loadScreen('../screens/warranty/WarrantyCard')}
+                component={WarrantyCard}
                 options={{ gestureEnabled: false }}
             />
             <Stack.Screen
                 name="FieldVisitForm"
-                getComponent={loadScreen('../screens/fieldvisit/FieldVisitForm')}
+                component={FieldVisitForm}
             />
             <Stack.Screen
                 name="AnalyticsScreen"
-                getComponent={loadScreen('../screens/analytics/AnalyticsScreen')}
+                component={AnalyticsScreen}
                 options={{ headerShown: true, title: 'My Analytics' }}
             />
             <Stack.Screen
                 name="RaiseComplaintStep1"
-                getComponent={loadScreen('../screens/complaints/RaiseComplaintStep1')}
+                component={RaiseComplaintStep1}
             />
             <Stack.Screen
                 name="RaiseComplaintStep2"
-                getComponent={loadScreen('../screens/complaints/RaiseComplaintStep2')}
+                component={RaiseComplaintStep2}
             />
             <Stack.Screen
                 name="ComplaintSuccess"
-                getComponent={loadScreen('../screens/complaints/ComplaintSuccess')}
+                component={ComplaintSuccess}
                 options={{ gestureEnabled: false }}
             />
             <Stack.Screen
                 name="FieldVisitSuccess"
-                getComponent={loadScreen('../screens/fieldvisit/FieldVisitSuccess')}
+                component={FieldVisitSuccess}
                 options={{ gestureEnabled: false }}
             />
             <Stack.Screen
                 name="Profile"
-                getComponent={loadScreen('../screens/profile/ProfileScreen')}
+                component={ProfileScreen}
                 options={{ headerShown: true, title: 'Profile Settings' }}
             />
             <Stack.Screen
                 name="CreateQuotationScreen"
-                getComponent={loadScreen('../screens/quotation/CreateQuotationScreen')}
+                component={CreateQuotationScreen}
                 options={{ headerShown: false }}
             />
         </Stack.Navigator>
