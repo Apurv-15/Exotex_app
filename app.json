@@ -25,17 +25,16 @@
         "CAMERA"
       ],
       "softwareKeyboardLayoutMode": "pan",
-      "resizableActivity": true,
-      "navigationBar": {
-        "backgroundColor": "#00000000",
-        "barStyle": "dark-content"
-      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/company_logo.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#00000000",
+      "barStyle": "dark-content"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -58,7 +57,8 @@
           "project": "react-native"
         }
       ],
-      "./plugins/withRemoveForegroundService"
+      "./plugins/withRemoveForegroundService",
+      "expo-asset"
     ],
     "extra": {
       "eas": {

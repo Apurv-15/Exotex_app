@@ -188,12 +188,13 @@ class Logger {
    * Tracks a meaningful user-facing action for business analytics.
    */
   public trackEvent(event: any, properties: any = {}) {
-    // We import analytics dynamically to avoid circular dependencies if any
-    import('../analytics/Analytics').then(({ analytics }) => {
+    // We require analytics lazily to avoid circular dependencies if any
+    try {
+      const { analytics } = require('../analytics/Analytics');
       analytics.track(event, properties);
-    }).catch(err => {
+    } catch (err) {
       if (this.isDev) console.warn('Failed to track event', err);
-    });
+    }
   }
 
   /**
