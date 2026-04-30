@@ -115,6 +115,25 @@ function App() {
     return () => clearTimeout(timer);
   }, [appReady]);
 
+  // Register background sync only after the UI is already visible.
+  // This keeps startup lighter in release builds and avoids blocking the splash screen.
+  useEffect(() => {
+    if (!appReady) return;
+
+    const timer = setTimeout(() => {
+      try {
+        const { registerBackgroundSync } = require('./src/services/BackgroundSyncTask');
+        registerBackgroundSync().catch((err: any) => {
+          console.warn('[App] Background sync registration failed:', err?.message || err);
+        });
+      } catch (err: any) {
+        console.warn('[App] Background sync module unavailable:', err?.message || err);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [appReady]);
+
   if (!appReady) {
     return null;
   }
