@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import React, { useState, useEffect } from 'react';
-import { View, LogBox, Alert } from 'react-native';
+import { View, LogBox, Alert, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,25 +18,32 @@ import { GlobalOfflinePopup } from './src/components/sync/GlobalOfflinePopup';
 import { GlobalErrorBoundary } from './src/core/errors/GlobalErrorBoundary';
 import { registerGlobalHandlers } from './src/core/errors/GlobalHandlers';
 import { SyncService } from './src/services/SyncService';
-import { registerBackgroundSync } from './src/services/BackgroundSyncTask';
 
-// 1. Keep splash visible while we fetch resources
-SplashScreen.preventAutoHideAsync().catch(() => {});
+/**
+ * App - Entry Point (Debug Hardened)
+ */
 
-// 2. Initialize Sentry with the DSN from environment
-// This prevents Sentry.wrap from hanging or crashing
-if (!__DEV__) {
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || 'https://c95856cca23d9890608273aa4f3821de@o4511118236647424.ingest.us.sentry.io/4511118241300480',
-    enableNative: true,
-  });
+// 1. Attempt to keep splash visible, but we will hide it aggressively if it hangs
+SplashScreen.preventAutoHideAsync().catch(e => console.warn('SplashScreen.preventAutoHideAsync failed', e));
+
+// 2. Safe Sentry Init (DSN fallback to ensures Sentry.wrap works)
+try {
+  if (!__DEV__) {
+    Sentry.init({
+      dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || 'https://c95856cca23d9890608273aa4f3821de@o4511118236647424.ingest.us.sentry.io/4511118241300480',
+    });
+  }
+} catch (e) {
+  console.error('Sentry init crashed top-level', e);
 }
 
-// 3. Register system-level listeners (JS & Native unhandled crashes)
+// 3. Register Global Handlers
 registerGlobalHandlers();
 
 function App() {
   const [appReady, setAppReady] = useState(false);
+  const [bootStatus, setBootStatus] = useState('Initializing...');
+
   const [fontsLoaded, fontError] = useFonts({
     'Nunito-Regular': Nunito_400Regular,
     'Nunito-SemiBold': Nunito_600SemiBold,
@@ -48,37 +55,32 @@ function App() {
     let isMounted = true;
 
     const prepare = async () => {
+      console.log('[DEBUG] 🚀 Starting Boot Sequence...');
+      
       try {
-        // Suppress noisy logs in production, but keep visible in Dev for debugging
-        if (!__DEV__) {
-          LogBox.ignoreAllLogs();
-        }
-        
-        // 1. Initialize Sync Services
+        // ALWAYS hide splash screen after 2.5 seconds regardless of state 
+        // to ensure user isn't stuck forever.
+        setTimeout(() => {
+          SplashScreen.hideAsync().catch(() => {});
+          console.log('[DEBUG] 🛠️ Forced Splash Hide triggered.');
+        }, 2500);
+
+        // Init Core Services
+        console.log('[DEBUG] 📡 Initializing SyncService...');
         SyncService.init();
         
-        // 2. Register Background Task (Non-blocking)
-        registerBackgroundSync().catch(e => {
-           console.warn('[App] Background task registration failed:', e);
-        });
-
-        // 3. Handle Font Resolution
+        // Font Resolution
         if (fontsLoaded || fontError) {
-          if (fontError) {
-            console.error('[App] Font loading failed:', fontError);
-          }
+          console.log('[DEBUG] 🔠 Fonts Resolved. Status:', fontsLoaded ? 'Success' : 'Error');
+          setBootStatus('Ready');
           
-          // Small delay to ensure everything is mounted
-          setTimeout(async () => {
-            if (isMounted) {
-              setAppReady(true);
-              await SplashScreen.hideAsync().catch(() => {});
-            }
-          }, 100);
+          if (isMounted) {
+            setAppReady(true);
+            await SplashScreen.hideAsync().catch(() => {});
+          }
         }
       } catch (err) {
-        console.error('[App] Critical Initialization Error:', err);
-        // Fallback: force app start so it doesn't freeze on splash
+        console.error('[DEBUG] ❌ BOOT CRASHED:', err);
         if (isMounted) {
           setAppReady(true);
           await SplashScreen.hideAsync().catch(() => {});
@@ -88,8 +90,7 @@ function App() {
 
     prepare();
 
-    // 4. Global Safety Timeout: force app to interactive state after 7 seconds
-    // This is the "kill switch" for the splash screen freeze.
+    // Safety timeout: force app to interactive state after 7 seconds
     const safetyTimeout = setTimeout(async () => {
       if (isMounted && !appReady) {
         console.warn('[App] Font/Service loading timeout. Forcing app start.');
@@ -105,7 +106,13 @@ function App() {
   }, [fontsLoaded, fontError]);
 
   if (!appReady) {
-    return null;
+    // Show a minimal debug view if it takes too long
+    return (
+      <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={{ color: '#666', marginTop: 10 }}>{bootStatus}</Text>
+      </View>
+    );
   }
 
   return (
@@ -124,5 +131,4 @@ function App() {
   );
 }
 
-// Sentry.wrap provides additional error context for UI crashes
 export default Sentry.wrap(App);
