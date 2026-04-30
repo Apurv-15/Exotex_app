@@ -16,6 +16,7 @@ const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placehol
 if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
     console.warn('⚠️ Supabase credentials not found or incomplete. Please check your .env file or build secrets.');
 }
+console.log('[DEBUG] 📡 Supabase URL in use:', SUPABASE_URL);
 
 // Custom storage adapter for Supabase to work with expo-secure-store/localStorage
 // This is defined inline to avoid circular dependency issues

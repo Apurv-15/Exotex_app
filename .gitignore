@@ -50,3 +50,7 @@ scripts/supabase_enable_rls.sql
 scripts/test_connection.sql
 gen-lang-client-0518706559-bfb18a77269d.json
 MASTER_DATABASE_SETUP.sql
+
+# CNG Native folders
+/android
+/ios
