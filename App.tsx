@@ -18,6 +18,7 @@ import { GlobalOfflinePopup } from './src/components/sync/GlobalOfflinePopup';
 import { GlobalErrorBoundary } from './src/core/errors/GlobalErrorBoundary';
 import { registerGlobalHandlers } from './src/core/errors/GlobalHandlers';
 import { SyncService } from './src/services/SyncService';
+import { CloudUpdateHandler } from './src/components/updates/CloudUpdateHandler';
 
 /**
  * App - Entry Point (Debug Hardened)
@@ -127,6 +128,7 @@ function App() {
             <View style={{ flex: 1 }}>
               <RootNavigator />
               <GlobalOfflinePopup />
+              <CloudUpdateHandler />
             </View>
           </AuthProvider>
         </PaperProvider>
