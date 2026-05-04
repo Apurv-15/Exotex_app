@@ -1,8 +1,6 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
 import { Platform } from 'react-native';
-import { OfflineQueueService } from './OfflineQueueService';
-import { SyncService } from './SyncService';
 import { logger } from '../core/logging/Logger';
 
 export interface Complaint {
@@ -50,7 +48,7 @@ export const ComplaintService = {
                     .order('created_at', { ascending: false });
 
                 if (branchId) {
-                    query = query.ilike('branch_id', branchId.trim());
+                    query = query.eq('branch_id', branchId);
                 }
 
                 const { data, error } = await query;
@@ -82,7 +80,7 @@ export const ComplaintService = {
                     createdAt: row.created_at
                 }));
             } catch (error) {
-                logger.error('ComplaintService', 'getComplaints Supabase error', { error });
+                logger.error('ComplaintService', 'Supabase getComplaints error', { details: error });
             }
         }
 
@@ -101,7 +99,7 @@ export const ComplaintService = {
 
         // Check if Supabase is configured
         if (!isSupabaseConfigured()) {
-            console.warn('Supabase not configured, using local storage');
+            logger.warn('ComplaintService', 'Supabase not configured, using local storage');
             return await ComplaintService.saveImageLocally(uri, complaintId, index);
         }
 
@@ -111,7 +109,7 @@ export const ComplaintService = {
             const netState = await NetInfo.fetch();
 
             if (!netState.isConnected) {
-                logger.warn('ComplaintService', 'No network connection, saving image locally', { complaintId, index });
+                logger.warn('ComplaintService', 'No network connection, saving locally');
                 return await ComplaintService.saveImageLocally(uri, complaintId, index);
             }
 
@@ -131,7 +129,7 @@ export const ComplaintService = {
                     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
                     fileBody = await response.blob();
                 } catch (fetchError) {
-                    console.error('Web fetch error:', fetchError);
+                    logger.error('ComplaintService', 'Web fetch error', { details: fetchError });
                     // If we can't fetch the blob (e.g. CORS on picsum), we can't upload it to Supabase from the client easily.
                     // For testing, just return the original URI if it's a remote URL.
                     if (uri.startsWith('http')) return uri;
@@ -154,12 +152,12 @@ export const ComplaintService = {
                     const buffer = Buffer.from(base64, 'base64');
                     fileBody = buffer;
                 } catch (readError) {
-                    console.warn('FileSystem read failed, trying fetch blob fallback...', readError);
+                    logger.warn('ComplaintService', 'FileSystem read failed, trying fetch blob fallback...', { details: readError });
                     try {
                         const response = await fetch(uri);
                         fileBody = await response.blob();
                     } catch (blobError) {
-                        console.warn('Blob conversion failed:', blobError);
+                        logger.warn('ComplaintService', 'Blob conversion failed', { details: blobError });
                         // On web, we cannot "save locally", just return original URI or empty
                         if ((Platform.OS as any) === 'web') return uri;
                         return await ComplaintService.saveImageLocally(uri, complaintId, index);
@@ -186,8 +184,8 @@ export const ComplaintService = {
                 });
 
             if (uploadError) {
-                console.error('Supabase upload error details:', uploadError);
-                console.warn('Upload failed, saving locally instead');
+                logger.error('ComplaintService', 'Supabase upload error details', { details: uploadError });
+                logger.warn('ComplaintService', 'Upload failed, saving locally instead');
                 return await ComplaintService.saveImageLocally(uri, complaintId, index);
             }
 
@@ -201,7 +199,8 @@ export const ComplaintService = {
 
             return urlData.publicUrl;
         } catch (error: any) {
-            logger.error('ComplaintService', 'Image upload failed', { error: error.message, complaintId, index });
+            logger.error('ComplaintService', 'Image upload error', { details: error });
+            logger.warn('ComplaintService', 'Error during upload, saving locally');
             return await ComplaintService.saveImageLocally(uri, complaintId, index);
         }
     },
@@ -230,93 +229,99 @@ export const ComplaintService = {
                 to: localPath,
             });
 
-            logger.info('ComplaintService', 'Image saved locally', { localPath });
+            logger.debug('ComplaintService', 'Image saved locally', { location: localPath });
             return localPath;
-        } catch (error: any) {
-            logger.error('ComplaintService', 'Local image save failed', { error: error.message, complaintId });
-            return uri;
+        } catch (error) {
+            logger.error('ComplaintService', 'Local save error', { details: error });
+            return uri; // Return original uri
         }
     },
 
     // Create new complaint
     createComplaint: async (complaint: Complaint): Promise<Complaint> => {
-        try {
-            const localId = complaint.id || Math.random().toString(36).substr(2, 9);
-            const dbData = {
-                complaint_id: complaint.complaintId,
-                invoice_no: complaint.invoiceNo,
-                customer_name: complaint.customerName,
-                customer_phone: complaint.customerPhone,
-                customer_email: complaint.customerEmail,
-                category: complaint.category,
-                description: complaint.description,
-                date_of_complaint: complaint.dateOfComplaint,
-                assigned_department: complaint.assignedDepartment,
-                assigned_officer: complaint.assignedOfficer,
-                action_taken: complaint.actionTaken,
-                resolution_date: complaint.resolutionDate,
-                status: complaint.status,
-                client_confirmation: complaint.clientConfirmation,
-                client_feedback: complaint.clientFeedback,
-                resolved_by_name: complaint.resolvedByName,
-                resolved_by_designation: complaint.resolvedByDesignation,
-                image_urls: complaint.imageUrls,
-                warranty_card_attached: complaint.warrantyCardAttached,
-                branch_id: complaint.branchId,
-                city: complaint.city
-            };
+        if (isSupabaseConfigured()) {
+            try {
+                const { data, error } = await supabase
+                    .from('complaints')
+                    .insert([{
+                        complaint_id: complaint.complaintId,
+                        invoice_no: complaint.invoiceNo,
+                        customer_name: complaint.customerName,
+                        customer_phone: complaint.customerPhone,
+                        customer_email: complaint.customerEmail,
+                        category: complaint.category,
+                        description: complaint.description,
+                        date_of_complaint: complaint.dateOfComplaint,
+                        assigned_department: complaint.assignedDepartment,
+                        assigned_officer: complaint.assignedOfficer,
+                        action_taken: complaint.actionTaken,
+                        resolution_date: complaint.resolutionDate,
+                        status: complaint.status,
+                        client_confirmation: complaint.clientConfirmation,
+                        client_feedback: complaint.clientFeedback,
+                        resolved_by_name: complaint.resolvedByName,
+                        resolved_by_designation: complaint.resolvedByDesignation,
+                        image_urls: complaint.imageUrls,
+                        warranty_card_attached: complaint.warrantyCardAttached,
+                        branch_id: complaint.branchId,
+                        city: complaint.city
+                    }])
+                    .select()
+                    .single();
 
-            await OfflineQueueService.enqueue('CREATE', 'complaints', dbData, localId, 'high');
-            SyncService.forceSync();
-
-            // Optimistic UI updates
-            const complaints = await ComplaintService.getComplaints();
-            const newComplaint = { ...complaint, id: localId };
-            await Storage.setItem(STORAGE_KEY, JSON.stringify([newComplaint, ...complaints]));
-            return newComplaint;
-        } catch (error: any) {
-            logger.error('ComplaintService', 'createComplaint failed', { error: error.message || error });
-            throw error;
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                logger.error('ComplaintService', 'Supabase createComplaint error', { details: error });
+                throw error;
+            }
         }
+
+        const complaints = await ComplaintService.getComplaints();
+        const newComplaint = { ...complaint, id: Math.random().toString(36).substr(2, 9) };
+        await Storage.setItem(STORAGE_KEY, JSON.stringify([newComplaint, ...complaints]));
+        return newComplaint;
     },
 
     // Update existing complaint
     updateComplaint: async (complaintId: string, updates: Partial<Complaint>): Promise<void> => {
-        try {
-            const dbData = {
-                complaint_id: complaintId,
-                invoice_no: updates.invoiceNo,
-                customer_name: updates.customerName,
-                customer_phone: updates.customerPhone,
-                customer_email: updates.customerEmail,
-                category: updates.category,
-                description: updates.description,
-                assigned_department: updates.assignedDepartment,
-                assigned_officer: updates.assignedOfficer,
-                action_taken: updates.actionTaken,
-                resolution_date: updates.resolutionDate,
-                status: updates.status,
-                client_confirmation: updates.clientConfirmation,
-                client_feedback: updates.clientFeedback,
-                resolved_by_name: updates.resolvedByName,
-                resolved_by_designation: updates.resolvedByDesignation,
-                image_urls: updates.imageUrls,
-                warranty_card_attached: updates.warrantyCardAttached,
-                city: updates.city
-            };
+        if (isSupabaseConfigured()) {
+            try {
+                const { error } = await supabase
+                    .from('complaints')
+                    .update({
+                        invoice_no: updates.invoiceNo,
+                        customer_name: updates.customerName,
+                        customer_phone: updates.customerPhone,
+                        customer_email: updates.customerEmail,
+                        category: updates.category,
+                        description: updates.description,
+                        assigned_department: updates.assignedDepartment,
+                        assigned_officer: updates.assignedOfficer,
+                        action_taken: updates.actionTaken,
+                        resolution_date: updates.resolutionDate,
+                        status: updates.status,
+                        client_confirmation: updates.clientConfirmation,
+                        client_feedback: updates.clientFeedback,
+                        resolved_by_name: updates.resolvedByName,
+                        resolved_by_designation: updates.resolvedByDesignation,
+                        image_urls: updates.imageUrls,
+                        warranty_card_attached: updates.warrantyCardAttached,
+                        city: updates.city
+                    })
+                    .eq('complaint_id', complaintId);
 
-            // Enqueue the update operation
-            await OfflineQueueService.enqueue('UPDATE', 'complaints', dbData, complaintId, 'high');
-            SyncService.forceSync();
-
-            // Optimistic UI update
-            const complaints = await ComplaintService.getComplaints();
-            const updated = complaints.map(c => c.complaintId === complaintId ? { ...c, ...updates } : c);
-            await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        } catch (error: any) {
-            logger.error('ComplaintService', 'updateComplaint failed', { complaintId, error: error.message || error });
-            throw error;
+                if (error) throw error;
+            } catch (error) {
+                logger.error('ComplaintService', 'Supabase updateComplaint error', { details: error });
+                throw error;
+            }
+            return;
         }
+
+        const complaints = await ComplaintService.getComplaints();
+        const updated = complaints.map(c => c.complaintId === complaintId ? { ...c, ...updates } : c);
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(updated));
     },
 
     // ============================================
@@ -340,7 +345,7 @@ export const ComplaintService = {
                 .select('*', { count: 'exact' });
 
             if (branchId) {
-                query = query.ilike('branch_id', branchId.trim());
+                query = query.eq('branch_id', branchId);
             }
 
             const { data, count, error } = await query
@@ -383,8 +388,8 @@ export const ComplaintService = {
                 total,
                 hasMore
             };
-        } catch (error: any) {
-            logger.error('ComplaintService', 'getComplaintsPaginated failed', { error: error.message || error });
+        } catch (error) {
+            logger.error('ComplaintService', 'Error fetching paginated complaints', { details: error });
             throw error;
         }
     },
@@ -444,8 +449,8 @@ export const ComplaintService = {
                 total,
                 hasMore
             };
-        } catch (error: any) {
-            logger.error('ComplaintService', 'getComplaintsByStatusPaginated failed', { status, error: error.message || error });
+        } catch (error) {
+            logger.error('ComplaintService', 'Error fetching paginated complaints by status', { details: error });
             throw error;
         }
     }

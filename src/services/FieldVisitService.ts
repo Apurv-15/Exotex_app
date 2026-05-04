@@ -1,8 +1,5 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
-import { Platform } from 'react-native';
-import { OfflineQueueService } from './OfflineQueueService';
-import { SyncService } from './SyncService';
 import { logger } from '../core/logging/Logger';
 
 export interface FieldVisit {
@@ -19,7 +16,6 @@ export interface FieldVisit {
     designation?: string;
     mobileNumber?: string;
     emailId?: string;
-    companyBuildingName?: string;
 
     // Water Source & Water Quality Details
     waterSource?: string[];
@@ -211,7 +207,6 @@ const dbToFieldVisit = (row: any): FieldVisit => ({
     scalingIssueObserved: row.scaling_issue_observed || '',
     scalingDescription: row.scaling_description || '',
 
-    // Existing System & Problems
     existingWaterTreatment: row.existing_water_treatment || '',
     existingSystemDetails: row.existing_system_details || '',
     problemsFaced: row.problems_faced || [],
@@ -219,44 +214,37 @@ const dbToFieldVisit = (row: any): FieldVisit => ({
     maintenanceFrequency: row.maintenance_frequency || '',
     customerExpectations: row.customer_expectations || '',
 
-    // Area of Application
     applicationArea: row.application_area || [],
     applicationOther: row.application_other || '',
     pipeLineSize: row.pipe_line_size || '',
     operatingPressure: row.operating_pressure || '',
     operatingTemperature: row.operating_temperature || '',
 
-    // Technical Observations
     ekotexInstallationFeasible: row.ekotex_installation_feasible || '',
     recommendedEkotexModel: row.recommended_ekotex_model || '',
     quantityRequired: row.quantity_required || '',
     siteConstraints: row.site_constraints || '',
     accessoriesRequired: row.accessories_required || '',
 
-    // Commercial Discussion
     customerInterestLevel: row.customer_interest_level || '',
     budgetDiscussed: row.budget_discussed || '',
     expectedDecisionTimeline: row.expected_decision_timeline || '',
     decisionMakerIdentified: row.decision_maker_identified || '',
 
-    // Market Info
     existingCompetitorSolution: row.existing_competitor_solution || '',
     competitorPriceRange: row.competitor_price_range || '',
     customerRemarks: row.customer_remarks || '',
 
-    // Photographs & Attachments
     sitePhotographsTaken: row.site_photographs_taken || false,
     existingSystemPhotographs: row.existing_system_photographs || false,
     problemAreaPhotographs: row.problem_area_photographs || false,
     drawingsCollected: row.drawings_collected || false,
 
-    // Follow-up
     nextActionRequired: row.next_action_required || [],
     nextActionOther: row.next_action_other || '',
     responsiblePerson: row.responsible_person || '',
     expectedFollowUpDate: row.expected_follow_up_date || '',
 
-    // Executive Remarks
     salesEngineerRemarks: row.sales_engineer_remarks || '',
     overallSiteAssessment: row.overall_site_assessment || '',
     conversionProbability: row.conversion_probability || '',
@@ -321,7 +309,6 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
     designation: visit.designation || null,
     mobile_number: visit.mobileNumber || null,
     email_id: visit.emailId || null,
-    company_building_name: visit.companyBuildingName || null,
 
     water_source: visit.waterSource || [],
     water_source_other: visit.waterSourceOther || null,
@@ -332,7 +319,6 @@ const fieldVisitToDb = (visit: Partial<FieldVisit>) => ({
     scaling_issue_observed: visit.scalingIssueObserved || null,
     scaling_description: visit.scalingDescription || null,
 
-    // Existing System & Problems
     existing_water_treatment: visit.existingWaterTreatment || null,
     existing_system_details: visit.existingSystemDetails || null,
     problems_faced: visit.problemsFaced || [],
@@ -389,7 +375,7 @@ export const FieldVisitService = {
 
         // Check if Supabase is configured
         if (!isSupabaseConfigured()) {
-            console.warn('Supabase not configured, using local storage');
+            logger.warn('FieldVisitService', 'Supabase not configured, using local storage');
             return await FieldVisitService.saveImageLocally(uri, visitId, index);
         }
 
@@ -399,7 +385,7 @@ export const FieldVisitService = {
             const netState = await NetInfo.fetch();
 
             if (!netState.isConnected) {
-                console.warn('No network connection, saving locally');
+                logger.warn('FieldVisitService', 'No network connection, saving locally');
                 return await FieldVisitService.saveImageLocally(uri, visitId, index);
             }
 
@@ -423,7 +409,7 @@ export const FieldVisitService = {
                 const { Buffer } = require('buffer');
                 fileBody = Buffer.from(base64, 'base64');
             } catch (readError) {
-                console.warn('FileSystem read failed, using blob fallback...', readError);
+                logger.warn('FieldVisitService', 'FileSystem read failed, using blob fallback', { details: readError });
                 const response = await fetch(uri);
                 fileBody = await response.blob();
             }
@@ -438,10 +424,10 @@ export const FieldVisitService = {
                 });
 
             if (uploadError) {
-                console.error('Supabase upload error details:', uploadError);
+                logger.error('FieldVisitService', 'Supabase upload error details', { details: uploadError });
 
                 // Fallback to local storage on upload error
-                console.warn('Upload failed, saving locally instead');
+                logger.warn('FieldVisitService', 'Upload failed, saving locally instead');
                 return await FieldVisitService.saveImageLocally(uri, visitId, index);
             }
 
@@ -455,7 +441,10 @@ export const FieldVisitService = {
 
             return urlData.publicUrl;
         } catch (error: any) {
-            logger.error('FieldVisitService', 'Image upload failed', { error: error.message, visitId, index });
+            logger.error('FieldVisitService', 'Image upload error', { details: error });
+
+            // Fallback to local storage on any error
+            logger.warn('FieldVisitService', 'Error during upload, saving locally');
             return await FieldVisitService.saveImageLocally(uri, visitId, index);
         }
     },
@@ -484,10 +473,11 @@ export const FieldVisitService = {
                 to: localPath,
             });
 
-            logger.info('FieldVisitService', 'Image saved locally', { localPath });
+            logger.info('FieldVisitService', 'Field visit image saved locally', { localPath });
             return localPath;
-        } catch (error: any) {
-            logger.error('FieldVisitService', 'Local image save failed', { error: error.message, visitId, index });
+        } catch (error) {
+            logger.error('FieldVisitService', 'Local save error', { details: error });
+            // If local save fails, return original URI as last resort
             return uri;
         }
     },
@@ -497,18 +487,15 @@ export const FieldVisitService = {
         if (isSupabaseConfigured()) {
             try {
                 let query = supabase.from('field_visits').select('*', { count: 'exact', head: true });
-                let cQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'completed');
-                let pQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-
-                if (branchId) {
-                    const trimmedBranch = branchId.trim();
-                    query = query.ilike('branch_id', trimmedBranch);
-                    cQuery = cQuery.ilike('branch_id', trimmedBranch);
-                    pQuery = pQuery.ilike('branch_id', trimmedBranch);
-                }
-
+                if (branchId) query = query.eq('branch_id', branchId);
                 const { count: total } = await query;
+
+                let cQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'completed');
+                if (branchId) cQuery = cQuery.eq('branch_id', branchId);
                 const { count: completed } = await cQuery;
+
+                let pQuery = supabase.from('field_visits').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+                if (branchId) pQuery = pQuery.eq('branch_id', branchId);
                 const { count: pending } = await pQuery;
 
                 return {
@@ -517,7 +504,7 @@ export const FieldVisitService = {
                     pending: pending || 0
                 };
             } catch (error) {
-                logger.error('FieldVisitService', 'getFieldVisitStats Supabase error', { branchId, error });
+                logger.error('FieldVisitService', 'Supabase visit stats error', { details: error });
             }
         }
 
@@ -553,7 +540,7 @@ export const FieldVisitService = {
 
                 return Object.values(grouped).sort((a, b) => b.total - a.total);
             } catch (error) {
-                logger.error('FieldVisitService', 'getFieldVisitRegionStats Supabase error', { error });
+                logger.error('FieldVisitService', 'Supabase visit region stats error', { details: error });
             }
         }
 
@@ -587,7 +574,7 @@ export const FieldVisitService = {
                 if (error) throw error;
                 return (data || []).map(dbToFieldVisit);
             } catch (error) {
-                logger.error('FieldVisitService', 'getFieldVisits Supabase error', { error });
+                logger.error('FieldVisitService', 'Supabase error, falling back to local storage', { details: error });
             }
         }
 
@@ -603,13 +590,13 @@ export const FieldVisitService = {
                 const { data, error } = await supabase
                     .from('field_visits')
                     .select('*')
-                    .ilike('branch_id', branchId.trim())
+                    .eq('branch_id', branchId)
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
                 return (data || []).map(dbToFieldVisit);
             } catch (error) {
-                logger.error('FieldVisitService', 'getFieldVisitsByBranch Supabase error', { branchId, error });
+                logger.error('FieldVisitService', 'Supabase error, falling back to local storage', { details: error });
             }
         }
 
@@ -624,74 +611,84 @@ export const FieldVisitService = {
         imageUris?: string[],
         onProgress?: (progress: number) => void
     ): Promise<FieldVisit> => {
-        try {
-            const visitId = `FV-${Math.floor(100000 + Math.random() * 900000)}`;
+        const visitId = `FV-${Math.floor(100000 + Math.random() * 900000)}`;
 
-            // Upload images sequentially with progress tracking
-            let imageUrls: string[] = [];
-            if (imageUris && imageUris.length > 0) {
-                for (let i = 0; i < imageUris.length; i++) {
-                    const progressPerImage = 80 / imageUris.length;
-                    const baseProgress = i * progressPerImage;
+        // Upload images sequentially with progress tracking
+        let imageUrls: string[] = [];
+        if (imageUris && imageUris.length > 0) {
+            for (let i = 0; i < imageUris.length; i++) {
+                const progressPerImage = 80 / imageUris.length; // Reserve 80% for uploads
+                const baseProgress = i * progressPerImage;
 
-                    const url = await FieldVisitService.uploadImage(
-                        imageUris[i],
-                        visitId,
-                        i,
-                        (imgProgress) => {
-                            const totalProgress = baseProgress + (imgProgress * progressPerImage / 100);
-                            onProgress?.(Math.round(totalProgress));
-                        }
-                    );
-                    imageUrls.push(url);
-                }
-                onProgress?.(80);
+                const url = await FieldVisitService.uploadImage(
+                    imageUris[i],
+                    visitId,
+                    i,
+                    (imgProgress) => {
+                        const totalProgress = baseProgress + (imgProgress * progressPerImage / 100);
+                        onProgress?.(Math.round(totalProgress));
+                    }
+                );
+                imageUrls.push(url);
             }
-
-            const dbData = fieldVisitToDb({
-                ...visitData,
-                status: 'completed',
-                imageUrls,
-            });
-
-            await OfflineQueueService.enqueue('CREATE', 'field_visits', dbData, visitId, 'high');
-            SyncService.forceSync();
-
-            // Optimistic UI fallback to local storage
-            const visits = await FieldVisitService.getFieldVisits();
-            const newVisit: FieldVisit = {
-                ...visitData,
-                id: visitId,
-                status: 'completed',
-                imageUrls,
-            };
-
-            const updatedVisits = [newVisit, ...visits];
-            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
-            return newVisit;
-        } catch (error: any) {
-            logger.error('FieldVisitService', 'createFieldVisit failed', { error: error.message || error });
-            throw error;
+            onProgress?.(80); // All uploads complete
         }
+
+        if (isSupabaseConfigured()) {
+            try {
+                const dbData = fieldVisitToDb({
+                    ...visitData,
+                    status: 'completed',
+                    imageUrls,
+                });
+
+                const { data, error } = await supabase
+                    .from('field_visits')
+                    .insert([dbData])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                return dbToFieldVisit(data);
+            } catch (error) {
+                logger.error('FieldVisitService', 'Supabase error creating visit, falling back to local storage', { details: error });
+            }
+        }
+
+        // Fallback to local storage
+        const visits = await FieldVisitService.getFieldVisits();
+        const newVisit: FieldVisit = {
+            ...visitData,
+            id: visitId,
+            status: 'completed',
+            imageUrls,
+        };
+
+        const updatedVisits = [newVisit, ...visits];
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
+        return newVisit;
     },
 
     // Update field visit status
     updateFieldVisitStatus: async (visitId: string, status: FieldVisit['status']): Promise<void> => {
-        try {
-            const payload = { id: visitId, status };
+        if (isSupabaseConfigured()) {
+            try {
+                const { error } = await supabase
+                    .from('field_visits')
+                    .update({ status })
+                    .eq('id', visitId);
 
-            // Enqueue update to Supabase
-            await OfflineQueueService.enqueue('UPDATE', 'field_visits', payload, visitId, 'medium');
-            SyncService.forceSync();
-
-            // Fallback for local storage (Optimistic UI)
-            const visits = await FieldVisitService.getFieldVisits();
-            const updatedVisits = visits.map(v => v.id === visitId ? { ...v, status } : v);
-            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
-        } catch (error: any) {
-            logger.error('FieldVisitService', 'updateFieldVisitStatus failed', { visitId, status, error: error.message || error });
-            throw error;
+                if (error) throw error;
+                return;
+            } catch (error) {
+                logger.error('FieldVisitService', 'Supabase error updating visit status, falling back to local storage', { details: error });
+            }
         }
+
+        // Fallback to local storage
+        const visits = await FieldVisitService.getFieldVisits();
+        const updatedVisits = visits.map(v => v.id === visitId ? { ...v, status } : v);
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
     },
 
     deleteFieldVisit: async (id: string) => {
@@ -711,8 +708,8 @@ export const FieldVisitService = {
             await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedVisits));
 
             return true;
-        } catch (error: any) {
-            logger.error('FieldVisitService', 'deleteFieldVisit failed', { id, error: error.message || error });
+        } catch (error) {
+            logger.error('FieldVisitService', 'Error deleting field visit', { details: error });
             throw error;
         }
     },
@@ -738,7 +735,7 @@ export const FieldVisitService = {
                 .select('*', { count: 'exact' });
 
             if (filters?.branchId) {
-                query = query.ilike('branch_id', filters.branchId.trim());
+                query = query.eq('branch_id', filters.branchId);
             }
             if (filters?.status) {
                 query = query.eq('status', filters.status);
@@ -758,8 +755,8 @@ export const FieldVisitService = {
                 total,
                 hasMore
             };
-        } catch (error: any) {
-            logger.error('FieldVisitService', 'getFieldVisitsPaginated failed', { error: error.message || error });
+        } catch (error) {
+            logger.error('FieldVisitService', 'Error fetching paginated field visits', { details: error });
             throw error;
         }
     },

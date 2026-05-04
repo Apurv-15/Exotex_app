@@ -210,7 +210,7 @@ export const AuthService = {
             });
 
             if (authError || !authData.user) {
-                console.error('Registration Auth error:', authError);
+                logger.error('AuthService', 'Registration Auth error', { details: authError });
                 throw authError || new Error('Registration failed');
             }
 
@@ -237,23 +237,23 @@ export const AuthService = {
 
                     if (!profileError) {
                         profileCreated = true;
-                        console.log(`✅ Profile created successfully for ${email} with region: ${region}`);
+                        logger.success('AuthService', `Profile created successfully for ${email} with region: ${region}`);
                         break;
                     }
 
                     if (attempt < maxRetries) {
-                        console.warn(`Profile creation attempt ${attempt} failed, retrying...`, profileError);
+                        logger.warn('AuthService', `Profile creation attempt ${attempt} failed, retrying...`, { details: profileError });
                         await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
                     } else {
-                        console.warn('Profile creation failed after retries:', profileError);
+                        logger.warn('AuthService', 'Profile creation failed after retries', { details: profileError });
                     }
                 } catch (retryError) {
-                    console.warn(`Retry ${attempt} error:`, retryError);
+                    logger.warn('AuthService', `Retry ${attempt} error`, { details: retryError });
                 }
             }
 
             if (!profileCreated) {
-                console.warn('⚠️ User created in Auth but profile sync may be delayed. Region can be updated later.');
+                logger.warn('AuthService', 'User created in Auth but profile sync may be delayed. Region can be updated later.');
             }
 
             return {
@@ -265,7 +265,7 @@ export const AuthService = {
                 region: region?.trim()
             };
         } catch (error: any) {
-            console.error('AuthService.registerUser error:', error);
+            logger.error('AuthService', 'registerUser error', { details: error });
             throw error;
         }
     },
@@ -280,12 +280,12 @@ export const AuthService = {
                 .maybeSingle();
 
             if (error) {
-                console.error('Check email error:', error);
+                logger.error('AuthService', 'Check email error', { details: error });
                 return false;
             }
             return !!data;
         } catch (error) {
-            console.error('Check email exception:', error);
+            logger.error('AuthService', 'Check email exception', { details: error });
             return false;
         }
     },
@@ -317,7 +317,7 @@ export const AuthService = {
             if (profileError) throw profileError;
 
         } catch (error: any) {
-            console.error('AuthService.updateProfile error:', error);
+            logger.error('AuthService', 'updateProfile error', { details: error });
             throw error;
         }
     },
@@ -330,7 +330,7 @@ export const AuthService = {
 
             if (error) throw error;
         } catch (error: any) {
-            console.error('AuthService.updatePassword error:', error);
+            logger.error('AuthService', 'updatePassword error', { details: error });
             throw error;
         }
     },
@@ -350,7 +350,7 @@ export const AuthService = {
 
             if (profileError) throw profileError;
         } catch (error: any) {
-            console.error('AuthService.adminUpdateProfile error:', error);
+            logger.error('AuthService', 'adminUpdateProfile error', { details: error });
             throw error;
         }
     },
@@ -366,7 +366,7 @@ export const AuthService = {
 
             if (profileError) throw profileError;
         } catch (error: any) {
-            console.error('AuthService.deleteUser error:', error);
+            logger.error('AuthService', 'deleteUser error', { details: error });
             throw error;
         }
     }

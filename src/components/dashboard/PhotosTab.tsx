@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 import GlassPanel from '../GlassPanel';
-import { Paths, File } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 const screenWidth = Dimensions.get('window').width;
@@ -122,8 +122,9 @@ export const PhotosTab = React.memo(({
         setIsDownloading(true);
         try {
             const filename = url.split('/').pop()?.split('?')[0] || `photo_${Date.now()}.jpg`;
-            const cacheFile = new File(Paths.cache, filename);
-            const downloadedFile = await File.downloadFileAsync(url, cacheFile);
+            const cacheDir = (FileSystem as any).cacheDirectory || '';
+            const fileUri = `${cacheDir}${filename}`;
+            const downloadedFile = await FileSystem.downloadAsync(url, fileUri);
 
             if (Platform.OS !== 'web' && await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(downloadedFile.uri);
@@ -239,10 +240,10 @@ export const PhotosTab = React.memo(({
                     <Text style={styles.emptyText}>No registered warranties with photos</Text>
                 </GlassPanel>
             ) : (
-                <View style={{ gap: 12 }}>
-                    {salesWithPhotos.map((sale) => (
+                <FlashList
+                    data={salesWithPhotos}
+                    renderItem={({ item: sale }) => (
                         <Pressable
-                            key={sale.id}
                             onPress={() => setViewingSale(sale)}
                             style={({ pressed }) => [
                                 styles.saleListItem,
@@ -265,8 +266,10 @@ export const PhotosTab = React.memo(({
                                 </View>
                             </GlassPanel>
                         </Pressable>
-                    ))}
-                </View>
+                    )}
+                    keyExtractor={(item) => item.id}
+                    ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+                />
             )}
         </View>
     );

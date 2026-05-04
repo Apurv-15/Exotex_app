@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../core/logging/Logger';
 
 export interface DraftData {
     formType: 'warranty' | 'field_visit' | 'complaint';
@@ -30,7 +31,7 @@ export const FormRecoveryService = {
 
             await AsyncStorage.setItem(key, JSON.stringify(draftData));
         } catch (error) {
-            console.error('Error saving draft:', error);
+            logger.error('FormRecoveryService', `Error saving draft for ${formType}`, { details: error });
         }
     },
 
@@ -44,7 +45,7 @@ export const FormRecoveryService = {
             const draftJson = await AsyncStorage.getItem(key);
             return draftJson ? JSON.parse(draftJson) : null;
         } catch (error) {
-            console.error('Error getting draft:', error);
+            logger.error('FormRecoveryService', `Error getting draft for ${formType}`, { details: error });
             return null;
         }
     },
@@ -58,7 +59,7 @@ export const FormRecoveryService = {
 
             await AsyncStorage.removeItem(key);
         } catch (error) {
-            console.error('Error clearing draft:', error);
+            logger.error('FormRecoveryService', `Error clearing draft for ${formType}`, { details: error });
         }
     },
 

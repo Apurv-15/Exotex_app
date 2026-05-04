@@ -91,13 +91,31 @@ class Logger {
     // 1. Console Output (Dev only)
     if (this.isDev && !silent) {
       const color = this.getLogColor(level);
-      console.log(
+      const consoleArgs = [
         `%c[${timestamp}] [${level}] [${module}]%c${logLocation ? ` @ ${logLocation}` : ''} %c${message}`,
         `color: ${color}; font-weight: bold;`,
         `color: ${this.themeColors.DEBUG}; font-size: 10px; font-style: italic;`,
-        'color: inherit; font-weight: normal;',
-        details || ''
-      );
+        'color: inherit; font-weight: normal;'
+      ];
+
+      if (details) {
+        consoleArgs.push(details);
+      }
+
+      switch (level) {
+        case 'ERROR':
+          console.error(...consoleArgs);
+          break;
+        case 'WARN':
+          console.warn(...consoleArgs);
+          break;
+        case 'SUCCESS':
+        case 'INFO':
+        case 'DEBUG':
+        default:
+          console.info(...consoleArgs);
+          break;
+      }
     }
 
     // 2. Persist to SyncStore (For Super Admin Dashboard)

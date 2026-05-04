@@ -175,19 +175,7 @@ export default function RootNavigator() {
 
     const { user, isLoadingStorage } = useAuth();
 
-    // Safety timeout: if auth resolution stalls in production (e.g., slow Supabase cold start),
-    // force the loading state to resolve after 5 seconds so the user isn't stuck on a blank screen.
-    const [forceReady, setForceReady] = React.useState(false);
-    React.useEffect(() => {
-        if (!isLoadingStorage) return;
-        const timer = setTimeout(() => {
-            console.warn('RootNavigator: Auth resolution timed out, forcing ready state.');
-            setForceReady(true);
-        }, 5000);
-        return () => clearTimeout(timer);
-    }, [isLoadingStorage]);
-
-    if (isLoadingStorage && !forceReady) {
+    if (isLoadingStorage) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={THEME.colors.primary} />
@@ -198,11 +186,7 @@ export default function RootNavigator() {
     return (
         <NavigationContainer ref={navigationRef}>
             {user ? (
-                user.role === 'Admin' || user.role === 'Super Admin' ? (
-                    <AdminStack />
-                ) : (
-                    <UserStack />
-                )
+                (user.role === 'Admin' || user.role === 'Super Admin') ? <AdminStack /> : <UserStack />
             ) : (
                 <AuthStack />
             )}

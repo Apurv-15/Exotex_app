@@ -4,6 +4,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
+import { logger } from '../core/logging/Logger';
 
 export interface WarrantyTemplateData {
     // Customer Details
@@ -59,60 +60,61 @@ export const TemplateService = {
         shouldShare: boolean = true
     ): Promise<string | null> => {
         try {
-            console.log('📄 Starting Word template generation...');
-            console.log('Template URI:', templateUri);
-            console.log('Output file:', outputFileName);
-            console.log('Data to fill:', JSON.stringify(data, null, 2));
+            logger.info('TemplateService', 'Starting Word template generation', {
+                templateUri,
+                outputFileName,
+                data: JSON.stringify(data, null, 2)
+            });
 
             let content;
 
             // Load template based on platform
             if (Platform.OS === 'web') {
-                console.log('🌐 Loading template for web platform...');
+                logger.info('TemplateService', 'Loading template for web platform');
                 const response = await fetch(templateUri);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch template: ${response.statusText}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
                 content = new Uint8Array(arrayBuffer);
-                console.log('✅ Template loaded successfully (web)');
+                logger.success('TemplateService', 'Template loaded successfully (web)');
             } else {
-                console.log('📱 Loading template for native platform...');
+                logger.info('TemplateService', 'Loading template for native platform');
                 const base64 = await FileSystem.readAsStringAsync(templateUri, {
                     encoding: 'base64',
                 });
                 content = Buffer.from(base64, 'base64');
-                console.log('✅ Template loaded successfully (native)');
+                logger.success('TemplateService', 'Template loaded successfully (native)');
             }
 
             // Parse the Word document
-            console.log('📦 Parsing Word document structure...');
+            logger.info('TemplateService', 'Parsing Word document structure');
             const zip = new PizZip(content);
             const doc = new Docxtemplater(zip, {
                 paragraphLoop: true,
                 linebreaks: true,
                 nullGetter: function (part: any) {
                     // Return empty string for undefined values instead of throwing error
-                    console.warn(`⚠️ Placeholder "${part.value}" not found in data`);
+                    logger.warn('TemplateService', `Placeholder "${part.value}" not found in data`);
                     return '';
                 },
             });
 
             // Set the data to be replaced
-            console.log('🔄 Setting template data...');
+            logger.info('TemplateService', 'Setting template data');
             doc.setData(data);
 
             try {
                 // Render the document (replace placeholders)
-                console.log('⚙️ Rendering document with data...');
+                logger.info('TemplateService', 'Rendering document with data');
                 doc.render();
-                console.log('✅ Document rendered successfully');
+                logger.success('TemplateService', 'Document rendered successfully');
             } catch (error: any) {
-                console.error('❌ Error rendering docx template:', error);
+                logger.error('TemplateService', 'Error rendering docx template', { details: error });
 
                 // Provide detailed error information
                 if (error.properties && error.properties.errors) {
-                    console.error('Template errors:', error.properties.errors);
+                    logger.error('TemplateService', 'Detailed template errors', { errors: error.properties.errors });
                 }
 
                 throw new Error(
@@ -123,7 +125,7 @@ export const TemplateService = {
 
             // Generate and save/download the filled document
             if (Platform.OS === 'web') {
-                console.log('💾 Generating file for web download...');
+                logger.info('TemplateService', 'Generating file for web download');
                 const output = doc.getZip().generate({
                     type: 'blob',
                     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -138,10 +140,10 @@ export const TemplateService = {
                 // Cleanup
                 setTimeout(() => window.URL.revokeObjectURL(url), 100);
 
-                console.log('✅ File downloaded successfully');
+                logger.success('TemplateService', 'File downloaded successfully');
                 return 'downloaded';
             } else {
-                console.log('💾 Generating file for native sharing...');
+                logger.info('TemplateService', 'Generating file for native sharing');
                 const base64Output = doc.getZip().generate({
                     type: 'base64',
                 });
@@ -150,27 +152,26 @@ export const TemplateService = {
                 const docDir = (FileSystem as any).documentDirectory;
                 const fileUri = `${docDir}${outputFileName}`;
 
-                console.log('📝 Writing file to:', fileUri);
+                logger.info('TemplateService', `Writing file to: ${fileUri}`);
                 await FileSystem.writeAsStringAsync(fileUri, base64Output, {
                     encoding: 'base64',
                 });
 
                 if (shouldShare) {
-                    console.log('📤 Sharing file...');
+                    logger.info('TemplateService', 'Sharing file');
                     await Sharing.shareAsync(fileUri, {
                         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                         UTI: 'com.microsoft.word.doc',
                     });
-                    console.log('✅ File shared successfully');
+                    logger.success('TemplateService', 'File shared successfully');
                 } else {
-                    console.log('✅ File generated successfully (sharing skipped)');
+                    logger.success('TemplateService', 'File generated successfully (sharing skipped)');
                 }
 
                 return fileUri;
             }
         } catch (error: any) {
-            console.error('❌ Failed to fill docx template:', error);
-            console.error('Error details:', {
+            logger.error('TemplateService', 'Failed to fill docx template', {
                 message: error.message,
                 name: error.name,
                 stack: error.stack,
@@ -192,7 +193,7 @@ export const TemplateService = {
                 return fileInfo.exists;
             }
         } catch (error) {
-            console.error('Template validation failed:', error);
+            logger.error('TemplateService', 'Template validation failed', { details: error });
             return false;
         }
     },

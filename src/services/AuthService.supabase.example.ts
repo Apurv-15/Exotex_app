@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { AuthResponse, User } from '../types';
 import { Storage } from '../utils/storage';
+import { logger } from '../core/logging/Logger';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
@@ -44,7 +45,7 @@ export const AuthService = {
             await AuthService.saveAuth(response);
             return response;
         } catch (error: any) {
-            console.error('Login error:', error);
+            logger.error('AuthService', 'Login error during template execution', { details: error });
             throw new Error(error.message || 'Login failed');
         }
     },

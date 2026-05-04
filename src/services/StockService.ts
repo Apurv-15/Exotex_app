@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
+import { logger } from '../core/logging/Logger';
 import { Stock } from '../types';
 
 const STORAGE_KEY = 'WARRANTY_PRO_STOCK';
@@ -30,7 +31,7 @@ export const StockService = {
                     updatedAt: row.updated_at,
                 }));
             } catch (error) {
-                console.error('Supabase error fetching stock:', error);
+                logger.error('StockService', 'Supabase error fetching stock', { details: error });
             }
         }
 
@@ -60,7 +61,7 @@ export const StockService = {
                     updatedAt: row.updated_at,
                 }));
             } catch (error) {
-                console.error(`Supabase error fetching stock for ${region}:`, error);
+                logger.error('StockService', `Supabase error fetching stock for ${region}`, { details: error });
             }
         }
 
@@ -90,7 +91,7 @@ export const StockService = {
                 if (error) throw error;
                 return;
             } catch (error) {
-                console.error('Supabase error updating stock:', error);
+                logger.error('StockService', 'Supabase error updating stock', { details: error });
             }
         }
 
@@ -134,7 +135,7 @@ export const StockService = {
                     .single();
 
                 if (fetchError) {
-                    console.warn('Stock not found for region/model, skipping decrement:', fetchError);
+                    logger.warn('StockService', 'Stock not found for region/model, skipping decrement', { region, modelName, details: fetchError });
                     return; // Don't throw error, just skip if stock doesn't exist
                 }
 
@@ -156,7 +157,7 @@ export const StockService = {
                 if (updateError) throw updateError;
                 return;
             } catch (error) {
-                console.error('Supabase error decrementing stock:', error);
+                logger.error('StockService', 'Supabase error decrementing stock', { details: error });
                 throw error; // Re-throw to handle in calling function
             }
         }
@@ -169,7 +170,7 @@ export const StockService = {
         );
 
         if (!stockItem) {
-            console.warn('Stock not found locally, skipping decrement');
+            logger.warn('StockService', 'Stock not found locally, skipping decrement', { region, modelName });
             return;
         }
 

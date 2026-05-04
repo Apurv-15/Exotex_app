@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Modal, Pressable, AppState, AppStateStatus } from 'react-native';
 import * as Updates from 'expo-updates';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { logger } from '../../core/logging/Logger';
@@ -16,16 +16,57 @@ export const CloudUpdateHandler = () => {
   } = Updates.useUpdates();
 
   const [visible, setVisible] = useState(false);
+  const [checkingForUpdate, setCheckingForUpdate] = useState(false);
+  const [lastCheckError, setLastCheckError] = useState<string | null>(null);
 
-  // 1. If an update is available on the server, fetch it automatically
-  useEffect(() => {
-    if (isUpdateAvailable) {
-      logger.info('Updates', 'Update available on server, fetching...');
-      Updates.fetchUpdateAsync().catch((err) => {
-        logger.error('Updates', 'Failed to fetch update', { details: err });
-      });
+  const checkAndFetchUpdate = useCallback(async () => {
+    if (!Updates.isEnabled) return;
+
+    try {
+      setCheckingForUpdate(true);
+      setLastCheckError(null);
+
+      logger.info('Updates', 'Checking for OTA update...');
+      const result = await Updates.checkForUpdateAsync();
+
+      if (result.isAvailable) {
+        logger.info('Updates', 'Update available on server, fetching...');
+        await Updates.fetchUpdateAsync();
+      } else {
+        logger.info('Updates', 'No OTA update available');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown update error';
+      setLastCheckError(message);
+      logger.error('Updates', 'Failed to check/fetch update', { details: err });
+    } finally {
+      setCheckingForUpdate(false);
     }
-  }, [isUpdateAvailable]);
+  }, []);
+
+  // Check once on mount so users don't have to restart the app to trigger OTA detection.
+  useEffect(() => {
+    checkAndFetchUpdate();
+  }, [checkAndFetchUpdate]);
+
+  // Re-check whenever the app returns to the foreground.
+  useEffect(() => {
+    let active = true;
+
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (!active) return;
+      if (nextState === 'active') {
+        checkAndFetchUpdate();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [checkAndFetchUpdate]);
 
   // 2. Once the update is downloaded (pending), show the professional prompt
   useEffect(() => {
@@ -64,6 +105,18 @@ export const CloudUpdateHandler = () => {
           <Text style={styles.description}>
             A new version of Ekotex is ready with improvements and fixes. Restart now to get the best experience.
           </Text>
+
+          {checkingForUpdate ? (
+            <View style={styles.statusRow}>
+              <Text style={styles.statusText}>Checking for updates...</Text>
+            </View>
+          ) : null}
+
+          {!checkingForUpdate && lastCheckError ? (
+            <View style={styles.statusRow}>
+              <Text style={styles.errorText}>Update check failed: {lastCheckError}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.buttonContainer}>
             <Pressable 
@@ -133,6 +186,20 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: '100%',
     gap: 12,
+  },
+  statusRow: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  statusText: {
+    color: '#6B7280',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 13,
+    textAlign: 'center',
   },
   button: {
     paddingVertical: 14,

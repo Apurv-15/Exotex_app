@@ -28,7 +28,7 @@ try {
     });
 } catch (defineError: any) {
     // Non-fatal: background sync won't run, but the app will still launch normally.
-    console.warn('[BackgroundSyncTask] TaskManager.defineTask failed (non-fatal):', defineError?.message || defineError);
+    logger.warn('BackgroundSyncTask', 'TaskManager.defineTask failed (non-fatal)', { details: defineError?.message || defineError });
 }
 
 /**
@@ -38,7 +38,7 @@ export async function registerBackgroundSync() {
     try {
         // Guard: verify TaskManager native module is available before proceeding
         if (!TaskManager || typeof TaskManager.isTaskRegisteredAsync !== 'function') {
-            console.warn('[BackgroundSyncTask] TaskManager native module unavailable, skipping registration.');
+            logger.warn('BackgroundSyncTask', 'TaskManager native module unavailable, skipping registration');
             return;
         }
 
@@ -57,6 +57,6 @@ export async function registerBackgroundSync() {
         logger.success('BackgroundSyncTask', 'Background sync registered successfully');
     } catch (err: any) {
         // Non-fatal: registration failure should never crash the app.
-        console.warn('[BackgroundSyncTask] Task registration failed (non-fatal):', err?.message || err);
+        logger.warn('BackgroundSyncTask', 'Task registration failed (non-fatal)', { details: err?.message || err });
     }
 }

@@ -1,9 +1,6 @@
 import { supabase } from '../config/supabase';
 import { Storage } from '../utils/storage';
 import { Platform } from 'react-native';
-import { OfflineQueueService } from './OfflineQueueService';
-import { useSyncStore } from '../store/SyncStore';
-import { SyncService } from './SyncService';
 import { logger } from '../core/logging/Logger';
 
 
@@ -110,7 +107,7 @@ export const SalesService = {
 
         // Check if Supabase is configured
         if (!isSupabaseConfigured()) {
-            logger.warn('SalesService', 'Supabase not configured, falling back to local storage', { warrantyId, index });
+            logger.warn('SalesService', 'Supabase not configured, using local storage');
             return await SalesService.saveImageLocally(uri, warrantyId, index);
         }
 
@@ -120,7 +117,7 @@ export const SalesService = {
             const netState = await NetInfo.fetch();
 
             if (!netState.isConnected) {
-                logger.warn('SalesService', 'No network connection detected, saving image locally', { warrantyId, index });
+                logger.warn('SalesService', 'No network connection, saving locally');
                 return await SalesService.saveImageLocally(uri, warrantyId, index);
             }
 
@@ -151,10 +148,14 @@ export const SalesService = {
                     });
 
                     onProgress?.(30); // File read complete
+
+                    // Convert Base64 to ArrayBuffer (Uint8Array)
+                    // This is the most reliable way to upload on React Native Android with Supabase
                     const { Buffer } = require('buffer');
                     fileBody = Buffer.from(base64, 'base64');
-                } catch (readError: any) {
-                    logger.warn('SalesService', 'FileSystem legacy read failed, trying fetch fallback', { error: readError.message });
+                } catch (readError) {
+                    logger.warn('SalesService', 'FileSystem read failed, trying fetch blob fallback...', { details: readError });
+                    // Fallback to fetch blob (works well on iOS, sometimes flaky on Android)
                     const response = await fetch(uri);
                     fileBody = await response.blob();
                 }
@@ -170,7 +171,9 @@ export const SalesService = {
                 });
 
             if (uploadError) {
-                logger.error('SalesService', 'Supabase image bucket upload failed', { uploadError, filePath });
+                logger.error('SalesService', 'Supabase upload error details', { details: uploadError });
+                // Fallback to local storage on upload error
+                logger.warn('SalesService', 'Upload failed, saving locally instead');
                 return await SalesService.saveImageLocally(uri, warrantyId, index);
             }
 
@@ -184,8 +187,10 @@ export const SalesService = {
 
             return urlData.publicUrl;
         } catch (error: any) {
-            logger.error('SalesService', 'Unhandled image upload exception', { error: error.message, warrantyId, index });
-            console.warn('Error during upload, saving locally');
+            logger.error('SalesService', 'Image upload error', { details: error });
+
+            // Fallback to local storage on any error
+            logger.warn('SalesService', 'Error during upload, saving locally');
             return await SalesService.saveImageLocally(uri, warrantyId, index);
         }
     },
@@ -218,10 +223,10 @@ export const SalesService = {
                 to: localPath,
             });
 
-            logger.info('SalesService', 'Image saved locally', { localPath });
+            logger.debug('SalesService', 'Image saved locally', { details: localPath });
             return localPath;
-        } catch (error: any) {
-            logger.error('SalesService', 'Local image save failed', { error: error.message, warrantyId, index });
+        } catch (error) {
+            logger.error('SalesService', 'Local save error', { details: error });
             // If local save fails, return original URI as last resort
             return uri;
         }
@@ -232,18 +237,15 @@ export const SalesService = {
         if (isSupabaseConfigured()) {
             try {
                 let query = supabase.from('sales').select('*', { count: 'exact', head: true });
-                let pQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-                let aQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'approved');
-                
-                if (branchId) {
-                    const trimmedBranch = branchId.trim();
-                    query = query.ilike('branch_id', trimmedBranch);
-                    pQuery = pQuery.ilike('branch_id', trimmedBranch);
-                    aQuery = aQuery.ilike('branch_id', trimmedBranch);
-                }
-                
+                if (branchId) query = query.eq('branch_id', branchId);
                 const { count: total } = await query;
+
+                let pQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+                if (branchId) pQuery = pQuery.eq('branch_id', branchId);
                 const { count: pending } = await pQuery;
+
+                let aQuery = supabase.from('sales').select('*', { count: 'exact', head: true }).eq('status', 'approved');
+                if (branchId) aQuery = aQuery.eq('branch_id', branchId);
                 const { count: approved } = await aQuery;
 
                 return {
@@ -252,7 +254,7 @@ export const SalesService = {
                     approved: approved || 0
                 };
             } catch (error) {
-                logger.error('SalesService', 'Supabase getSalesStats error', { error });
+                logger.error('SalesService', 'Supabase stats error', { details: error });
             }
         }
 
@@ -289,7 +291,7 @@ export const SalesService = {
 
                 return Object.values(grouped).sort((a, b) => b.total - a.total);
             } catch (error) {
-                logger.error('SalesService', 'Supabase getRegionStats error', { error });
+                logger.error('SalesService', 'Supabase region stats error', { details: error });
             }
         }
 
@@ -324,7 +326,7 @@ export const SalesService = {
                 if (error) throw error;
                 return (data || []).map(dbToSale);
             } catch (error) {
-                console.error('Supabase error, falling back to local storage:', error);
+                logger.error('SalesService', 'Supabase error fetching sales, falling back to local storage', { details: error });
             }
         }
 
@@ -340,13 +342,13 @@ export const SalesService = {
                 const { data, error } = await supabase
                     .from('sales')
                     .select('*')
-                    .ilike('branch_id', branchId.trim())
+                    .eq('branch_id', branchId)
                     .order('sale_date', { ascending: false });
 
                 if (error) throw error;
                 return (data || []).map(dbToSale);
             } catch (error) {
-                logger.error('SalesService', 'Supabase getSalesByBranch error', { error });
+                logger.error('SalesService', 'Supabase error fetching sales by branch, falling back to local storage', { details: error });
             }
         }
 
@@ -370,7 +372,7 @@ export const SalesService = {
                 if (error) {
                     // Handle missing column error (42703: undefined_column)
                     if (error.code === '42703') {
-                        console.warn('Region column missing in DB, falling back to city-only ilike');
+                        logger.warn('SalesService', 'Region column missing in DB, falling back to city-only ilike');
                         const { data: cityData, error: cityErr } = await supabase
                             .from('sales')
                             .select('*')
@@ -384,7 +386,7 @@ export const SalesService = {
                 }
                 return (data || []).map(dbToSale);
             } catch (error) {
-                logger.error('SalesService', 'Supabase getSalesByRegion error', { region, error });
+                logger.error('SalesService', `Supabase error fetching sales for region ${region}`, { details: error });
             }
         }
 
@@ -432,103 +434,120 @@ export const SalesService = {
             onProgress?.(80); // All uploads complete
         }
 
+        if (isSupabaseConfigured()) {
+            try {
+                const status = saleData.paymentReceived ? 'approved' : 'pending';
+                const warrantyGenerated = saleData.paymentReceived;
+
+                const dbData = saleToDb({
+                    ...saleData,
+                    warrantyId,
+                    status,
+                    imageUrls,
+                    warrantyGenerated,
+                });
+
+                const { data, error } = await supabase
+                    .from('sales')
+                    .insert([dbData])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                // Automatically decrement stock after successful warranty creation
+                try {
+                    const { StockService } = require('./StockService');
+                    // Use branchId as region (or extract region from user context if available)
+                    await StockService.decrementStock(
+                        saleData.branchId, // Using branchId as region
+                        saleData.productModel,
+                        1
+                    );
+                    logger.success('SalesService', `Stock decremented for ${saleData.productModel} in ${saleData.branchId}`);
+                } catch (stockError: any) {
+                    // Log but don't fail the warranty creation if stock update fails
+                    logger.warn('SalesService', 'Stock decrement warning', { details: stockError.message });
+                }
+
+                return dbToSale(data);
+            } catch (error) {
+                logger.error('SalesService', 'Supabase error creating sale, falling back to local storage', { details: error });
+            }
+        }
+
+        // Fallback to local storage
+        const sales = await SalesService.getSales();
         const status = saleData.paymentReceived ? 'approved' : 'pending';
         const warrantyGenerated = saleData.paymentReceived;
 
-        const dbData = saleToDb({
-            ...saleData,
-            warrantyId,
-            status,
-            imageUrls,
-            warrantyGenerated,
-        });
-
-        const localId = Math.random().toString(36).substr(2, 9);
-        await OfflineQueueService.enqueue('CREATE', 'sales', dbData, localId, 'high');
-        SyncService.forceSync();
-
-        // Optimistic UI updates
-        const sales = await SalesService.getSales();
-
         const newSale: Sale = {
             ...saleData,
-            id: localId,
+            id: Math.random().toString(36).substr(2, 9),
             warrantyId,
             status,
             imageUrls,
             warrantyGenerated,
         };
 
-        const filteredSales = sales.filter(s => 
-            s.warrantyId !== warrantyId && 
-            s.id !== localId
-        );
-
-        if (filteredSales.length < sales.length) {
-            logger.info('SalesService', 'Local storage deduplicated before saving', {
-                details: `Removed existing duplicate for warranty: ${warrantyId}`,
-                table: 'sales',
-                localId: localId
-            });
-        }
-
-        const updatedSales = [newSale, ...filteredSales];
+        const updatedSales = [newSale, ...sales];
         await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
-
-        logger.info('SalesService', 'Optimistic local update completed', {
-            details: `Record saved to offline storage. WarrantyID: ${warrantyId}`,
-            table: 'sales',
-            localId: localId
-        });
         return newSale;
     },
 
     // Update payment status and generate warranty
     updatePaymentStatus: async (saleId: string, received: boolean): Promise<void> => {
-        try {
-            const updateData = {
-                id: saleId,
-                payment_received: received,
-                status: (received ? 'approved' : 'pending') as Sale['status'],
-                warranty_generated: received
-            };
+        const updateData = {
+            payment_received: received,
+            status: received ? 'approved' : 'pending',
+            warranty_generated: received
+        };
 
-            // Enqueue the update
-            await OfflineQueueService.enqueue('UPDATE', 'sales', updateData, saleId, 'high');
-            SyncService.forceSync();
+        if (isSupabaseConfigured()) {
+            try {
+                const { error } = await supabase
+                    .from('sales')
+                    .update(updateData)
+                    .eq('id', saleId);
 
-            // Fallback to local storage (Optimistic UI)
-            const sales = await SalesService.getSales();
-            const updatedSales = sales.map(s => s.id === saleId ? {
-                ...s,
-                paymentReceived: received,
-                status: received ? 'approved' : 'pending' as any,
-                warrantyGenerated: received
-            } : s);
-            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
-        } catch (error: any) {
-            logger.error('SalesService', 'updatePaymentStatus failed', { saleId, error: error.message || error });
-            throw error;
+                if (error) throw error;
+                return;
+            } catch (error) {
+                logger.error('SalesService', 'Supabase updatePaymentStatus error', { details: error });
+            }
         }
+
+        // Fallback to local storage
+        const sales = await SalesService.getSales();
+        const updatedSales = sales.map(s => s.id === saleId ? {
+            ...s,
+            paymentReceived: received,
+            status: received ? 'approved' : 'pending' as any,
+            warrantyGenerated: received
+        } : s);
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
     },
 
     // Update sale status
     updateSaleStatus: async (saleId: string, status: Sale['status']): Promise<void> => {
-        try {
-            const payload = { id: saleId, status };
+        if (isSupabaseConfigured()) {
+            try {
+                const { error } = await supabase
+                    .from('sales')
+                    .update({ status })
+                    .eq('id', saleId);
 
-            // Enqueue update to Supabase
-            await OfflineQueueService.enqueue('UPDATE', 'sales', payload, saleId, 'medium');
-            SyncService.forceSync();
-
-            // Fallback to local storage (Optimistic UI)
-            const sales = await SalesService.getSales();
-            const updatedSales = sales.map(s => s.id === saleId ? { ...s, status } : s);
-            await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
-        } catch (error: any) {
-            logger.error('SalesService', 'updateSaleStatus failed', { saleId, status, error: error.message || error });
-            throw error;
+                if (error) throw error;
+                return;
+            } catch (error) {
+                logger.error('SalesService', 'Supabase error updating sale status, falling back to local storage', { details: error });
+            }
         }
+
+        // Fallback to local storage
+        const sales = await SalesService.getSales();
+        const updatedSales = sales.map(s => s.id === saleId ? { ...s, status } : s);
+        await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
     },
 
     deleteSale: async (id: string) => {
@@ -548,8 +567,8 @@ export const SalesService = {
             await Storage.setItem(STORAGE_KEY, JSON.stringify(updatedSales));
 
             return true;
-        } catch (error: any) {
-            logger.error('SalesService', 'deleteSale failed', { id, error: error.message || error });
+        } catch (error) {
+            logger.error('SalesService', 'Error deleting sale', { details: error });
             throw error;
         }
     },
@@ -574,7 +593,7 @@ export const SalesService = {
                 }
                 return data && data.length > 0 ? dbToSale(data[0]) : null;
             } catch (error) {
-                logger.error('SalesService', 'getSaleByInvoice Supabase error', { invoiceNo, error });
+                logger.error('SalesService', 'Supabase getSaleByInvoice error', { details: error });
             }
         }
 
@@ -601,7 +620,7 @@ export const SalesService = {
                 if (error) throw error;
                 return (data || []).map(dbToSale);
             } catch (error) {
-                logger.error('SalesService', 'searchSales Supabase error', { queryText, error });
+                logger.error('SalesService', 'Supabase searchSales error', { details: error });
                 return [];
             }
         }
@@ -631,7 +650,7 @@ export const SalesService = {
         }
     ): Promise<{ data: Sale[]; total: number; hasMore: boolean }> => {
         if (!isSupabaseConfigured()) {
-            console.warn('Supabase not configured for pagination');
+            logger.warn('SalesService', 'Supabase not configured for pagination');
             return { data: [], total: 0, hasMore: false };
         }
 
@@ -644,7 +663,7 @@ export const SalesService = {
 
             // Apply filters if provided
             if (filters?.branchId) {
-                query = query.ilike('branch_id', filters.branchId.trim());
+                query = query.eq('branch_id', filters.branchId);
             }
             if (filters?.status) {
                 query = query.eq('status', filters.status);
@@ -670,8 +689,8 @@ export const SalesService = {
                 total,
                 hasMore
             };
-        } catch (error: any) {
-            logger.error('SalesService', 'getSalesPaginated failed', { error: error.message || error });
+        } catch (error) {
+            logger.error('SalesService', 'Error fetching paginated sales', { details: error });
             throw error;
         }
     },
@@ -719,8 +738,8 @@ export const SalesService = {
                 total,
                 hasMore
             };
-        } catch (error: any) {
-            logger.error('SalesService', 'searchSalesPaginated failed', { error: error.message || error });
+        } catch (error) {
+            logger.error('SalesService', 'Error searching paginated sales', { details: error });
             throw error;
         }
     }
