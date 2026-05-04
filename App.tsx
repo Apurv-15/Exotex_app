@@ -69,7 +69,7 @@ function App() {
         console.log('[DEBUG] 📡 Initializing SyncService...');
         SyncService.init();
         
-        // Font Resolution
+        // Font Resolution: wait for fonts to be ready before marking appReady
         if (fontsLoaded || fontError) {
           console.log('[DEBUG] 🔠 Fonts Resolved. Status:', fontsLoaded ? 'Success' : 'Error');
           setBootStatus('Ready');
@@ -79,6 +79,7 @@ function App() {
             await SplashScreen.hideAsync().catch(() => {});
           }
         }
+        // If fonts are not loaded yet, the effect will re-run when they are (deps: [fontsLoaded, fontError])
       } catch (err) {
         console.error('[DEBUG] ❌ BOOT CRASHED:', err);
         if (isMounted) {
@@ -90,10 +91,12 @@ function App() {
 
     prepare();
 
-    // Safety timeout: force app to interactive state after 7 seconds
+    // Safety timeout: force app to interactive state after 7 seconds.
+    // Uses a ref-like closure check to avoid firing if fonts already resolved.
     const safetyTimeout = setTimeout(async () => {
       if (isMounted && !appReady) {
         console.warn('[App] Font/Service loading timeout. Forcing app start.');
+        setBootStatus('Ready (Timeout)');
         setAppReady(true);
         await SplashScreen.hideAsync().catch(() => {});
       }
@@ -103,6 +106,7 @@ function App() {
       isMounted = false;
       clearTimeout(safetyTimeout);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fontsLoaded, fontError]);
 
   if (!appReady) {

@@ -23,12 +23,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [isLoadingStorage, setIsLoadingStorage] = useState<boolean>(true);
 
     useEffect(() => {
+        logger.info('AuthContext', 'Initializing AuthProvider...');
         // This flag prevents the initAuth fallback from running if
         // onAuthStateChange already resolved the session (avoids double network call on cold start)
         let authStateChangeFired = false;
 
         // Listen for auth changes FIRST so we capture the initial session event
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            logger.info('AuthContext', `Auth state change event: ${event}`, { hasSession: !!session });
             authStateChangeFired = true;
             try {
                 if (session?.user) {
@@ -38,17 +40,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setUser(null);
                 }
             } catch (err) {
-                console.error('Auth state change handler error:', err);
+                logger.error('AuthContext', 'Auth state change handler error', { details: err });
                 setUser(null);
             } finally {
                 setIsLoadingStorage(false);
             }
         });
 
-        // Fallback: if the auth state change listener didn't fire within 1.5s
-        // (can happen on slow cold-starts in production), resolve manually.
+        // Fallback: if the auth state change listener didn't fire within 2.5s
+        // (increased from 1.5s to allow for slower networks), resolve manually.
         const fallbackTimer = setTimeout(async () => {
-            if (authStateChangeFired) return; // Already handled
+            if (authStateChangeFired) return; 
+            logger.info('AuthContext', 'Fallback auth check triggered');
             try {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session?.user) {
@@ -56,11 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setUser(profile);
                 }
             } catch (err) {
-                console.log('Fallback auth check failed:', err);
+                logger.warn('AuthContext', 'Fallback auth check failed', { details: err });
             } finally {
                 setIsLoadingStorage(false);
             }
-        }, 1500);
+        }, 2500);
 
         return () => {
             clearTimeout(fallbackTimer);
@@ -82,15 +85,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const login = useCallback(async (email: string, pass: string) => {
+        logger.info('AuthContext', 'Login attempt started', { email });
         setLoading(true);
         try {
             const response = await AuthService.login(email, pass);
+            logger.info('AuthContext', 'AuthService.login succeeded, saving auth...');
             await AuthService.saveAuth(response);
+            logger.info('AuthContext', 'Auth saved successfully, updating user state');
             setUser(response.user);
         } catch (error: any) {
-            console.error('Login error:', error?.message || error);
+            logger.error('AuthContext', 'Login failed', { details: error });
             throw error;
         } finally {
+            logger.info('AuthContext', 'Login flow finished, clearing loading state');
             setLoading(false);
         }
     }, []);

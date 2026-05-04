@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Paths, File } from 'expo-file-system';
 
 // Keys that MUST be stored securely
-const SECURE_KEYS = ['auth_token', 'supabase.auth.token', 'supabase-auth-token'];
+// Keys that MUST be stored securely (and might be sharded if > 2KB)
+const SECURE_KEYS = ['auth_token', 'auth_user', 'supabase.auth.token', 'supabase-auth-token'];
 
 /**
  * Helper to get a File instance for a specific key.
@@ -25,9 +26,8 @@ const getFileHandle = (key: string): File | null => {
 export const Storage = {
     getItem: async (key: string): Promise<string | null> => {
         if (Platform.OS === 'web') {
-            if (SECURE_KEYS.includes(key)) {
-                return sessionStorage.getItem(key);
-            }
+            // On web, we always use localStorage for persistence across refreshes/tabs.
+            // sessionStorage would cause "auto logout" which we want to avoid.
             return localStorage.getItem(key);
         }
 
@@ -42,11 +42,13 @@ export const Storage = {
                         const part = await SecureStore.getItemAsync(`_secure_part_${key}_${i}`);
                         if (part) parts.push(part);
                     }
-                    return parts.join('');
+                    if (parts.length === count) return parts.join('');
                 }
-                return await SecureStore.getItemAsync(key);
+                
+                const secureValue = await SecureStore.getItemAsync(key);
+                if (secureValue) return secureValue;
             } catch (e) {
-                console.warn(`Storage: SecureStore read failed for ${key}`, e);
+                console.warn(`Storage: SecureStore read failed for ${key}, falling back...`, e);
             }
         }
 
@@ -70,11 +72,7 @@ export const Storage = {
 
     setItem: async (key: string, value: string): Promise<void> => {
         if (Platform.OS === 'web') {
-            if (SECURE_KEYS.includes(key)) {
-                sessionStorage.setItem(key, value);
-            } else {
-                localStorage.setItem(key, value);
-            }
+            localStorage.setItem(key, value);
             return;
         }
 
@@ -105,17 +103,14 @@ export const Storage = {
                     await SecureStore.deleteItemAsync(key).catch(() => { });
                 }
 
-                // Clean up fallbacks if they exist
-                const file = getFileHandle(key);
-                if (file && file.exists) file.delete();
-                await AsyncStorage.removeItem(key).catch(() => { });
-                return;
+                // NOTE: We used to return here, but now we fall through to also write 
+                // a backup to FileSystem for maximum reliability.
             } catch (e) {
                 console.error(`Storage: SecureStore write failed for ${key}`, e);
             }
         }
 
-        // 2. For normal keys, use FileSystem (more reliable for > 2KB)
+        // 2. Use FileSystem (always as a backup for secure keys, or primary for normal keys)
         try {
             const file = getFileHandle(key);
             if (file) {
@@ -132,11 +127,7 @@ export const Storage = {
 
     deleteItem: async (key: string): Promise<void> => {
         if (Platform.OS === 'web') {
-            if (SECURE_KEYS.includes(key)) {
-                sessionStorage.removeItem(key);
-            } else {
-                localStorage.removeItem(key);
-            }
+            localStorage.removeItem(key);
             return;
         }
 

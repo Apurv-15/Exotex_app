@@ -15,9 +15,8 @@ const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placehol
 // Validate configuration
 if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
     console.warn('⚠️ Supabase credentials not found or incomplete. Please check your .env file or build secrets.');
-} else if (!SUPABASE_ANON_KEY.startsWith('eyJ')) {
-    console.warn('🚨 Supabase Anon Key does not appear to be a valid JWT. It should start with "eyJ". Current key starts with:', SUPABASE_ANON_KEY.substring(0, 15));
 }
+// Note: Supabase keys may start with "eyJ" (legacy JWT) or "sb_publishable_" (new format). Both are valid.
 console.log('[DEBUG] 📡 Supabase URL in use:', SUPABASE_URL);
 
 // Custom storage adapter for Supabase to work with expo-secure-store/localStorage
@@ -42,6 +41,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,
+        storageKey: 'supabase.auth.token',
     },
 });
 

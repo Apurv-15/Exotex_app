@@ -5,38 +5,69 @@ import { logger } from '../core/logging/Logger';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
+const SUPABASE_TOKEN_KEY = 'supabase.auth.token';
+
+// Helper to wrap promises with a timeout
+const withTimeout = <T>(promise: PromiseLike<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
+    return Promise.race([
+        Promise.resolve(promise),
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+        )
+    ]);
+};
 
 export const AuthService = {
     login: async (email: string, password: string): Promise<AuthResponse> => {
         try {
-            // Updated to use built-in Supabase Auth
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
+            logger.info('AuthService', 'Initiating login...', { email });
+
+            // 1. Authenticate with Supabase Auth (15s timeout)
+            const { data: authData, error: authError } = await withTimeout<any>(
+                supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                }),
+                15000,
+                'Login request timed out. Please check your internet connection.'
+            );
 
             if (authError || !authData.user) {
                 logger.error('AuthService', 'Supabase Auth Login error', { details: authError });
                 
-                // FEATURE 1 & 2: Track failure and capture exception
                 logger.trackEvent('user_login', { success: false, error: authError?.message });
                 logger.captureException(authError || new Error('Auth Login Failed'), { email });
 
-                if (authError?.message?.includes('Aborted')) {
-                    throw new Error('Login request aborted. Please check your internet connection or if the Supabase project is active.');
+                if (authError?.message?.includes('Aborted') || authError?.message?.includes('failed to fetch')) {
+                    throw new Error('Network error. Please check your internet connection and try again.');
                 }
-                throw authError || new Error('No user data returned');
+                throw authError || new Error('Invalid credentials or no user data returned');
             }
 
-            // Fetch user profile from public 'users' table using email for linking
-            const { data: profile } = await supabase
-                .from('users')
-                .select('*')
-                .eq('email', email)
-                .single();
+            // 2. Fetch user profile from public 'users' table (10s timeout)
+            // We make this resilient - if profile fetch fails, we still allow login with metadata
+            let profile = null;
+            try {
+                const { data: profileData, error: profileError } = await withTimeout<any>(
+                    supabase
+                        .from('users')
+                        .select('*')
+                        .eq('email', email)
+                        .single(),
+                    10000,
+                    'Profile fetch timed out'
+                );
 
-            // Construct user object
-            // Use profile data if available, otherwise fall back to metadata or basic info
+                if (profileError) {
+                    logger.warn('AuthService', 'Profile fetch error (non-fatal)', { details: profileError });
+                } else {
+                    profile = profileData;
+                }
+            } catch (pError) {
+                logger.warn('AuthService', 'Profile fetch failed or timed out (non-fatal)', { details: pError });
+            }
+
+            // 3. Construct user object with fallbacks
             const user: User = {
                 id: authData.user.id,
                 name: profile?.name || authData.user.user_metadata?.name || email.split('@')[0],
@@ -45,7 +76,6 @@ export const AuthService = {
                 branchId: profile?.branch_id || authData.user.user_metadata?.branch_id || 'default'
             };
 
-            // FEATURE 2: Track successful login
             logger.trackEvent('user_login', { success: true, role: user.role, branchId: user.branchId });
 
             return {
@@ -59,56 +89,103 @@ export const AuthService = {
     },
 
     logout: async () => {
-        // FEATURE 2: Track logout
         logger.trackEvent('user_logout');
-        
-        await supabase.auth.signOut();
-        await Storage.deleteItem(TOKEN_KEY);
-        await Storage.deleteItem(USER_KEY);
+        try {
+            await supabase.auth.signOut();
+            // Thorough storage purge
+            await Promise.all([
+                Storage.deleteItem(TOKEN_KEY),
+                Storage.deleteItem(USER_KEY),
+                Storage.deleteItem(SUPABASE_TOKEN_KEY),
+                Storage.deleteItem('supabase-auth-token') // Legacy key just in case
+            ]);
+            logger.info('AuthService', 'User logged out and storage cleared');
+        } catch (error) {
+            logger.error('AuthService', 'Logout error', { details: error });
+            // Even if sign out fails, clear local storage
+            await Storage.deleteItem(TOKEN_KEY);
+            await Storage.deleteItem(USER_KEY);
+            await Storage.deleteItem(SUPABASE_TOKEN_KEY);
+        }
     },
 
     getToken: async () => {
-        const { data } = await supabase.auth.getSession();
-        return data.session?.access_token || await Storage.getItem(TOKEN_KEY);
+        try {
+            const { data } = await supabase.auth.getSession();
+            return data.session?.access_token || await Storage.getItem(TOKEN_KEY);
+        } catch (e) {
+            return await Storage.getItem(TOKEN_KEY);
+        }
     },
 
     getUser: async (): Promise<User | null> => {
-        // Try getting from active session first
-        const { data: { session } } = await supabase.auth.getSession();
+        try {
+            // Try getting from active session first
+            const { data: { session } = { session: null } as any, error: sessionError } = await withTimeout<any>(
+                supabase.auth.getSession(),
+                8000,
+                'Session check timed out'
+            );
 
-        if (session?.user) {
-            // Start with basic session info
-            let user: User = {
-                id: session.user.id,
-                name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-                email: session.user.email || '',
-                role: (session.user.user_metadata?.role as any) || 'User',
-                branchId: session.user.user_metadata?.branch_id || 'default',
-                region: session.user.user_metadata?.region || undefined
-            };
-
-            // Try to enrich with profile data if possible
-            const { data: profile } = await supabase
-                .from('users')
-                .select('*')
-                .eq('email', session.user.email)
-                .single();
-
-            if (profile) {
-                user = {
-                    ...user,
-                    name: profile.name,
-                    role: profile.role,
-                    branchId: profile.branch_id,
-                    region: profile.region || undefined
-                };
+            if (sessionError) {
+                logger.warn('AuthService', 'Get session error', { details: sessionError });
             }
-            return user;
-        }
 
-        // Fallback to minimal storage check
-        const userJson = await Storage.getItem(USER_KEY);
-        return userJson ? JSON.parse(userJson) : null;
+            if (session?.user) {
+                // Start with basic session info
+                let user: User = {
+                    id: session.user.id,
+                    name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+                    email: session.user.email || '',
+                    role: (session.user.user_metadata?.role as any) || 'User',
+                    branchId: session.user.user_metadata?.branch_id || 'default',
+                    region: session.user.user_metadata?.region || undefined
+                };
+
+                // Try to enrich with profile data if possible (5s timeout)
+                try {
+                    const { data: profile } = await withTimeout<any>(
+                        supabase
+                            .from('users')
+                            .select('*')
+                            .eq('email', session.user.email)
+                            .single(),
+                        5000,
+                        'Enrichment timed out'
+                    );
+
+                    if (profile) {
+                        user = {
+                            ...user,
+                            name: profile.name,
+                            role: profile.role,
+                            branchId: profile.branch_id,
+                            region: profile.region || undefined
+                        };
+                    }
+                } catch (e) {
+                    logger.warn('AuthService', 'Profile enrichment failed or timed out', { details: e });
+                }
+                return user;
+            }
+
+            // Fallback to minimal storage check
+            const userJson = await Storage.getItem(USER_KEY);
+            if (userJson) {
+                try {
+                    return JSON.parse(userJson);
+                } catch (e) {
+                    logger.error('AuthService', 'Failed to parse user from storage', { details: e });
+                    return null;
+                }
+            }
+            return null;
+        } catch (error) {
+            logger.error('AuthService', 'getUser exception', { details: error });
+            // Final fallback to storage
+            const userJson = await Storage.getItem(USER_KEY);
+            return userJson ? JSON.parse(userJson) : null;
+        }
     },
 
     saveAuth: async (response: AuthResponse) => {

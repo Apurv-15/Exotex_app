@@ -213,6 +213,11 @@ class Logger {
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData?.session?.user?.id;
 
+      // IMPORTANT: Do NOT attempt to insert without an authenticated session.
+      // The system_audit_logs table has RLS policies that require auth.
+      // Inserting without a session causes RLS violations during app boot.
+      if (!userId) return;
+
       // Prepare payload to match system_audit_logs schema
       const payload = {
         level: level.toLowerCase(),
